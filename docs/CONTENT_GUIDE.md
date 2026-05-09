@@ -15,6 +15,7 @@ Example:
 	"id": "temeke",
 	"name_key": "ROUTE_TEMEKE",
 	"difficulty": 1.35,
+	"spawn_interval_mult": 0.98,
 	"sky": Color("#f8c291"),
 	"road": Color("#30336b"),
 	"flavor_key": "ROUTE_TEMEKE_D",
@@ -35,6 +36,7 @@ Example:
 
 `obstacle_weights` and `collectible_weights` do not need to add to 100. They are relative weights.
 For example, if `truck` is twice as high as `car`, trucks are roughly twice as likely as cars.
+Use `spawn_interval_mult` above `1.0` for calmer routes and below `1.0` for busier routes.
 
 Route goals support these `goal_type` values:
 

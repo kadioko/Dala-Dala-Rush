@@ -44,6 +44,7 @@ var passenger_timer: float = 0.0
 var difficulty_mult: float = 1.0
 var current_route: Dictionary = {}
 var current_vehicle: Dictionary = {}
+var spawn_interval_mult: float = 1.0
 var fuel_drain_mult: float = 1.0
 var coin_mult: float = 1.0
 var paused: bool = false
@@ -59,8 +60,8 @@ const SLOW_MAX   := 4.0
 
 # ── Fuel ──────────────────────────────────────────────────────────
 var fuel: float = 1.0
-const FUEL_DRAIN := 0.014
-const FUEL_RESTORE := 0.38
+const FUEL_DRAIN := 0.0115
+const FUEL_RESTORE := 0.42
 const FUEL_LOW_THRESHOLD := 0.28
 
 # ── Combo ─────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ func _ready() -> void:
 
 	current_route = Routes.get_by_id(GameState.selected_route_id)
 	difficulty_mult = float(current_route.difficulty)
+	spawn_interval_mult = float(current_route.get("spawn_interval_mult", 1.0))
 
 	camera = Camera2D.new()
 	add_child(camera)
@@ -575,7 +577,7 @@ func _process(delta: float) -> void:
 
 	spawn_timer -= delta
 	if spawn_timer <= 0.0:
-		var interval: float = max(0.42, 1.5 - elapsed * 0.018) / difficulty_mult
+		var interval: float = max(0.55, 1.75 - elapsed * 0.014) * spawn_interval_mult / difficulty_mult
 		spawn_timer = interval
 		_spawn_wave()
 

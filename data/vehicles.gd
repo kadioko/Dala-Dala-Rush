@@ -17,7 +17,7 @@ const LIST: Array = [
 	{
 		"id": "kariakoo_yellow",
 		"name_key": "VEH_KARIAKOO_YELLOW",
-		"price": 250,
+		"price": 150,
 		"body": Color("#f7c531"),
 		"accent": Color("#0a3d62"),
 		"lane_time": 0.13,
@@ -28,7 +28,7 @@ const LIST: Array = [
 	{
 		"id": "mwendokasi_red",
 		"name_key": "VEH_MWENDOKASI_RED",
-		"price": 500,
+		"price": 325,
 		"body": Color("#e63946"),
 		"accent": Color("#f1faee"),
 		"lane_time": 0.11,
@@ -39,7 +39,7 @@ const LIST: Array = [
 	{
 		"id": "night_bus",
 		"name_key": "VEH_NIGHT_BUS",
-		"price": 750,
+		"price": 500,
 		"body": Color("#2d3142"),
 		"accent": Color("#7c3aed"),
 		"lane_time": 0.15,
@@ -50,7 +50,7 @@ const LIST: Array = [
 	{
 		"id": "vip",
 		"name_key": "VEH_VIP",
-		"price": 1500,
+		"price": 900,
 		"body": Color("#0a0a0a"),
 		"accent": Color("#d4af37"),
 		"lane_time": 0.12,
@@ -61,7 +61,7 @@ const LIST: Array = [
 	{
 		"id": "old_school",
 		"name_key": "VEH_OLD_SCHOOL",
-		"price": 1000,
+		"price": 700,
 		"body": Color("#7d8a4a"),
 		"accent": Color("#c0392b"),
 		"lane_time": 0.17,

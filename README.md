@@ -17,6 +17,7 @@ This repo is now a playable offline MVP with:
 - Offline daily challenges that rotate by local date and reward bonus coins once per day.
 
 Extra docs live in `docs/`:
+- `docs/ROADMAP.md` - professional roadmap and remaining production work.
 - `docs/UPGRADES.md` - current improvements, next upgrade plan, and balancing notes.
 - `docs/CONTENT_GUIDE.md` - how to add routes, obstacles, collectibles, vehicles, and localization keys.
 - `docs/ANDROID_EXPORT.md` - Android export checklist and low-end phone optimization notes.
@@ -120,6 +121,7 @@ Optional vibration can be enabled or disabled in **Settings → Vibration**. It 
 - Speed ramps up by **15 % every 20 seconds** during a run.
 - After 60 s two or more lanes can be blocked simultaneously.
 - Every route has its own `obstacle_weights` and `collectible_weights` in `data/routes.gd`.
+- Every route has a `spawn_interval_mult` for calmer or busier traffic pacing.
 - Every route has a `goal_type`, `goal_target`, and `goal_reward`.
 
 ### Scoring
@@ -194,6 +196,10 @@ Open `data/vehicles.gd` and append to `LIST`:
     "price": 2000,
     "body": Color("#00b894"),
     "accent": Color("#fdcb6e"),
+    "lane_time": 0.13,
+    "fuel_drain_mult": 0.95,
+    "coin_mult": 1.08,
+    "horn_charges": 3,
 },
 ```
 All drawing is automatic — no sprite files needed.

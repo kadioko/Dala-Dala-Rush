@@ -67,7 +67,7 @@ static func is_met(challenge: Dictionary, stats: Dictionary) -> bool:
 static func progress(challenge: Dictionary, stats: Dictionary) -> String:
 	var challenge_type := String(challenge.get("type", "score"))
 	var target := float(challenge.get("target", 0))
-	var current_value := min(_value(challenge_type, stats), target)
+	var current_value: float = minf(_value(challenge_type, stats), target)
 	if challenge_type == "distance":
 		return "%dm/%dm" % [int(current_value), int(target)]
 	return "%d/%d" % [int(current_value), int(target)]

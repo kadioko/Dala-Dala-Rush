@@ -8,6 +8,7 @@ const LIST: Array = [
 		"id": "kariakoo",
 		"name_key": "ROUTE_KARIAKOO",
 		"difficulty": 1.0,
+		"spawn_interval_mult": 1.18,
 		"flavor_key": "ROUTE_KARIAKOO_D",
 		"goal_key": "GOAL_KARIAKOO",
 		"goal_type": "passengers",
@@ -27,7 +28,8 @@ const LIST: Array = [
 	{
 		"id": "mwenge",
 		"name_key": "ROUTE_MWENGE",
-		"difficulty": 1.15,
+		"difficulty": 1.1,
+		"spawn_interval_mult": 1.1,
 		"flavor_key": "ROUTE_MWENGE_D",
 		"goal_key": "GOAL_MWENGE",
 		"goal_type": "near_misses",
@@ -47,7 +49,8 @@ const LIST: Array = [
 	{
 		"id": "mbezi",
 		"name_key": "ROUTE_MBEZI",
-		"difficulty": 1.3,
+		"difficulty": 1.22,
+		"spawn_interval_mult": 1.02,
 		"flavor_key": "ROUTE_MBEZI_D",
 		"goal_key": "GOAL_MBEZI",
 		"goal_type": "distance",
@@ -67,7 +70,8 @@ const LIST: Array = [
 	{
 		"id": "posta",
 		"name_key": "ROUTE_POSTA",
-		"difficulty": 1.45,
+		"difficulty": 1.34,
+		"spawn_interval_mult": 0.96,
 		"flavor_key": "ROUTE_POSTA_D",
 		"goal_key": "GOAL_POSTA",
 		"goal_type": "score",
@@ -87,7 +91,8 @@ const LIST: Array = [
 	{
 		"id": "kigamboni",
 		"name_key": "ROUTE_KIGAMBONI",
-		"difficulty": 1.6,
+		"difficulty": 1.46,
+		"spawn_interval_mult": 0.92,
 		"flavor_key": "ROUTE_KIGAMBONI_D",
 		"goal_key": "GOAL_KIGAMBONI",
 		"goal_type": "coins",
@@ -107,7 +112,8 @@ const LIST: Array = [
 	{
 		"id": "ubungo",
 		"name_key": "ROUTE_UBUNGO",
-		"difficulty": 1.8,
+		"difficulty": 1.58,
+		"spawn_interval_mult": 0.88,
 		"flavor_key": "ROUTE_UBUNGO_D",
 		"goal_key": "GOAL_UBUNGO",
 		"goal_type": "score",
@@ -155,7 +161,7 @@ static func is_goal_met(route: Dictionary, stats: Dictionary) -> bool:
 static func goal_progress(route: Dictionary, stats: Dictionary) -> String:
 	var goal_type := String(route.get("goal_type", "score"))
 	var target := float(route.get("goal_target", 0.0))
-	var current := min(_goal_value(goal_type, stats), target)
+	var current: float = minf(_goal_value(goal_type, stats), target)
 	if goal_type == "distance":
 		return "%dm/%dm" % [int(current), int(target)]
 	return "%d/%d" % [int(current), int(target)]
