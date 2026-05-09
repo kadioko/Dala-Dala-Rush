@@ -13,6 +13,7 @@ var _coins_lbl: Label
 var _pass_lbl: Label
 var _best_lbl: Label
 var _goal_lbl: Label
+var _daily_lbl: Label
 var _tagline_lbl: Label
 var _play_btn: Button
 var _menu_btn: Button
@@ -96,6 +97,7 @@ func _ready() -> void:
 	_coins_lbl = _stat_label(stats, UIFactory.COL_ACCENT)
 	_pass_lbl  = _stat_label(stats)
 	_goal_lbl  = _stat_label(stats, UIFactory.COL_PRIMARY, 18)
+	_daily_lbl = _stat_label(stats, UIFactory.COL_ACCENT, 18)
 	_best_lbl  = _stat_label(stats, UIFactory.COL_MUTED, 16)
 
 	# ── Leaderboard name entry (when score qualifies) ──
@@ -204,6 +206,7 @@ func _update_stats_labels() -> void:
 	_pass_lbl.text  = "%s: %d"    % [LocaleManager.t("PASSENGERS"), int(_anim_pass)]
 	var goal_status := LocaleManager.t("GOAL_COMPLETE") if GameState.last_route_goal_met else LocaleManager.t("GOAL_FAILED")
 	_goal_lbl.text  = "%s: %s  %s" % [LocaleManager.t("ROUTE_GOAL"), goal_status, GameState.last_route_goal_progress]
+	_daily_lbl.text = _daily_result_text()
 	_best_lbl.text  = "%s: %d"    % [LocaleManager.t("BEST"),       int(SaveSystem.get_value("best_score", 0))]
 
 func _refresh(_l := "") -> void:
@@ -228,6 +231,21 @@ func _calc_stars() -> int:
 	if sc >= 2000: return 3
 	if sc >= 500:  return 2
 	return 1
+
+func _daily_result_text() -> String:
+	if GameState.last_daily_challenge_rewarded:
+		return "%s: %s (+%d)" % [
+			LocaleManager.t("DAILY_CHALLENGE"),
+			LocaleManager.t("GOAL_COMPLETE"),
+			GameState.last_daily_bonus_coins,
+		]
+	if GameState.last_daily_challenge_met:
+		return "%s: %s" % [LocaleManager.t("DAILY_CHALLENGE"), LocaleManager.t("DAILY_COMPLETE")]
+	return "%s: %s  %s" % [
+		LocaleManager.t("DAILY_CHALLENGE"),
+		LocaleManager.t("GOAL_FAILED"),
+		GameState.last_daily_challenge_progress,
+	]
 
 func _pulse_label(lbl: Label) -> void:
 	if not is_instance_valid(lbl):

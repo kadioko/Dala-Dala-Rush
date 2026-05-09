@@ -5,11 +5,13 @@ const UIFactory  := preload("res://ui/ui_factory.gd")
 const RoadCls    := preload("res://scripts/entities/road.gd")
 const Vehicles   := preload("res://data/vehicles.gd")
 const Routes     := preload("res://data/routes.gd")
+const DailyChallengesData := preload("res://data/daily_challenges.gd")
 
 var _title: Label
 var _subtitle: Label
 var _high_score_label: Label
 var _coin_label: Label
+var _daily_label: Label
 var _btn_play: Button
 var _btn_routes: Button
 var _btn_garage: Button
@@ -78,6 +80,10 @@ func _ready() -> void:
 	stats_row.add_child(_high_score_label)
 	_coin_label = UIFactory.make_label("", 18, UIFactory.COL_ACCENT)
 	stats_row.add_child(_coin_label)
+
+	_daily_label = UIFactory.make_label("", 15, UIFactory.COL_ACCENT)
+	_daily_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_daily_label)
 
 	v.add_child(_spacer(4))
 
@@ -163,6 +169,7 @@ func _refresh_text(_l := "") -> void:
 	_high_score_label.text = "★ %d" % int(SaveSystem.get_value("best_score", 0))
 	_coin_label.text       = "🪙 %d" % int(SaveSystem.get_value("total_coins", 0))
 	_btn_play.text         = LocaleManager.t("PLAY")
+	_daily_label.text      = _daily_text()
 	_btn_stats.text        = LocaleManager.t("STATS")
 	_btn_leaderboard.text  = LocaleManager.t("LEADERBOARD")
 	_btn_routes.text       = LocaleManager.t("ROUTES")
@@ -178,6 +185,17 @@ func _on_play() -> void:
 func _go(path: String) -> void:
 	AudioManager.play_sfx("click")
 	TransitionManager.go_to(path)
+
+func _daily_text() -> String:
+	var daily := DailyChallengesData.current()
+	var goal := LocaleManager.t(daily.get("key", "")).replace("{n}", str(int(daily.get("target", 0))))
+	if DailyChallengesData.is_completed_today():
+		return "%s: %s" % [LocaleManager.t("DAILY_CHALLENGE"), LocaleManager.t("DAILY_COMPLETE")]
+	return "%s: %s (+%d)" % [
+		LocaleManager.t("DAILY_CHALLENGE"),
+		goal,
+		int(daily.get("reward", 0)),
+	]
 
 # ══════════════════════ Inner draw nodes ══════════════════════════
 

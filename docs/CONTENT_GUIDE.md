@@ -46,6 +46,23 @@ Route goals support these `goal_type` values:
 
 Add the matching `goal_key` text in both Swahili and English locale dictionaries.
 
+## Add a Daily Challenge
+
+Open `data/daily_challenges.gd` and append to `LIST`:
+
+```gdscript
+{
+	"id": "daily_fuel_run",
+	"key": "DAILY_FUEL_RUN",
+	"type": "distance",
+	"target": 2500,
+	"reward": 90,
+}
+```
+
+Supported `type` values are the same as route goals: `score`, `coins`, `distance`, `near_misses`, and `passengers`.
+Add the `key` text in both locale dictionaries.
+
 ## Add a Vehicle
 
 1. Add a vehicle entry in `data/vehicles.gd`.

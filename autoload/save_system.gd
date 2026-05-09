@@ -31,6 +31,8 @@ const DEFAULTS := {
 	# Achievements (array of unlocked id strings)
 	"achievements": [],
 	"route_goals_completed": 0,
+	"daily_challenge_claimed_date": "",
+	"daily_challenges_completed": 0,
 	# Top-5 leaderboard: Array of {name, score, route}
 	"leaderboard": [],
 }

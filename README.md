@@ -14,6 +14,7 @@ This repo is now a playable offline MVP with:
 - Route-specific traffic profiles, so Kariakoo, Posta, Kigamboni, and Ubungo do not spawn the same mix of hazards.
 - Route-specific run goals with bonus coin rewards.
 - Vehicle skins with light gameplay perks: handling, fuel efficiency, coin gain, and horn charges.
+- Offline daily challenges that rotate by local date and reward bonus coins once per day.
 
 Extra docs live in `docs/`:
 - `docs/UPGRADES.md` - current improvements, next upgrade plan, and balancing notes.
@@ -145,6 +146,11 @@ Optional vibration can be enabled or disabled in **Settings → Vibration**. It 
 - `fuel_drain_mult`: modifies fuel drain.
 - `coin_mult`: modifies coin pickup value.
 - `horn_charges`: controls starting and maximum horn charges.
+
+### Daily Challenge
+- `data/daily_challenges.gd` picks one challenge from the local date.
+- Challenges work offline and do not need an account.
+- Rewards can be claimed once per calendar day.
 
 ### Object Pooling
 Obstacles and collectibles are pooled (24 obstacles, 16 collectibles).  

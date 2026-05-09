@@ -2,6 +2,7 @@ extends Node
 ## Tracks selections that survive between scenes and the most recent run.
 
 const Routes := preload("res://data/routes.gd")
+const DailyChallengesData := preload("res://data/daily_challenges.gd")
 
 var selected_vehicle_id: String = "classic_blue"
 var selected_route_id: String = "kariakoo"
@@ -18,6 +19,11 @@ var last_is_route_record: bool = false
 var last_route_goal_met: bool = false
 var last_route_goal_key: String = ""
 var last_route_goal_progress: String = ""
+var last_daily_challenge_met: bool = false
+var last_daily_challenge_rewarded: bool = false
+var last_daily_challenge_key: String = ""
+var last_daily_challenge_progress: String = ""
+var last_daily_bonus_coins: int = 0
 
 func _ready() -> void:
 	selected_vehicle_id = SaveSystem.get_value("selected_vehicle", "classic_blue")
@@ -35,6 +41,9 @@ func record_run(score: int, coins: int, passengers: int, distance: float, near_m
 	last_score      = score
 	last_coins      = coins
 	last_bonus_coins = 0
+	last_daily_bonus_coins = 0
+	last_daily_challenge_met = false
+	last_daily_challenge_rewarded = false
 	last_passengers = passengers
 	last_distance   = distance
 	last_near_misses = near_misses
@@ -56,5 +65,15 @@ func record_run(score: int, coins: int, passengers: int, distance: float, near_m
 		last_bonus_coins = int(route.get("goal_reward", 0))
 		SaveSystem.add_route_goal_completion(selected_route_id)
 
-	SaveSystem.add_coins(coins + last_bonus_coins)
-	SaveSystem.add_run_stats(distance, coins + last_bonus_coins, passengers)
+	var daily := DailyChallengesData.current()
+	last_daily_challenge_key = String(daily.get("key", ""))
+	last_daily_challenge_progress = DailyChallengesData.progress(daily, stats)
+	last_daily_challenge_met = DailyChallengesData.is_met(daily, stats)
+	if last_daily_challenge_met and not DailyChallengesData.is_completed_today():
+		last_daily_bonus_coins = int(daily.get("reward", 0))
+		last_daily_challenge_rewarded = true
+		DailyChallengesData.mark_completed_today()
+
+	var earned_coins := coins + last_bonus_coins + last_daily_bonus_coins
+	SaveSystem.add_coins(earned_coins)
+	SaveSystem.add_run_stats(distance, earned_coins, passengers)

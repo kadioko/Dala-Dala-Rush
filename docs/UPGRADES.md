@@ -13,6 +13,7 @@
 - Route selection now shows route flavor, difficulty marks, and per-route best score.
 - Routes now include one run goal each. Completing it awards bonus coins at Game Over.
 - Vehicle skins now have light gameplay perks for handling, fuel efficiency, coin gain, and horn charges.
+- Added offline daily challenges that rotate by local date and reward coins once per day.
 
 ## Recommended Next Upgrades
 
@@ -40,6 +41,7 @@
 - Route pickups come from `collectible_weights` in `data/routes.gd`.
 - Route goals use `goal_type`, `goal_target`, and `goal_reward` in `data/routes.gd`.
 - Vehicle perks use `lane_time`, `fuel_drain_mult`, `coin_mult`, and `horn_charges` in `data/vehicles.gd`.
+- Daily challenges live in `data/daily_challenges.gd` and reuse score/coins/distance/near-miss/passenger stats.
 - Fuel drain is intentionally slow for MVP. Tune `FUEL_DRAIN` only after testing on real phones.
 - Magnet lasts 6 seconds and slow motion lasts 4 seconds.
 
