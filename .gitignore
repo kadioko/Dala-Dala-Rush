@@ -1,0 +1,19 @@
+# Godot editor/import cache
+.godot/
+
+# Godot export/build output
+export.cfg
+export_presets.cfg
+*.apk
+*.aab
+*.pck
+*.zip
+bin/
+build/
+exports/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
