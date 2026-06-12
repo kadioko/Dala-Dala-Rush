@@ -6,12 +6,17 @@ const RoadCls    := preload("res://scripts/entities/road.gd")
 const Vehicles   := preload("res://data/vehicles.gd")
 const Routes     := preload("res://data/routes.gd")
 const DailyChallengesData := preload("res://data/daily_challenges.gd")
+const LoginStreakData := preload("res://data/login_streak.gd")
 
 var _title: Label
 var _subtitle: Label
 var _high_score_label: Label
 var _coin_label: Label
 var _daily_label: Label
+var _streak_label: Label
+var _streak_result: Dictionary = {}
+var _rank_label: Label
+var _rank_up: Dictionary = {}
 var _btn_play: Button
 var _btn_routes: Button
 var _btn_garage: Button
@@ -20,6 +25,7 @@ var _btn_settings: Button
 var _btn_how: Button
 var _btn_stats: Button
 var _btn_leaderboard: Button
+var _btn_missions: Button
 
 # Animated background
 var _scroll_t: float = 0.0
@@ -51,25 +57,41 @@ func _ready() -> void:
 
 	# ── UI layer ─────────────────────────────────────────────────
 	var v := VBoxContainer.new()
-	v.anchor_left = 0.5
+	v.anchor_left = 0.0
 	v.anchor_top = 0.0
-	v.anchor_right = 0.5
+	v.anchor_right = 1.0
 	v.anchor_bottom = 1.0
-	v.offset_left = -168
-	v.offset_right = 168
-	v.offset_top = 40
-	v.offset_bottom = -110
+	v.offset_left = 24
+	v.offset_right = -24
+	v.offset_top = 28 + UIFactory.safe_top_inset(vsize.y)
+	v.offset_bottom = -28
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 8)
+	v.add_theme_constant_override("separation", 7)
 	add_child(v)
 
-	_title = UIFactory.make_title("", 42)
+	_title = UIFactory.make_title("", 34)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_title)
 
 	_subtitle = UIFactory.make_label("", 16, UIFactory.COL_MUTED)
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_subtitle)
+
+	# Career rank badge (+ rank-up reward check)
+	_rank_label = UIFactory.make_label("", 16, Color("#d4af37"))
+	_rank_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rank_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(_rank_label)
+	_rank_up = Career.check_rank_up()
+	if not _rank_up.is_empty():
+		AudioManager.play_sfx("powerup")
+		var tw := _rank_label.create_tween()
+		tw.set_loops(5)
+		tw.tween_property(_rank_label, "modulate:a", 0.4, 0.25)
+		tw.tween_property(_rank_label, "modulate:a", 1.0, 0.25)
 
 	var stats_row := HBoxContainer.new()
 	stats_row.add_theme_constant_override("separation", 20)
@@ -83,12 +105,30 @@ func _ready() -> void:
 
 	_daily_label = UIFactory.make_label("", 15, UIFactory.COL_ACCENT)
 	_daily_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_daily_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_daily_label)
+
+	# Daily login streak (claims reward on first open of the day).
+	# Tapping the row opens the 7-day reward calendar.
+	_streak_result = LoginStreakData.claim_today()
+	_streak_label = UIFactory.make_label("", 15, Color("#fd79a8"))
+	_streak_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_streak_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_streak_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	_streak_label.gui_input.connect(func(ev: InputEvent):
+		if (ev is InputEventMouseButton and ev.pressed) \
+		or (ev is InputEventScreenTouch and ev.pressed):
+			_show_streak_calendar()
+	)
+	v.add_child(_streak_label)
+	if _streak_result.get("claimed_now", false):
+		_pulse_streak_label()
 
 	v.add_child(_spacer(4))
 
 	_btn_play = UIFactory.make_button("")
-	_btn_play.custom_minimum_size = Vector2(320, 68)
+	_btn_play.custom_minimum_size = Vector2(0, 64)
+	_btn_play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_play.pressed.connect(_on_play)
 	v.add_child(_btn_play)
 
@@ -100,13 +140,24 @@ func _ready() -> void:
 
 	_btn_stats = UIFactory.make_button("", false)
 	_btn_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_stats.custom_minimum_size = Vector2(0, 56)
+	_btn_stats.add_theme_font_size_override("font_size", 18)
 	_btn_stats.pressed.connect(func(): _go("res://scenes/stats.tscn"))
 	info_row.add_child(_btn_stats)
 
 	_btn_leaderboard = UIFactory.make_button("", false)
 	_btn_leaderboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_leaderboard.custom_minimum_size = Vector2(0, 56)
+	_btn_leaderboard.add_theme_font_size_override("font_size", 18)
 	_btn_leaderboard.pressed.connect(func(): _go("res://scenes/leaderboard.tscn"))
 	info_row.add_child(_btn_leaderboard)
+
+	_btn_missions = UIFactory.make_button("", false)
+	_btn_missions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_missions.custom_minimum_size = Vector2(0, 56)
+	_btn_missions.add_theme_font_size_override("font_size", 18)
+	_btn_missions.pressed.connect(func(): _go("res://scenes/missions.tscn"))
+	info_row.add_child(_btn_missions)
 
 	for pair in [
 		["", "res://scenes/routes.tscn"],
@@ -117,6 +168,9 @@ func _ready() -> void:
 	]:
 		var path: String = pair[1]
 		var btn := UIFactory.make_button("", false)
+		btn.custom_minimum_size = Vector2(0, 58)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.add_theme_font_size_override("font_size", 20)
 		btn.pressed.connect(func(): _go(path))
 		v.add_child(btn)
 		match path:
@@ -152,11 +206,12 @@ func _process(delta: float) -> void:
 func _pulse_play_btn() -> void:
 	if not is_instance_valid(_btn_play):
 		return
+	await get_tree().process_frame
 	var tw := _btn_play.create_tween()
 	tw.set_loops()
 	tw.tween_property(_btn_play, "scale", Vector2(1.04, 1.04), 0.55).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(_btn_play, "scale", Vector2(1.0, 1.0), 0.55).set_trans(Tween.TRANS_SINE)
-	_btn_play.pivot_offset = _btn_play.custom_minimum_size * 0.5
+	_btn_play.pivot_offset = _btn_play.size * 0.5
 
 func _spacer(h: int) -> Control:
 	var c := Control.new()
@@ -170,8 +225,14 @@ func _refresh_text(_l := "") -> void:
 	_coin_label.text       = "🪙 %d" % int(SaveSystem.get_value("total_coins", 0))
 	_btn_play.text         = LocaleManager.t("PLAY")
 	_daily_label.text      = _daily_text()
+	_streak_label.text     = _streak_text()
+	var rank_txt := "🧢 %s" % LocaleManager.t(Career.rank_key())
+	if not _rank_up.is_empty():
+		rank_txt += "  ⬆ +%d 🪙" % int(_rank_up.reward)
+	_rank_label.text = rank_txt
 	_btn_stats.text        = LocaleManager.t("STATS")
 	_btn_leaderboard.text  = LocaleManager.t("LEADERBOARD")
+	_btn_missions.text     = LocaleManager.t("MISSIONS")
 	_btn_routes.text       = LocaleManager.t("ROUTES")
 	_btn_garage.text       = LocaleManager.t("GARAGE")
 	_btn_shop.text         = LocaleManager.t("SHOP")
@@ -196,6 +257,105 @@ func _daily_text() -> String:
 		goal,
 		int(daily.get("reward", 0)),
 	]
+
+func _streak_text() -> String:
+	var streak := int(SaveSystem.get_value("streak_count", 0))
+	if streak <= 0:
+		return ""
+	var txt := LocaleManager.t("STREAK_LABEL").replace("{n}", str(streak))
+	if _streak_result.get("claimed_now", false):
+		txt += "  +%d 🪙" % int(_streak_result.get("reward", 0))
+	return "🔥 " + txt
+
+## 7-day streak reward calendar popup.
+func _show_streak_calendar() -> void:
+	AudioManager.play_sfx("click")
+	var streak := int(SaveSystem.get_value("streak_count", 0))
+	var day_in_week: int = ((streak - 1) % 7) + 1 if streak > 0 else 0
+
+	var overlay := Control.new()
+	overlay.anchor_right = 1.0
+	overlay.anchor_bottom = 1.0
+	add_child(overlay)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.7)
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	overlay.add_child(dim)
+
+	var panel := UIFactory.make_panel()
+	panel.anchor_left = 0.5; panel.anchor_right = 0.5
+	panel.anchor_top = 0.5;  panel.anchor_bottom = 0.5
+	panel.offset_left = -220; panel.offset_right = 220
+	panel.offset_top = -200;  panel.offset_bottom = 200
+	overlay.add_child(panel)
+
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 12)
+	panel.add_child(vb)
+
+	vb.add_child(UIFactory.make_title(LocaleManager.t("STREAK_TITLE"), 26))
+	var sub := UIFactory.make_label(
+		"🔥 " + LocaleManager.t("STREAK_LABEL").replace("{n}", str(streak)), 17, Color("#fd79a8"))
+	vb.add_child(sub)
+
+	var grid := HBoxContainer.new()
+	grid.add_theme_constant_override("separation", 6)
+	grid.alignment = BoxContainer.ALIGNMENT_CENTER
+	vb.add_child(grid)
+
+	for i in range(1, 8):
+		var cell := PanelContainer.new()
+		var sb := StyleBoxFlat.new()
+		var is_today: bool = i == day_in_week
+		var is_done: bool = i < day_in_week
+		sb.bg_color = Color("#fd79a8") if is_today \
+			else (Color("#444c66") if is_done else Color("#2d3436"))
+		sb.corner_radius_top_left = 8; sb.corner_radius_top_right = 8
+		sb.corner_radius_bottom_left = 8; sb.corner_radius_bottom_right = 8
+		sb.content_margin_left = 6; sb.content_margin_right = 6
+		sb.content_margin_top = 8; sb.content_margin_bottom = 8
+		cell.add_theme_stylebox_override("panel", sb)
+		var cvb := VBoxContainer.new()
+		cvb.add_theme_constant_override("separation", 2)
+		cell.add_child(cvb)
+		var d := UIFactory.make_label(str(i), 14,
+			Color.WHITE if is_today else UIFactory.COL_MUTED)
+		cvb.add_child(d)
+		var rw := UIFactory.make_label("%d🪙" % LoginStreakData.reward_for(i), 12,
+			UIFactory.COL_ACCENT)
+		cvb.add_child(rw)
+		grid.add_child(cell)
+
+	var hint := UIFactory.make_label(LocaleManager.t("STREAK_HINT"), 14, UIFactory.COL_MUTED)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(hint)
+
+	var close := UIFactory.make_button(LocaleManager.t("BACK"), false)
+	close.pressed.connect(func():
+		AudioManager.play_sfx("click")
+		overlay.queue_free()
+	)
+	vb.add_child(close)
+
+	# Entrance pop
+	panel.pivot_offset = Vector2(220, 200)
+	panel.scale = Vector2(0.8, 0.8)
+	panel.modulate.a = 0.0
+	var tw := panel.create_tween()
+	tw.tween_property(panel, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(panel, "modulate:a", 1.0, 0.18)
+
+func _pulse_streak_label() -> void:
+	await get_tree().process_frame
+	if not is_instance_valid(_streak_label):
+		return
+	_streak_label.pivot_offset = _streak_label.size * 0.5
+	var tw := _streak_label.create_tween()
+	tw.set_loops(4)
+	tw.tween_property(_streak_label, "scale", Vector2(1.1, 1.1), 0.25)
+	tw.tween_property(_streak_label, "scale", Vector2.ONE, 0.25)
 
 # ══════════════════════ Inner draw nodes ══════════════════════════
 

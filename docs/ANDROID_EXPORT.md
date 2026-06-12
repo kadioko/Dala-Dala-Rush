@@ -41,11 +41,31 @@ godot --export-release "Android" bin/DalaDalaRushTZ.apk
 - Test with Swahili and English text.
 - Check 540x960 and 720x1280 portrait layouts.
 
-## Ad SDK Note
+## On-Device Test Checklist
 
-`autoload/ad_service.gd` is intentionally a no-network placeholder. When adding a real rewarded-ad SDK:
+Run through this on a real phone before each release:
 
-1. Keep all SDK-specific code inside `AdService`.
-2. Make `show_rewarded_continue()` return true only after the reward callback fires.
-3. Make `show_rewarded_double_coins()` return true only after the reward callback fires.
-4. Do not block the main thread while waiting for ads.
+- [ ] Swipe left/right feels responsive at high speed (adjust `swipe_threshold` in game.gd if not).
+- [ ] On-screen ◀ / 📯 / ▶ buttons are reachable with a thumb.
+- [ ] Hardware back button: pauses during a run, returns to menu from sub-screens, quits from main menu (handled in `transition_manager.gd`).
+- [ ] HUD clears the notch/camera cutout (`UIFactory.safe_top_inset` — verify on a notched phone).
+- [ ] Haptics fire on tap/crash/powerup (FeedbackManager).
+- [ ] Audio works after minimizing and restoring the app.
+- [ ] Save survives force-killing the app (save.json + save.json.bak rotation).
+- [ ] Daily streak grants once per calendar day (change device date to test).
+- [ ] Continue-after-crash restores score/coins and grants brief invulnerability.
+- [ ] Performance: steady frame rate after 3+ minutes of play (pools, no leaks).
+- [ ] Battery/thermals acceptable after a 10-minute session.
+
+## Ads
+
+See `docs/ADMOB_SETUP.md`. `autoload/ad_service.gd` is the single integration point — keep all SDK code inside it. In debug builds the service simulates successful ads so the continue/double-coins flows can be tested without a device or SDK.
+
+## Online Leaderboard (later)
+
+The local top-5 leaderboard lives in `save_system.gd`. To go online, the recommended path is **Google Play Games Services v2** via a Godot plugin:
+
+1. Create the game in Google Play Console > Play Games Services.
+2. Add a leaderboard, note its ID.
+3. Install a GPGS plugin for Godot 4 and submit scores where `SaveSystem.add_to_leaderboard()` is called (game_over.gd `_on_submit_score`).
+4. Keep the local leaderboard as offline fallback.

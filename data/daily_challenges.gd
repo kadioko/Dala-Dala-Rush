@@ -46,10 +46,10 @@ static func today_key() -> String:
 static func current() -> Dictionary:
 	var date := today_key()
 	var parts := date.split("-")
-	var seed := 0
+	var day_seed := 0
 	for part in parts:
-		seed += int(part)
-	return LIST[seed % LIST.size()]
+		day_seed += int(part)
+	return LIST[day_seed % LIST.size()]
 
 static func is_completed_today() -> bool:
 	return SaveSystem.get_value("daily_challenge_claimed_date", "") == today_key()

@@ -4,6 +4,7 @@ extends Control
 
 const UIFactory := preload("res://ui/ui_factory.gd")
 const Vehicles := preload("res://data/vehicles.gd")
+const ConsumablesData := preload("res://data/consumables.gd")
 
 var _title: Label
 var _back_btn: Button
@@ -11,6 +12,11 @@ var _list_box: VBoxContainer
 var _coin_label: Label
 var _msg: Label
 var _entries: Array = []
+var _item_entries: Array = []
+var _upgrade_entries: Array = []
+var _items_hdr: Label
+var _veh_hdr: Label
+var _upg_hdr: Label
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -54,6 +60,38 @@ func _build_rows() -> void:
 	for c in _list_box.get_children():
 		c.queue_free()
 	_entries.clear()
+	_item_entries.clear()
+	_upgrade_entries.clear()
+
+	# ── Permanent bus upgrades ────────────────────────────────────
+	_upg_hdr = UIFactory.make_label("", 18, UIFactory.COL_PRIMARY)
+	_list_box.add_child(_upg_hdr)
+	for u in Career.UPGRADES:
+		var ubtn := UIFactory.make_button("", false)
+		ubtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ubtn.custom_minimum_size = Vector2(0, 80)
+		ubtn.add_theme_font_size_override("font_size", 15)
+		var uid: String = u.id
+		ubtn.pressed.connect(func(): _try_buy_upgrade(uid))
+		_list_box.add_child(ubtn)
+		_upgrade_entries.append({"btn": ubtn, "upg": u})
+
+	# ── Consumable items section ──────────────────────────────────
+	_items_hdr = UIFactory.make_label("", 18, UIFactory.COL_PRIMARY)
+	_list_box.add_child(_items_hdr)
+	for item in ConsumablesData.LIST:
+		var ibtn := UIFactory.make_button("", false)
+		ibtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ibtn.custom_minimum_size = Vector2(0, 80)
+		ibtn.add_theme_font_size_override("font_size", 15)
+		var iid: String = item.id
+		ibtn.pressed.connect(func(): _try_buy_item(iid))
+		_list_box.add_child(ibtn)
+		_item_entries.append({"btn": ibtn, "item": item})
+
+	# ── Vehicles section ─────────────────────────────────────────
+	_veh_hdr = UIFactory.make_label("", 18, UIFactory.COL_PRIMARY)
+	_list_box.add_child(_veh_hdr)
 	for v in Vehicles.LIST:
 		if SaveSystem.is_vehicle_unlocked(v.id):
 			continue
@@ -70,9 +108,63 @@ func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SHOP")
 	_back_btn.text = LocaleManager.t("BACK")
 	_coin_label.text = "%s: %d" % [LocaleManager.t("COINS"), int(SaveSystem.get_value("total_coins", 0))]
+	if _items_hdr:
+		_items_hdr.text = LocaleManager.t("SHOP_ITEMS")
+	if _veh_hdr:
+		_veh_hdr.text = LocaleManager.t("SHOP_VEHICLES")
+	if _upg_hdr:
+		_upg_hdr.text = LocaleManager.t("SHOP_UPGRADES")
+	for ue in _upgrade_entries:
+		var u: Dictionary = ue.upg
+		var lvl := Career.upgrade_level(u.id)
+		var cost := Career.upgrade_cost(u.id)
+		var stars := ""
+		for i in range(3):
+			stars += "★" if i < lvl else "☆"
+		if cost < 0:
+			ue.btn.text = "%s %s  %s\n%s  (%s)" % [
+				u.icon, LocaleManager.t(u.key), stars,
+				LocaleManager.t(u.desc_key), LocaleManager.t("MAXED")]
+			ue.btn.disabled = true
+		else:
+			ue.btn.text = "%s %s  %s - %d 🪙\n%s" % [
+				u.icon, LocaleManager.t(u.key), stars, cost,
+				LocaleManager.t(u.desc_key)]
+	for ie in _item_entries:
+		var item: Dictionary = ie.item
+		var owned := SaveSystem.get_consumable_count(item.id)
+		ie.btn.text = "%s %s - %d 🪙   (%s)\n%s" % [
+			item.icon,
+			LocaleManager.t(item.name_key),
+			int(item.price),
+			LocaleManager.t("OWNED_COUNT").replace("{n}", str(owned)),
+			LocaleManager.t(item.desc_key),
+		]
 	for e in _entries:
 		var v: Dictionary = e.veh
 		e.btn.text = "%s - %d\n%s" % [LocaleManager.t(v.name_key), int(v.price), _vehicle_stats(v)]
+
+func _try_buy_upgrade(id: String) -> void:
+	if Career.buy_upgrade(id):
+		AudioManager.play_sfx("powerup")
+		_msg.text = ""
+	else:
+		AudioManager.play_sfx("crash")
+		_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
+	_refresh()
+
+func _try_buy_item(id: String) -> void:
+	var item: Dictionary = ConsumablesData.get_by_id(id)
+	if item.is_empty():
+		return
+	if not SaveSystem.spend_coins(int(item.price)):
+		_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
+		AudioManager.play_sfx("crash")
+		return
+	SaveSystem.add_consumable(id)
+	AudioManager.play_sfx("powerup")
+	_msg.text = ""
+	_refresh()
 
 func _try_buy(id: String) -> void:
 	var v: Dictionary = Vehicles.get_by_id(id)

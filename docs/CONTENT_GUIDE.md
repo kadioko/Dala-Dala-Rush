@@ -7,6 +7,9 @@ This project is designed so most new content can be added through small data/scr
 1. Add a route entry in `data/routes.gd`.
 2. Add a route name key in both locale dictionaries in `autoload/locale_manager.gd`.
 3. If the route needs a unique visual identity, update `scripts/entities/road.gd`.
+4. Optional unlock gate: add `"unlock_goals": N` (total route-goal
+   completions needed) and `"unlock_price": C` (instant coin unlock).
+   Omit both for a free route.
 
 Example:
 
@@ -114,6 +117,56 @@ Vehicle perk fields:
 2. Copy all keys from `en` first, then translate.
 3. Update Settings if you want a third button instead of the current Swahili/English selector.
 4. Test every menu after switching language.
+
+## Add a Mission
+
+Open `data/missions.gd` and append to `TEMPLATES`:
+
+```gdscript
+{"id": "m_drop_30", "key": "MIS_DROPOFFS", "type": "dropoffs",
+ "target": 30, "reward": 90, "xp": 60},
+```
+
+Mission `type` values: `coins`, `passengers`, `distance`, `near_misses`,
+`dropoffs`, `fares`, `horn_uses`, `boosts` (cumulative across runs), and
+`score_best` (best single run). Reuse an existing `key` or add a new one
+to both locales (use `{n}` for the target).
+
+## Add a Consumable (one-run item)
+
+1. Append to `LIST` in `data/consumables.gd` (id, name/desc keys, price, icon).
+2. Apply its effect in `scripts/game.gd` → `_apply_consumables()`.
+3. Add locale keys. It appears in the shop automatically.
+
+## Add a Bus Upgrade
+
+1. Append to `UPGRADES` in `data/career.gd` (id, keys, icon, 3 costs).
+2. Read `Career.upgrade_level("your_id")` in `game.gd` and apply the effect.
+3. Add locale keys. The shop row renders automatically.
+
+## Add a Career Rank
+
+Append to `RANKS` in `data/career.gd` with an XP threshold and add the
+`RANK_N` key to both locales. XP sources are defined in `career_xp()`.
+
+## Add Livery Options
+
+`scripts/livery_lib.gd`: extend `BODY_PALETTE` / `ACCENT_PALETTE` /
+`SLOGAN_PRESETS` freely. New patterns need an entry in `PATTERNS`, a
+draw case in `draw_bus()`, and a `PATTERN_X` locale key.
+
+## Add a Voice Line
+
+Drop `audio/voice_yourkey.ogg`, add `"voice_yourkey"` to `VOICE_KEYS` in
+`autoload/audio_manager.gd`, and call
+`AudioManager.play_sfx("voice_yourkey")` at the trigger point. Voice keys
+are file-only — silent until the recording exists.
+
+## Remote-Tunable Values
+
+To make any number tunable without an app update: add a default to
+`DEFAULTS` in `autoload/remote_config.gd` and read it at the point of use
+with `RemoteConfig.get_value("key", default)`. See docs/LIVE_OPS.md.
 
 ## Content Tone
 

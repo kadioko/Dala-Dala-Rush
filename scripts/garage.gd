@@ -9,6 +9,7 @@ var _back_btn: Button
 var _list_box: VBoxContainer
 var _entries: Array = []
 var _coin_label: Label
+var _livery_btn: Button
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -37,6 +38,13 @@ func _ready() -> void:
 	_list_box.add_theme_constant_override("separation", 10)
 	_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list_box)
+
+	var livery_btn := UIFactory.make_button("", false)
+	livery_btn.pressed.connect(func():
+		AudioManager.play_sfx("click")
+		TransitionManager.go_to("res://scenes/livery.tscn"))
+	root.add_child(livery_btn)
+	_livery_btn = livery_btn
 
 	_back_btn = UIFactory.make_button("", false)
 	_back_btn.pressed.connect(_on_back)
@@ -74,6 +82,7 @@ func _build_rows() -> void:
 func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SELECT_VEHICLE")
 	_back_btn.text = LocaleManager.t("BACK")
+	_livery_btn.text = "🎨 " + LocaleManager.t("LIVERY")
 	_coin_label.text = "%s: %d" % [LocaleManager.t("COINS"), int(SaveSystem.get_value("total_coins", 0))]
 	for e in _entries:
 		var v: Dictionary = e.veh

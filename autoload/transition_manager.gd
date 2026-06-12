@@ -35,6 +35,28 @@ func _do_change(path: String) -> void:
 	tw.tween_property(_overlay, "modulate:a", 0.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(func(): _busy = false)
 
+# ─── Android hardware back button ─────────────────────────────────
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_handle_back()
+
+func _handle_back() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	# Scenes can define handle_back() for custom behaviour (e.g. pause).
+	if scene.has_method("handle_back"):
+		scene.handle_back()
+		return
+	var path := String(scene.scene_file_path)
+	if path.ends_with("main_menu.tscn"):
+		get_tree().quit()
+	elif path.ends_with("splash.tscn"):
+		pass  # ignore during splash
+	else:
+		go_to("res://scenes/main_menu.tscn")
+
 ## Optional: fade in immediately on game boot (first scene already shown).
 func fade_in_only() -> void:
 	_overlay.modulate.a = 1.0

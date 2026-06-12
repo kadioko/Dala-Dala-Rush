@@ -2,6 +2,7 @@ extends Node
 ## Persists all player data to user://save.json.
 
 const SAVE_PATH := "user://save.json"
+const BACKUP_PATH := "user://save.json.bak"
 
 var data: Dictionary = {}
 
@@ -12,6 +13,7 @@ const DEFAULTS := {
 	"selected_vehicle": "classic_blue",
 	"selected_route": "kariakoo",
 	"unlocked_vehicles": ["classic_blue"],
+	"unlocked_routes": ["kariakoo"],
 	"music_on": true,
 	"sfx_on": true,
 	"haptics_on": true,
@@ -33,6 +35,11 @@ const DEFAULTS := {
 	"route_goals_completed": 0,
 	"daily_challenge_claimed_date": "",
 	"daily_challenges_completed": 0,
+	# Daily login streak
+	"streak_count": 0,
+	"streak_last_date": "",
+	# Consumable inventory: {item_id: count}
+	"consumables": {},
 	# Top-5 leaderboard: Array of {name, score, route}
 	"leaderboard": [],
 }
@@ -42,19 +49,31 @@ func _ready() -> void:
 
 func load_data() -> void:
 	data = DEFAULTS.duplicate(true)
-	if not FileAccess.file_exists(SAVE_PATH):
-		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	# Try the main save, fall back to the backup if missing/corrupt.
+	if not _load_from(SAVE_PATH):
+		if _load_from(BACKUP_PATH):
+			push_warning("Save: main file corrupt or missing — restored from backup.")
+
+func _load_from(path: String) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return
+		return false
 	var text := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(text)
-	if typeof(parsed) == TYPE_DICTIONARY:
-		for k in parsed.keys():
-			data[k] = parsed[k]
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	for k in parsed.keys():
+		data[k] = parsed[k]
+	return true
 
 func save() -> void:
+	# Rotate the last good save to .bak before overwriting,
+	# so a crash mid-write can never lose everything.
+	if FileAccess.file_exists(SAVE_PATH):
+		DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("Save: cannot open file for writing.")
@@ -95,6 +114,41 @@ func unlock_vehicle(id: String) -> void:
 func is_vehicle_unlocked(id: String) -> bool:
 	return id in data.get("unlocked_vehicles", [])
 
+# ── Consumables ──────────────────────────────────────────────────
+
+func get_consumable_count(id: String) -> int:
+	var inv: Dictionary = data.get("consumables", {})
+	return int(inv.get(id, 0))
+
+func add_consumable(id: String, amount: int = 1) -> void:
+	var inv: Dictionary = data.get("consumables", {})
+	inv[id] = int(inv.get(id, 0)) + amount
+	data["consumables"] = inv
+	save()
+
+## Returns true and decrements if at least one is owned.
+func use_consumable(id: String) -> bool:
+	var inv: Dictionary = data.get("consumables", {})
+	var n := int(inv.get(id, 0))
+	if n <= 0:
+		return false
+	inv[id] = n - 1
+	data["consumables"] = inv
+	save()
+	return true
+
+# ── Routes ───────────────────────────────────────────────────────
+
+func unlock_route(id: String) -> void:
+	var u: Array = data.get("unlocked_routes", [])
+	if id not in u:
+		u.append(id)
+		data["unlocked_routes"] = u
+		save()
+
+func is_route_unlocked(id: String) -> bool:
+	return id in data.get("unlocked_routes", [])
+
 # ── Scores ───────────────────────────────────────────────────────
 
 func update_best_score(score: int) -> bool:
@@ -117,8 +171,9 @@ func get_route_best(route_id: String) -> int:
 
 # ── Career stats ─────────────────────────────────────────────────
 
-func add_run_stats(distance: float, coins: int, passengers: int) -> void:
-	data["total_runs"]          = int(data.get("total_runs", 0)) + 1
+func add_run_stats(distance: float, coins: int, passengers: int, count_run: bool = true) -> void:
+	if count_run:
+		data["total_runs"]      = int(data.get("total_runs", 0)) + 1
 	data["total_distance_ever"] = float(data.get("total_distance_ever", 0.0)) + distance
 	data["total_coins_ever"]    = int(data.get("total_coins_ever", 0)) + coins
 	data["total_passengers_ever"] = int(data.get("total_passengers_ever", 0)) + passengers

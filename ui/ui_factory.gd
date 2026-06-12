@@ -34,19 +34,19 @@ static func make_button(text: String, primary: bool = true) -> Button:
 	b.add_theme_font_size_override("font_size", 22)
 	return b
 
-static func make_title(text: String, size: int = 42) -> Label:
+static func make_title(text: String, font_size: int = 42) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_color_override("font_color", COL_ACCENT)
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", font_size)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
 
-static func make_label(text: String, size: int = 20, color: Color = COL_TEXT) -> Label:
+static func make_label(text: String, font_size: int = 20, color: Color = COL_TEXT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_color_override("font_color", color)
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", font_size)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
 
@@ -64,6 +64,17 @@ static func make_panel(color: Color = COL_PANEL) -> PanelContainer:
 	sb.content_margin_bottom = 16
 	p.add_theme_stylebox_override("panel", sb)
 	return p
+
+## Top inset (in viewport units) needed to clear notches/camera cutouts.
+static func safe_top_inset(viewport_height: float = 960.0) -> float:
+	var os_name := OS.get_name()
+	if os_name != "Android" and os_name != "iOS":
+		return 0.0
+	var sa := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y <= 0:
+		return 0.0
+	return clampf(float(sa.position.y) * viewport_height / float(win.y), 0.0, 80.0)
 
 static func paint_background(control: Control, color: Color = COL_BG) -> void:
 	var bg := ColorRect.new()

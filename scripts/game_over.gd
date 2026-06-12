@@ -100,6 +100,14 @@ func _ready() -> void:
 	_daily_lbl = _stat_label(stats, UIFactory.COL_ACCENT, 18)
 	_best_lbl  = _stat_label(stats, UIFactory.COL_MUTED, 16)
 
+	# Completed missions banner
+	for t in GameState.last_missions_completed:
+		var m_lbl := _stat_label(stats, Color("#2ecc71"), 16)
+		m_lbl.text = "✓ %s  +%d 🪙" % [
+			LocaleManager.t(String(t.key)).replace("{n}", str(int(t.target))),
+			int(t.reward),
+		]
+
 	# ── Leaderboard name entry (when score qualifies) ──
 	if SaveSystem.qualifies_for_leaderboard(GameState.last_score):
 		var lb_panel := UIFactory.make_panel()
@@ -168,6 +176,12 @@ func _ready() -> void:
 	_share_btn.pressed.connect(_on_share)
 	v.add_child(_share_btn)
 
+	AdService.rewarded_result.connect(_on_rewarded_result)
+	# Hide ad buttons entirely when no ad (or simulation) is available.
+	if not AdService.is_rewarded_available():
+		ad_row.visible = false
+		_ad_msg_lbl.visible = false
+
 	LocaleManager.locale_changed.connect(_refresh)
 	_refresh()
 	set_process(true)
@@ -203,7 +217,10 @@ func _update_stats_labels() -> void:
 	_coins_lbl.text = "%s: %d"    % [LocaleManager.t("COINS"),      int(_anim_coins)]
 	if GameState.last_bonus_coins > 0:
 		_coins_lbl.text += " (+%d)" % GameState.last_bonus_coins
-	_pass_lbl.text  = "%s: %d"    % [LocaleManager.t("PASSENGERS"), int(_anim_pass)]
+	_pass_lbl.text  = "%s: %d   |   %s: %d (+%d 🪙)" % [
+		LocaleManager.t("PASSENGERS"), int(_anim_pass),
+		LocaleManager.t("DROPOFFS"), GameState.last_dropoffs, GameState.last_fares,
+	]
 	var goal_status := LocaleManager.t("GOAL_COMPLETE") if GameState.last_route_goal_met else LocaleManager.t("GOAL_FAILED")
 	_goal_lbl.text  = "%s: %s  %s" % [LocaleManager.t("ROUTE_GOAL"), goal_status, GameState.last_route_goal_progress]
 	_daily_lbl.text = _daily_result_text()
@@ -287,19 +304,36 @@ func _on_view_leaderboard() -> void:
 
 func _on_continue_ad() -> void:
 	AudioManager.play_sfx("click")
-	if AdService.show_rewarded_continue():
-		TransitionManager.go_to("res://scenes/game.tscn")
+	if not AdService.is_rewarded_available():
+		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
-	_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
+	_continue_btn.disabled = true
+	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
+	AdService.show_rewarded(AdService.PLACEMENT_CONTINUE)
 
 func _on_double_coins_ad() -> void:
 	AudioManager.play_sfx("click")
-	if AdService.show_rewarded_double_coins():
-		SaveSystem.add_coins(GameState.last_coins)
-		_ad_msg_lbl.text = "+%d %s" % [GameState.last_coins, LocaleManager.t("COINS")]
-		_double_btn.disabled = true
+	if not AdService.is_rewarded_available():
+		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
-	_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
+	_double_btn.disabled = true
+	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
+	AdService.show_rewarded(AdService.PLACEMENT_DOUBLE_COINS)
+
+func _on_rewarded_result(placement: String, success: bool) -> void:
+	if not success:
+		_ad_msg_lbl.text = LocaleManager.t("AD_FAILED")
+		_continue_btn.disabled = false
+		_double_btn.disabled = false
+		return
+	match placement:
+		AdService.PLACEMENT_CONTINUE:
+			GameState.request_continue()
+			TransitionManager.go_to("res://scenes/game.tscn")
+		AdService.PLACEMENT_DOUBLE_COINS:
+			SaveSystem.add_coins(GameState.last_coins)
+			AudioManager.play_sfx("powerup")
+			_ad_msg_lbl.text = "+%d %s" % [GameState.last_coins, LocaleManager.t("COINS")]
 
 func _on_share() -> void:
 	AudioManager.play_sfx("click")

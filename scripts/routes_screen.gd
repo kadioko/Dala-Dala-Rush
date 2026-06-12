@@ -7,6 +7,8 @@ var _title: Label
 var _back_btn: Button
 var _list_box: VBoxContainer
 var _row_buttons: Array = []
+var _msg: Label
+var _coin_label: Label
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -23,6 +25,12 @@ func _ready() -> void:
 
 	_title = UIFactory.make_title("", 32)
 	root.add_child(_title)
+
+	_coin_label = UIFactory.make_label("", 17, UIFactory.COL_ACCENT)
+	root.add_child(_coin_label)
+
+	_msg = UIFactory.make_label("", 15, UIFactory.COL_DANGER)
+	root.add_child(_msg)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -59,9 +67,22 @@ func _build_rows() -> void:
 func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SELECT_ROUTE")
 	_back_btn.text = LocaleManager.t("BACK")
+	_coin_label.text = "🪙 %d   |   %s: %d" % [
+		int(SaveSystem.get_value("total_coins", 0)),
+		LocaleManager.t("GOALS_DONE"),
+		int(SaveSystem.get_value("route_goals_completed", 0)),
+	]
 	for entry in _row_buttons:
 		var r: Dictionary = entry.route
 		var label := LocaleManager.t(r.name_key)
+		if not Routes.is_unlocked(r):
+			var req := LocaleManager.t("UNLOCK_REQ") \
+				.replace("{n}", str(int(r.get("unlock_goals", 0)))) \
+				.replace("{c}", str(int(r.get("unlock_price", 0))))
+			entry.btn.text = "🔒 %s\n%s" % [label, req]
+			entry.btn.modulate.a = 0.7
+			continue
+		entry.btn.modulate.a = 1.0
 		if r.id == GameState.selected_route_id:
 			label += "  [%s]" % LocaleManager.t("SELECTED")
 		var best := SaveSystem.get_route_best(r.id)
@@ -96,6 +117,21 @@ func _goal_text(route: Dictionary) -> String:
 
 func _select(id: String) -> void:
 	AudioManager.play_sfx("click")
+	var r := Routes.get_by_id(id)
+	if not Routes.is_unlocked(r):
+		# Offer instant coin unlock as the alternative to goal progress.
+		var price := int(r.get("unlock_price", 0))
+		if SaveSystem.spend_coins(price):
+			SaveSystem.unlock_route(id)
+			AudioManager.play_sfx("powerup")
+			_msg.text = LocaleManager.t("ROUTE_UNLOCKED")
+		else:
+			AudioManager.play_sfx("crash")
+			_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
+		_build_rows()
+		_refresh()
+		return
+	_msg.text = ""
 	GameState.set_route(id)
 	_build_rows()
 	_refresh()

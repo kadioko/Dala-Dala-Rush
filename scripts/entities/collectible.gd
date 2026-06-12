@@ -18,12 +18,14 @@ var size: Vector2 = Vector2(36, 36)
 var color: Color = Color("#ffd23f")
 var active: bool = false
 var spin: float = 0.0
+var _tex: Texture2D = null
 
 func setup(t: String, lane_x: float, top_y: float) -> void:
 	type_id = t
 	var def: Dictionary = TYPES.get(t, TYPES["coin"])
 	color = def.color
 	size = def.size
+	_tex = SpriteLib.get_tex("collectible", t)
 	position = Vector2(lane_x, top_y)
 	active = true
 	visible = true
@@ -45,6 +47,12 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var top_left := -size * 0.5
+	if _tex:
+		# Gentle bob + pulse so sprites still feel alive
+		var pulse: float = 1.0 + 0.06 * sin(spin)
+		var sz: Vector2 = size * pulse
+		draw_texture_rect(_tex, Rect2(-sz * 0.5, sz), false)
+		return
 	match type_id:
 		"coin":
 			var w: float = size.x * (0.6 + 0.4 * abs(sin(spin)))

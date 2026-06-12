@@ -2,6 +2,8 @@ class_name Routes
 ## Route catalog. Add new routes by appending entries to LIST.
 ## difficulty multiplier scales obstacle spawn rate and base speed.
 ## obstacle_weights and collectible_weights make every route feel different.
+## unlock_goals: total route-goal completions needed to unlock for free.
+## unlock_price: coin price to unlock immediately instead.
 
 const LIST: Array = [
 	{
@@ -19,6 +21,7 @@ const LIST: Array = [
 		"obstacle_weights": {
 			"bodaboda": 16, "bajaji": 18, "car": 12, "pothole": 8, "cone": 10,
 			"police": 5, "barrier": 7, "truck": 5, "pedestrian": 13, "tire": 6,
+			"mbuzi": 6,
 		},
 		"collectible_weights": {
 			"coin": 55, "passenger": 28, "fuel": 8, "shield": 4,
@@ -28,6 +31,8 @@ const LIST: Array = [
 	{
 		"id": "mwenge",
 		"name_key": "ROUTE_MWENGE",
+		"unlock_goals": 1,
+		"unlock_price": 150,
 		"difficulty": 1.1,
 		"spawn_interval_mult": 1.1,
 		"flavor_key": "ROUTE_MWENGE_D",
@@ -49,6 +54,8 @@ const LIST: Array = [
 	{
 		"id": "mbezi",
 		"name_key": "ROUTE_MBEZI",
+		"unlock_goals": 3,
+		"unlock_price": 350,
 		"difficulty": 1.22,
 		"spawn_interval_mult": 1.02,
 		"flavor_key": "ROUTE_MBEZI_D",
@@ -70,6 +77,8 @@ const LIST: Array = [
 	{
 		"id": "posta",
 		"name_key": "ROUTE_POSTA",
+		"unlock_goals": 5,
+		"unlock_price": 600,
 		"difficulty": 1.34,
 		"spawn_interval_mult": 0.96,
 		"flavor_key": "ROUTE_POSTA_D",
@@ -91,6 +100,8 @@ const LIST: Array = [
 	{
 		"id": "kigamboni",
 		"name_key": "ROUTE_KIGAMBONI",
+		"unlock_goals": 8,
+		"unlock_price": 900,
 		"difficulty": 1.46,
 		"spawn_interval_mult": 0.92,
 		"flavor_key": "ROUTE_KIGAMBONI_D",
@@ -103,6 +114,7 @@ const LIST: Array = [
 		"obstacle_weights": {
 			"bodaboda": 12, "bajaji": 8, "car": 12, "pothole": 18, "cone": 7,
 			"police": 5, "barrier": 8, "truck": 10, "pedestrian": 5, "tire": 15,
+			"mbuzi": 10,
 		},
 		"collectible_weights": {
 			"coin": 52, "passenger": 16, "fuel": 15, "shield": 5,
@@ -112,6 +124,8 @@ const LIST: Array = [
 	{
 		"id": "ubungo",
 		"name_key": "ROUTE_UBUNGO",
+		"unlock_goals": 12,
+		"unlock_price": 1400,
 		"difficulty": 1.58,
 		"spawn_interval_mult": 0.88,
 		"flavor_key": "ROUTE_UBUNGO_D",
@@ -137,6 +151,16 @@ static func get_by_id(id: String) -> Dictionary:
 		if r.id == id:
 			return r
 	return LIST[0]
+
+## A route is unlocked if: no requirement, explicitly purchased,
+## or the player has completed enough route goals overall.
+static func is_unlocked(route: Dictionary) -> bool:
+	var need := int(route.get("unlock_goals", 0))
+	if need <= 0:
+		return true
+	if SaveSystem.is_route_unlocked(String(route.id)):
+		return true
+	return int(SaveSystem.get_value("route_goals_completed", 0)) >= need
 
 static func weighted_pick(weights: Dictionary, allowed_ids: Array, fallback_id: String) -> String:
 	var total := 0.0

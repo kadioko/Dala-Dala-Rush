@@ -69,6 +69,28 @@ const LIST: Array = [
 		"coin_mult": 1.08,
 		"horn_charges": 3,
 	},
+	{
+		"id": "simba_express",
+		"name_key": "VEH_SIMBA",
+		"price": 1200,
+		"body": Color("#c0392b"),
+		"accent": Color("#f9ca24"),
+		"lane_time": 0.10,
+		"fuel_drain_mult": 1.05,
+		"coin_mult": 1.10,
+		"horn_charges": 4,
+	},
+	{
+		"id": "bongo_flava",
+		"name_key": "VEH_BONGO_FLAVA",
+		"price": 1600,
+		"body": Color("#6c5ce7"),
+		"accent": Color("#00cec9"),
+		"lane_time": 0.11,
+		"fuel_drain_mult": 0.90,
+		"coin_mult": 1.22,
+		"horn_charges": 5,
+	},
 ]
 
 static func get_by_id(id: String) -> Dictionary:

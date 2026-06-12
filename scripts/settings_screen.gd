@@ -13,6 +13,8 @@ var _music_label: Label
 var _sfx_label: Label
 var _haptics_label: Label
 var _lang_label: Label
+var _ghost_label: Label
+var _ghost_btn: Button
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -51,6 +53,12 @@ func _ready() -> void:
 	_haptics_btn.pressed.connect(_toggle_haptics)
 	v.add_child(_haptics_btn)
 
+	_ghost_label = UIFactory.make_label("", 18)
+	v.add_child(_ghost_label)
+	_ghost_btn = UIFactory.make_button("", false)
+	_ghost_btn.pressed.connect(_toggle_ghost)
+	v.add_child(_ghost_btn)
+
 	_lang_label = UIFactory.make_label("", 18)
 	v.add_child(_lang_label)
 	var lang_row := HBoxContainer.new()
@@ -86,6 +94,8 @@ func _refresh(_l := "") -> void:
 	_music_btn.text = LocaleManager.t("ON") if AudioManager.music_on else LocaleManager.t("OFF")
 	_sfx_btn.text = LocaleManager.t("ON") if AudioManager.sfx_on else LocaleManager.t("OFF")
 	_haptics_btn.text = LocaleManager.t("ON") if FeedbackManager.haptics_on else LocaleManager.t("OFF")
+	_ghost_label.text = LocaleManager.t("GHOST_SETTING")
+	_ghost_btn.text = LocaleManager.t("ON") if bool(SaveSystem.get_value("ghost_on", true)) else LocaleManager.t("OFF")
 	_sw_btn.text = LocaleManager.t("SWAHILI")
 	_en_btn.text = LocaleManager.t("ENGLISH")
 	_sw_btn.modulate.a = 1.0 if LocaleManager.current_locale == "sw" else 0.62
@@ -105,6 +115,11 @@ func _toggle_sfx() -> void:
 func _toggle_haptics() -> void:
 	FeedbackManager.set_haptics_on(not FeedbackManager.haptics_on)
 	FeedbackManager.tap()
+	AudioManager.play_sfx("click")
+	_refresh()
+
+func _toggle_ghost() -> void:
+	SaveSystem.set_value("ghost_on", not bool(SaveSystem.get_value("ghost_on", true)))
 	AudioManager.play_sfx("click")
 	_refresh()
 

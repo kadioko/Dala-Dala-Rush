@@ -7,6 +7,9 @@ const Routes    := preload("res://data/routes.gd")
 var _title: Label
 var _back_btn: Button
 var _content: VBoxContainer
+var _ghost_msg: Label
+var _copy_ghost_btn: Button
+var _import_ghost_btn: Button
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -29,6 +32,28 @@ func _ready() -> void:
 	_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(_content)
 
+	# ── Ghost racing share/import ─────────────────────────────────
+	_ghost_msg = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
+	root.add_child(_ghost_msg)
+
+	var ghost_row := HBoxContainer.new()
+	ghost_row.add_theme_constant_override("separation", 8)
+	root.add_child(ghost_row)
+
+	_copy_ghost_btn = UIFactory.make_button("", false)
+	_copy_ghost_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_copy_ghost_btn.custom_minimum_size = Vector2(0, 50)
+	_copy_ghost_btn.add_theme_font_size_override("font_size", 15)
+	_copy_ghost_btn.pressed.connect(_on_copy_ghost)
+	ghost_row.add_child(_copy_ghost_btn)
+
+	_import_ghost_btn = UIFactory.make_button("", false)
+	_import_ghost_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_import_ghost_btn.custom_minimum_size = Vector2(0, 50)
+	_import_ghost_btn.add_theme_font_size_override("font_size", 15)
+	_import_ghost_btn.pressed.connect(_on_import_ghost)
+	ghost_row.add_child(_import_ghost_btn)
+
 	_back_btn = UIFactory.make_button("", false)
 	_back_btn.pressed.connect(_on_back)
 	root.add_child(_back_btn)
@@ -39,6 +64,12 @@ func _ready() -> void:
 func _rebuild() -> void:
 	_title.text = LocaleManager.t("LEADERBOARD")
 	_back_btn.text = LocaleManager.t("BACK")
+	_copy_ghost_btn.text = "👻 " + LocaleManager.t("GHOST_COPY")
+	_import_ghost_btn.text = "📥 " + LocaleManager.t("GHOST_IMPORT")
+	var rival: Variant = SaveSystem.get_value("ghost_rival", null)
+	if typeof(rival) == TYPE_DICTIONARY:
+		_ghost_msg.text = LocaleManager.t("GHOST_RIVAL_SET") \
+			.replace("{n}", str(int((rival as Dictionary).get("score", 0))))
 	for c in _content.get_children():
 		c.queue_free()
 
@@ -93,6 +124,36 @@ func _rebuild() -> void:
 		route_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		route_lbl.clip_text = true
 		hb.add_child(route_lbl)
+
+# ─── Ghost codes ──────────────────────────────────────────────────
+## A ghost code is base64 JSON of {events, end, score, name} — small
+## enough to paste into WhatsApp. Works fully offline.
+
+func _on_copy_ghost() -> void:
+	AudioManager.play_sfx("click")
+	var ghost: Variant = SaveSystem.get_value("ghost_best", null)
+	if typeof(ghost) != TYPE_DICTIONARY:
+		_ghost_msg.text = LocaleManager.t("GHOST_NONE")
+		return
+	var code := Marshalls.utf8_to_base64(JSON.stringify(ghost))
+	DisplayServer.clipboard_set("DDRTZ-GHOST:" + code)
+	_ghost_msg.text = LocaleManager.t("GHOST_COPIED")
+
+func _on_import_ghost() -> void:
+	AudioManager.play_sfx("click")
+	var clip := DisplayServer.clipboard_get().strip_edges()
+	if not clip.begins_with("DDRTZ-GHOST:"):
+		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
+		return
+	var json_text := Marshalls.base64_to_utf8(clip.trim_prefix("DDRTZ-GHOST:"))
+	var parsed: Variant = JSON.parse_string(json_text)
+	if typeof(parsed) != TYPE_DICTIONARY or not (parsed as Dictionary).has("events"):
+		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
+		return
+	SaveSystem.set_value("ghost_rival", parsed)
+	_ghost_msg.text = LocaleManager.t("GHOST_RIVAL_SET") \
+		.replace("{n}", str(int((parsed as Dictionary).get("score", 0))))
+	AudioManager.play_sfx("powerup")
 
 func _on_back() -> void:
 	AudioManager.play_sfx("click")

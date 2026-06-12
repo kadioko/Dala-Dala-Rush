@@ -16,6 +16,7 @@ const OBSTACLES := [
 	{"id":"truck",      "color":Color("#2c3e50"), "name":"OBS_TRUCK"},
 	{"id":"pedestrian", "color":Color("#fdcb6e"), "name":"OBS_PEDESTRIAN"},
 	{"id":"tire",       "color":Color("#1a1a2e"), "name":"OBS_TIRE"},
+	{"id":"mbuzi",      "color":Color("#d7ccc8"), "name":"OBS_MBUZI"},
 ]
 
 # Collectible catalog: id, color, name key, desc key
@@ -313,8 +314,8 @@ func _build_tips_page() -> Control:
 
 	page.add_child(_spacer(8))
 
-	var tip_keys := ["TIP1","TIP2","TIP3","TIP4","TIP5","TIP6"]
-	var tip_icons := ["◀▶","  ★","  ×","  ★","  ⛽","  ↑"]
+	var tip_keys := ["TIP1","TIP2","TIP3","TIP4","TIP5","TIP6","TIP7","TIP8"]
+	var tip_icons := ["◀▶","  ★","  ×","  ★","  ⛽","  ↑","  🚏","  👤"]
 
 	for i in range(tip_keys.size()):
 		page.add_child(_tip_row(tip_icons[i], tip_keys[i]))

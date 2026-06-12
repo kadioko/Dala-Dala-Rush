@@ -16,6 +16,10 @@ const ACHIEVEMENTS: Array = [
 	{"id": "combo_5",     "key": "ACH_COMBO_5",      "color": Color("#a55eea")},
 	{"id": "shield_use",  "key": "ACH_SHIELD_USE",   "color": Color("#74b9ff")},
 	{"id": "horn_3",      "key": "ACH_HORN_3",       "color": Color("#e67e22")},
+	{"id": "boost_use",   "key": "ACH_BOOST",        "color": Color("#2ecc71")},
+	{"id": "streak_3",    "key": "ACH_STREAK_3",     "color": Color("#fd79a8")},
+	{"id": "dropoff_20",  "key": "ACH_DROPOFF_20",   "color": Color("#fab1a0")},
+	{"id": "chase_escape","key": "ACH_CHASE",        "color": Color("#1f4e79")},
 ]
 
 var _canvas: CanvasLayer

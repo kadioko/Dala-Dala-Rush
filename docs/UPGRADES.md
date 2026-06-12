@@ -1,74 +1,112 @@
-# Dala Dala Rush TZ - Upgrade Notes
+# Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-## Implemented Improvements
+## Wave 3 — "10x" feature wave (latest)
 
-- Settings now has a two-button language selector for Kiswahili and English.
-- Added `FeedbackManager` for optional Android vibration on lane changes, pickups, power-ups, shield hits, horn use, and crashes.
-- Added `haptics_on` to saved settings.
-- Added `AdService` as a safe rewarded-ad placeholder. It does not ship an ad SDK or call a network.
-- Game Over now exposes placeholder actions for continue-after-crash and double-coins rewards.
-- Android share text is URI-encoded before opening the share intent.
-- Shop purchases now use `SaveSystem.spend_coins()` so coin deduction is centralized.
-- Routes now have obstacle and collectible weight profiles, so each road has different traffic behavior.
-- Route selection now shows route flavor, difficulty marks, and per-route best score.
-- Routes now include one run goal each. Completing it awards bonus coins at Game Over.
-- Vehicle skins now have light gameplay perks for handling, fuel efficiency, coin gain, and horn charges.
-- Added offline daily challenges that rotate by local date and reward coins once per day.
-- Softer beginner pacing: slower fuel drain, stronger fuel restore, calmer early route spawn intervals, and cheaper first vehicle unlocks.
-- Fixed strict GDScript Variant inference warnings in route/daily progress helpers.
+**Core loop rework — vituo:**
+- Passengers now board the bus (capacity 8 + overload 4, HUD 👤 X/12).
+- Roadside bus stops (vituo) every 20–32 s: stop in the adjacent lane to
+  drop all passengers for fares (+overload premium) and board the queue.
+- Overload effects: heavier lane switching, faster fuel drain, police
+  checkpoint fines per excess passenger.
+- Game over shows dropoffs + fares; first kituo arrives at 9 s to teach.
 
-## Recommended Next Upgrades
+**New systems:**
+- Missions: 3 rotating from a 12-template pool, persistent progress,
+  coin + season-XP rewards; season levels pay coins; missions screen.
+- Livery editor: body/accent palettes, 4 patterns, slogan presets +
+  custom, per-vehicle persistence, WhatsApp share, drawn in-game.
+- Living city: per-run day/dusk/night/rain + rush hour; headlight cones,
+  rain particles + slippery steering, denser rush traffic, condition
+  banner during countdown; music pitch rises with run intensity.
+- Police chase boss event (~every 35–55 s, 50%): cop tracks your lane for
+  10 s; caught = fine, escape = reward + achievement.
+- Ghost racing: best-run lane timeline recorded; translucent ghost bus;
+  beat it for +150; export/import ghost codes (clipboard, offline) from
+  the Leaderboard screen; Settings toggle.
+- Career: 6 ranks (Konda → Mfalme wa Barabara) from lifetime XP with
+  rank-up coin rewards on the menu; 3-level bus upgrades in the shop
+  (Engine +4% score/lvl, Brakes +1 s slow-mo/lvl, Sound +2 coins/kituo/lvl).
+- Scaffolds: IapService (Play Billing seam + carrier billing docs),
+  AnalyticsService (offline event queue, run_end instrumented),
+  RemoteConfig (hosted JSON + cache). Registered as autoloads.
+- 2 new achievements (People's Champion, The Great Escape); voice-line
+  hooks (voice_twende/mwisho/mafuta/kituo); How-To-Play tips 7–8.
 
-1. Replace procedural icons with a tiny sprite atlas.
-   Keep each vehicle/obstacle around 128x128 or smaller and use Android-friendly import compression.
+## Wave 2 — polish/retention wave
 
-2. Add progressive route mastery.
-   Example: bronze/silver/gold route goals that unlock after the first goal is completed.
+- Audio: file-based loading (`audio/*.ogg`) with improved procedural
+  fallbacks (two-tone horn, noise crash, arpeggio coin) + generated
+  looping chiptune music + 5-voice SFX polyphony.
+- Ads: async AdMob adapter w/ signals, editor simulation mode, buttons
+  hide when unavailable; real continue restores run state + grace shield.
+- Sprites: drop-in PNG override pipeline (`sprites/`, SpriteLib).
+- Android: hardware back button routing, notch safe-area insets, expanded
+  device-QA checklist.
+- Route progression: unlock gates (route-goal totals or coin price),
+  grandfathering migration, locked-route UI.
+- Obstacle movement: bodabodas weave, goats wander across the road.
+- Coin trails (4–6 coin runs, 35% of pickup spawns).
+- Streak: 7-day reward calendar popup.
+- Shop consumables: head-start shield / extra horn / reserve fuel,
+  auto-used next run.
+- Save hardening: .bak rotation + corruption recovery.
 
-3. Add a proper continue-after-crash flow.
-   Current placeholder starts from Game Over. A real version should save the active run state before ending, then resume once after a rewarded ad.
+## Wave 1 — gameplay/UX wave
 
-4. Add lightweight background music.
-   Use mono `.ogg` at 22,050 Hz. Keep loops short and local.
+- Real ad-continue with banked-stat accounting (no double counting).
+- Real speed boost (3 s, +45%, smash-through), goat obstacle (mbuzi),
+  Simba Express + Bongo Flava vehicles, boost/streak achievements.
+- Juice: lane-change tilt, crash hit-stop + particle bursts, coin
+  sparkles, combo label punch.
+- Daily login streak with escalating rewards.
+- Fixes: `seed` shadowing, screen-shake tween overlap, dead code.
 
-5. Add device testing presets.
-   Test 540x960, 720x1280, and 1080x1920 portrait layouts before Android export.
+## Pre-wave MVP (original)
 
-## Balancing Notes
+- 3-lane runner, 6 routes with weights/goals, 6 vehicles with perks,
+  daily challenges, achievements, local leaderboard, stats, sw/en
+  localization, haptics, ad placeholders, procedural everything.
 
-- Base speed starts at `340 * route.difficulty`.
-- Speed increases by 15% every 20 seconds.
-- Spawn interval tightens over time and is divided by route difficulty.
-- Route traffic comes from `obstacle_weights` in `data/routes.gd`.
-- Route pickups come from `collectible_weights` in `data/routes.gd`.
-- Route goals use `goal_type`, `goal_target`, and `goal_reward` in `data/routes.gd`.
-- Route spawn pacing can be tuned with `spawn_interval_mult` in `data/routes.gd`.
-- Vehicle perks use `lane_time`, `fuel_drain_mult`, `coin_mult`, and `horn_charges` in `data/vehicles.gd`.
-- Daily challenges live in `data/daily_challenges.gd` and reuse score/coins/distance/near-miss/passenger stats.
-- Fuel drain is intentionally forgiving for MVP. Tune `FUEL_DRAIN` only after testing on real phones.
-- Magnet lasts 6 seconds and slow motion lasts 4 seconds.
+---
 
-## Route Personality
+## Balancing Notes (current values)
 
-- Kariakoo: more bajajis, pedestrians, and passengers.
-- Mwenge: more bodabodas and sudden road clutter.
-- Mbezi: more cars, trucks, tires, and useful fuel.
-- Posta: more cones, barriers, police checkpoints, shields, and slow motion.
-- Kigamboni: more potholes, tires, fuel cans, and speed boosts.
-- Ubungo: more trucks, jam pressure, shields, and slow motion.
+Run economy:
+- Base speed `340 × route.difficulty`, +15% every 20 s.
+- Score = distance × 0.1; engine upgrade adds +4%/lvl to distance gain.
+- Coin pickups: 1 + combo bonus, × vehicle `coin_mult`.
 
-## Route Goals
+Vituo loop (constants atop `scripts/game.gd`):
+- `CAPACITY 8`, `OVERLOAD_MAX 4`.
+- Fares: `FARE_NORMAL 2`, `FARE_OVERLOAD 3` (+2/lvl sound upgrade per stop).
+- Overload: `OVERLOAD_HANDLING 0.07` lane-time/excess,
+  `OVERLOAD_FUEL 0.04` drain/excess, `POLICE_FINE_PER_EXCESS 5`.
+- Kituo gap 20–32 s; waiting 2–5; boards up to 8 (overload only via
+  roadside pickups — deliberate player choice).
 
-- Kariakoo: pick up 8 passengers.
-- Mwenge: score 6 near misses.
-- Mbezi: drive 1,800 meters.
-- Posta: score 700 points.
-- Kigamboni: collect 18 coins.
-- Ubungo: score 1,200 points.
+Chase: every 35–55 s @50% after 40 s; 10 s duration; caught after 2.2 s
+in-lane = 15 + overload fines; escape = +25.
+
+Conditions: day 40% / dusk 20% / night 20% / rain 20%; rush 25%
+(spawn ×0.85). Rain lane-time ×1.18.
+
+Power-ups: magnet 6 s, slow 4 s (+1 s/brake lvl), boost 3 s ×1.45.
+
+Economy sinks: vehicles 150–1600, route unlocks 150–1400, upgrades
+150–1100, consumables 25–40. Sources: pickups, fares, goals 35–100,
+daily 60–100, missions 25–80, streak 10–60, season levels 30×level,
+rank-ups 50×rank.
+
+## Route Personality & Goals
+
+Unchanged from MVP (see `data/routes.gd`): Kariakoo passengers/bajaji,
+Mwenge bodaboda, Mbezi trucks/distance, Posta checkpoints/score,
+Kigamboni potholes/coins (+goats), Ubungo jams/score. Goats also roam
+Kariakoo.
 
 ## UX Notes
 
-- Swahili should remain the default locale.
-- English is useful for testing, store pages, and wider player reach.
-- Keep humor in short UI lines, not long paragraphs.
-- Avoid real brands, real operators, and copyrighted logos.
+- Swahili remains default; humor in short lines.
+- No real brands/operators/logos; police content family-friendly.
+- New-player path: Kariakoo (the only unlocked route) → first kituo at
+  9 s teaches the loop → goal completion unlocks Mwenge.

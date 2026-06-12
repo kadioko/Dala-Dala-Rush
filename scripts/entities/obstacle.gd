@@ -14,12 +14,18 @@ const TYPES := {
 	"truck":      {"color": Color("#34495e"), "size": Vector2(76, 130)},
 	"pedestrian": {"color": Color("#fdcb6e"), "size": Vector2(80, 22)},
 	"tire":       {"color": Color("#2c3e50"), "size": Vector2(36, 36)},
+	"mbuzi":      {"color": Color("#d7ccc8"), "size": Vector2(44, 52)},
 }
 
 var type_id: String = "car"
 var size: Vector2 = Vector2(70, 100)
 var color: Color = Color("#9b59b6")
 var active: bool = false
+var _tex: Texture2D = null
+# Movement behaviour (used by game.gd): weaving / wandering
+var base_x: float = 0.0
+var drift_phase: float = 0.0
+var walk_dir: int = 1
 
 func setup(t: String, lane_x: float, top_y: float) -> void:
 	type_id = t
@@ -27,6 +33,10 @@ func setup(t: String, lane_x: float, top_y: float) -> void:
 	color = def.color
 	size = def.size
 	position = Vector2(lane_x, top_y)
+	base_x = lane_x
+	drift_phase = randf() * TAU
+	walk_dir = 1 if randf() < 0.5 else -1
+	_tex = SpriteLib.get_tex("obstacle", t)
 	active = true
 	visible = true
 	queue_redraw()
@@ -40,6 +50,9 @@ func deactivate() -> void:
 
 func _draw() -> void:
 	var top_left := -size * 0.5
+	if _tex:
+		draw_texture_rect(_tex, Rect2(top_left, size), false)
+		return
 	match type_id:
 		"pothole":
 			draw_circle(Vector2.ZERO, size.x * 0.5, color)
@@ -67,6 +80,22 @@ func _draw() -> void:
 		"tire":
 			draw_circle(Vector2.ZERO, size.x * 0.5, color)
 			draw_circle(Vector2.ZERO, size.x * 0.25, Color("#555"))
+		"mbuzi":
+			# Goat wandering onto the road: body, head, horns, legs.
+			var body_r := Rect2(Vector2(top_left.x, top_left.y + 14), Vector2(size.x, size.y * 0.5))
+			draw_rect(body_r, color)
+			# Head (top centre)
+			draw_circle(Vector2(0, top_left.y + 10), 11.0, color)
+			# Horns
+			draw_line(Vector2(-7, top_left.y + 2), Vector2(-13, top_left.y - 8), Color("#8d6e63"), 3.0)
+			draw_line(Vector2(7, top_left.y + 2), Vector2(13, top_left.y - 8), Color("#8d6e63"), 3.0)
+			# Eyes
+			draw_circle(Vector2(-4, top_left.y + 8), 2.0, Color("#222"))
+			draw_circle(Vector2(4, top_left.y + 8), 2.0, Color("#222"))
+			# Legs
+			var leg_y := body_r.position.y + body_r.size.y
+			for lx in [top_left.x + 6, top_left.x + size.x - 10]:
+				draw_rect(Rect2(Vector2(lx, leg_y), Vector2(5, size.y - (leg_y - top_left.y))), Color("#a1887f"))
 		_:
 			# Generic vehicle-shaped obstacle (cars, trucks, bodaboda, bajaji, police).
 			draw_rect(Rect2(top_left, size), color, true)
