@@ -18,8 +18,9 @@ func _ready() -> void:
 	root.anchor_bottom = 1.0
 	root.offset_left = 24
 	root.offset_right = -24
-	root.offset_top = 40
-	root.offset_bottom = -24
+	var safe_bottom := UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	root.offset_top = 40 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	root.offset_bottom = -24 - safe_bottom
 	root.add_theme_constant_override("separation", 12)
 	add_child(root)
 
@@ -121,6 +122,7 @@ func _select(id: String) -> void:
 	if not Routes.is_unlocked(r):
 		# Offer instant coin unlock as the alternative to goal progress.
 		var price := int(r.get("unlock_price", 0))
+		SaveSystem.begin_batch()
 		if SaveSystem.spend_coins(price):
 			SaveSystem.unlock_route(id)
 			AudioManager.play_sfx("powerup")
@@ -128,6 +130,7 @@ func _select(id: String) -> void:
 		else:
 			AudioManager.play_sfx("crash")
 			_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
+		SaveSystem.end_batch()
 		_build_rows()
 		_refresh()
 		return

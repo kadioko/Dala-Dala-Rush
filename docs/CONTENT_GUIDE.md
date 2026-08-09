@@ -1,5 +1,7 @@
 # Content Guide
 
+Last verified: August 9, 2026.
+
 This project is designed so most new content can be added through small data/script edits.
 
 ## Add a Route
@@ -50,6 +52,23 @@ Route goals support these `goal_type` values:
 - `passengers`
 
 Add the matching `goal_key` text in both Swahili and English locale dictionaries.
+
+## Fairness And Localization Rules
+
+- Keep at least one lane free in each obstacle wave. `game.gd` enforces this;
+  do not add a route rule that blocks all three lanes.
+- Keep new obstacle weights compatible with the 12-second beginner window.
+  Add early hazards to the starter allow-list only after playtesting.
+- New direct UI copy needs entries in both `"sw"` and `"en"` dictionaries.
+  Swahili is the runtime fallback, but both entries are required before release.
+- Pickups spawned independently of a wave use a clear lane check. Preserve that
+  behavior when adding collectible types or movement patterns.
+- Forced two-lane waves must keep the next safe lane current or adjacent; do
+  not introduce patterns that require an instant far-left to far-right move.
+- Pool setup must reset transform, modulation, depth, and animation state. New
+  entity effects cannot assume they start from constructor defaults.
+- Only coins respond to the magnet unless the design and localized copy are
+  intentionally changed together.
 
 ## Add a Daily Challenge
 
@@ -110,6 +129,8 @@ Vehicle perk fields:
 2. Add the effect in `scripts/game.gd` inside `_on_collect()`.
 3. Add labels/descriptions in `autoload/locale_manager.gd`.
 4. Consider haptics: call `FeedbackManager.collect()` or `FeedbackManager.powerup()`.
+5. Keep pickup corridors clear of active obstacles and reset all visual state
+   when pooled instances are reused.
 
 ## Add a Language
 
@@ -167,6 +188,13 @@ are file-only — silent until the recording exists.
 To make any number tunable without an app update: add a default to
 `DEFAULTS` in `autoload/remote_config.gd` and read it at the point of use
 with `RemoteConfig.get_value("key", default)`. See docs/LIVE_OPS.md.
+
+## Save Mutations
+
+Single changes can call `SaveSystem.set_value()` or another typed helper
+directly. Wrap multi-step rewards, purchases, unlocks, or migrations with
+`SaveSystem.begin_batch()` and `SaveSystem.end_batch()` so they commit once.
+Every success and failure return path must close the batch. Batches may nest.
 
 ## Content Tone
 

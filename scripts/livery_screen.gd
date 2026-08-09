@@ -27,7 +27,7 @@ func _ready() -> void:
 	root.offset_left = 20
 	root.offset_right = -20
 	root.offset_top = 28 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
-	root.offset_bottom = -16
+	root.offset_bottom = -16 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
 	root.add_theme_constant_override("separation", 10)
 	add_child(root)
 

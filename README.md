@@ -1,6 +1,6 @@
 # Dala Dala Rush TZ 🚌
 
-A Tanzanian daladala endless runner built with **Godot 4.6**.
+A Tanzanian daladala endless runner built with **Godot 4.7.1**.
 Drive your dala dala through Dar es Salaam: board abiria, stop at **vituo**
 for fares, overload at your own risk, dodge bodabodas and goats, escape
 police chases — then paint your bus with a proper slogan and share it.
@@ -14,7 +14,9 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 ## Feature Overview
 
 ### Core loop — the daladala fantasy
-- 3-lane runner: swipe / lane buttons / keyboard.
+- 3-lane runner: swipe / lane buttons / keyboard. The bottom driving dock
+  keeps steering, horn, power-up state, and the bus visually separated on
+  portrait screens.
 - **Passenger system**: riders board your bus (8 seats, HUD shows 👤 X/12).
   Roadside **bus stops (vituo)** appear with a pulsing marker — drive the
   adjacent lane as you pass to drop everyone for fares and board the queue.
@@ -50,12 +52,15 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - One-run **consumables** in the shop (head-start shield, extra horn,
   reserve fuel).
 - Full **Swahili (default) + English** localization, switchable live.
+- Compact settings with a saved **Reduced Effects** mode for motion comfort,
+  battery life, and lower-end Android phones.
 
-### Monetization & live ops (scaffolded, offline-safe)
-- Rewarded ads: continue-after-crash (restores your run!) and double-coins.
-  AdMob adapter with editor simulation — `docs/ADMOB_SETUP.md`.
-- IAP catalog + Play Billing seam, incl. **TZ carrier billing** notes —
-  `docs/MONETIZATION.md`.
+### Monetization and live ops
+- AdMob is integrated for rewarded revive, rewarded double coins,
+  interstitials after 2-3 completed runs, and banners on menu/results only.
+  Editor debug builds simulate ads; Android builds use the installed SDK.
+- Deferred IAP catalog + Play Billing seam, including **TZ carrier billing**
+  notes. No real-money purchases are enabled — `docs/MONETIZATION.md`.
 - Remote config (hosted JSON, cached) + offline analytics event queue —
   `docs/LIVE_OPS.md`.
 
@@ -65,15 +70,31 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 
 | Tool | Version |
 |------|---------|
-| Godot Engine | 4.6+ (standard GDScript build) |
-| Android SDK | API 21+ (export only) |
+| Godot Engine | 4.7.1 (standard GDScript build) |
+| Android SDK | Min API 24, target API 36 (export only) |
 | JDK | 17+ (export only) |
 
 1. [Download Godot 4](https://godotengine.org/download/), **Import** this
    folder's `project.godot`, press **F5**.
-2. Keyboard: **A/D** or **←/→** to steer, **Esc** to pause.
+2. Keyboard: **A/D** or arrow keys to steer, **H** for horn, **Esc** to pause.
 3. Android: see `docs/ANDROID_EXPORT.md` (incl. on-device test checklist,
    back-button behavior, notch safe-areas).
+
+## Current Build Notes
+
+- The project is validated with Godot 4.7.1 in headless scene startup checks.
+- Current Play baseline: version `1.0.4`, code `5`. A signed local candidate
+  for version `1.0.5`, code `6` has been built for closed testing.
+- Android export is configured for package `com.kadioko.daladalarush`, minimum
+  API 24, target API 36, Gradle custom build, and AAB output.
+- AdMob is wired with production unit IDs; real-device loading, consent, and
+  placement QA remain release checks.
+- Swahili and English are complete locale sets; English falls back to Swahili
+  if a future key is missing.
+- Store-listing drafts are under `assets/store_listing/`; recapture screenshots
+  after the final UI pass before uploading the next release.
+- See `docs/ROADMAP.md` for launch work remaining and `docs/UPGRADES.md` for
+  the current implementation changelog.
 
 ---
 
@@ -89,7 +110,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   ├── achievement_manager.gd  # unlocks + toast queue
 │   ├── transition_manager.gd   # scene fades + Android back button
 │   ├── feedback_manager.gd     # haptics
-│   ├── ad_service.gd      #   AdMob seam (simulated in debug builds)
+│   ├── ad_service.gd      #   AdMob SDK bridge + placement policy
 │   ├── iap_service.gd     #   Play Billing seam
 │   ├── analytics_service.gd    # offline event queue → SDK seam
 │   └── remote_config.gd   #   hosted-JSON tuning w/ local cache
@@ -119,15 +140,18 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 
 | Doc | What's in it |
 |-----|--------------|
-| `docs/ROADMAP.md` | Status by area + path to launch |
+| `docs/ROADMAP.md` | Current status, release priorities, and remaining work |
 | `docs/UPGRADES.md` | Changelog of implemented systems + balancing notes |
 | `docs/CONTENT_GUIDE.md` | How to add routes/vehicles/obstacles/missions/etc. |
 | `docs/ANDROID_EXPORT.md` | Export setup + on-device QA checklist |
-| `docs/ADMOB_SETUP.md` | Rewarded ads go-live steps |
+| `docs/ANDROID_RELEASE_BUILD.md` | Signed AAB build, verification, and upload runbook |
+| `docs/ADMOB_SETUP.md` | Installed AdMob integration and release QA |
 | `docs/MONETIZATION.md` | IAP, carrier billing (TZ), season pass plan |
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |
 | `docs/SPRITES.md` | Sprite filenames/sizes for the art pass |
 | `docs/AUDIO_ASSETS.md` | Audio filenames/specs incl. Swahili voice lines |
+| `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Current closed-testing and upload checklist |
+| `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Suggested Play Console declarations |
 
 ---
 
@@ -151,11 +175,12 @@ Catalog numbers live in `data/`. Remote-tunable knobs go through
 
 ## Save Data
 
-`user://save.json` with automatic `.bak` rotation and corruption recovery.
+`user://save.json` with batched multi-reward commits, automatic `.bak` rotation,
+and corruption recovery.
 On Windows during development:
 `%APPDATA%\Godot\app_userdata\Dala Dala Rush TZ\save.json`.
 
 ---
 
-*Godot 4 · GDScript · No third-party dependencies · Works fully offline ·
+*Godot 4 · GDScript · AdMob-integrated · Gameplay works offline ·
 Swahili-first · No brands, no gambling, family-friendly*

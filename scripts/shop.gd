@@ -26,8 +26,9 @@ func _ready() -> void:
 	root.anchor_bottom = 1.0
 	root.offset_left = 24
 	root.offset_right = -24
-	root.offset_top = 40
-	root.offset_bottom = -24
+	var safe_bottom := UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	root.offset_top = 40 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	root.offset_bottom = -24 - safe_bottom
 	root.add_theme_constant_override("separation", 12)
 	add_child(root)
 
@@ -157,22 +158,28 @@ func _try_buy_item(id: String) -> void:
 	var item: Dictionary = ConsumablesData.get_by_id(id)
 	if item.is_empty():
 		return
+	SaveSystem.begin_batch()
 	if not SaveSystem.spend_coins(int(item.price)):
+		SaveSystem.end_batch()
 		_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
 		AudioManager.play_sfx("crash")
 		return
 	SaveSystem.add_consumable(id)
+	SaveSystem.end_batch()
 	AudioManager.play_sfx("powerup")
 	_msg.text = ""
 	_refresh()
 
 func _try_buy(id: String) -> void:
 	var v: Dictionary = Vehicles.get_by_id(id)
+	SaveSystem.begin_batch()
 	if not SaveSystem.spend_coins(int(v.price)):
+		SaveSystem.end_batch()
 		_msg.text = LocaleManager.t("NOT_ENOUGH_COINS")
 		AudioManager.play_sfx("crash")
 		return
 	SaveSystem.unlock_vehicle(id)
+	SaveSystem.end_batch()
 	AudioManager.play_sfx("powerup")
 	_msg.text = ""
 	_build_rows()

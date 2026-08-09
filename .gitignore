@@ -11,6 +11,7 @@ export_presets.cfg
 bin/
 build/
 exports/
+ios/plugins/
 
 # OS/editor noise
 .DS_Store

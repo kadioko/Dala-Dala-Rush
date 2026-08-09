@@ -5,6 +5,8 @@ const SAVE_PATH := "user://save.json"
 const BACKUP_PATH := "user://save.json.bak"
 
 var data: Dictionary = {}
+var _batch_depth: int = 0
+var _batch_dirty: bool = false
 
 const DEFAULTS := {
 	"schema_version": 2,
@@ -17,6 +19,7 @@ const DEFAULTS := {
 	"music_on": true,
 	"sfx_on": true,
 	"haptics_on": true,
+	"reduced_effects": false,
 	"locale": "sw",
 	# Career stats
 	"total_runs": 0,
@@ -35,6 +38,10 @@ const DEFAULTS := {
 	"route_goals_completed": 0,
 	"daily_challenge_claimed_date": "",
 	"daily_challenges_completed": 0,
+	# Ad pacing. Keep this local so interstitial cadence survives restarts.
+	"ads_runs_since_interstitial": 0,
+	"ads_next_interstitial_at": 2,
+	"ads_pending_interstitial": false,
 	# Daily login streak
 	"streak_count": 0,
 	"streak_last_date": "",
@@ -69,7 +76,7 @@ func _load_from(path: String) -> bool:
 		data[k] = parsed[k]
 	return true
 
-func save() -> void:
+func save() -> bool:
 	# Rotate the last good save to .bak before overwriting,
 	# so a crash mid-write can never lose everything.
 	if FileAccess.file_exists(SAVE_PATH):
@@ -77,29 +84,52 @@ func save() -> void:
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_warning("Save: cannot open file for writing.")
-		return
+		return false
 	f.store_string(JSON.stringify(data))
 	f.close()
+	_batch_dirty = false
+	return true
+
+## Defers disk writes until the matching end_batch(). Calls may be nested.
+func begin_batch() -> void:
+	_batch_depth += 1
+
+## Flushes all mutations once the outermost batch finishes.
+func end_batch() -> void:
+	if _batch_depth <= 0:
+		push_warning("Save: end_batch called without begin_batch.")
+		return
+	_batch_depth -= 1
+	if _batch_depth == 0 and _batch_dirty:
+		save()
+
+func _request_save() -> void:
+	if _batch_depth > 0:
+		_batch_dirty = true
+	else:
+		save()
 
 func get_value(key: String, fallback: Variant = null) -> Variant:
 	return data.get(key, fallback)
 
 func set_value(key: String, value: Variant) -> void:
 	data[key] = value
-	save()
+	_request_save()
 
 # ── Coins ────────────────────────────────────────────────────────
 
 func add_coins(amount: int) -> void:
+	if amount == 0:
+		return
 	data["total_coins"] = int(data.get("total_coins", 0)) + amount
-	save()
+	_request_save()
 
 func spend_coins(amount: int) -> bool:
 	var total := int(data.get("total_coins", 0))
 	if amount < 0 or total < amount:
 		return false
 	data["total_coins"] = total - amount
-	save()
+	_request_save()
 	return true
 
 # ── Vehicles ─────────────────────────────────────────────────────
@@ -109,7 +139,7 @@ func unlock_vehicle(id: String) -> void:
 	if id not in u:
 		u.append(id)
 		data["unlocked_vehicles"] = u
-		save()
+		_request_save()
 
 func is_vehicle_unlocked(id: String) -> bool:
 	return id in data.get("unlocked_vehicles", [])
@@ -124,7 +154,7 @@ func add_consumable(id: String, amount: int = 1) -> void:
 	var inv: Dictionary = data.get("consumables", {})
 	inv[id] = int(inv.get(id, 0)) + amount
 	data["consumables"] = inv
-	save()
+	_request_save()
 
 ## Returns true and decrements if at least one is owned.
 func use_consumable(id: String) -> bool:
@@ -134,7 +164,7 @@ func use_consumable(id: String) -> bool:
 		return false
 	inv[id] = n - 1
 	data["consumables"] = inv
-	save()
+	_request_save()
 	return true
 
 # ── Routes ───────────────────────────────────────────────────────
@@ -144,7 +174,7 @@ func unlock_route(id: String) -> void:
 	if id not in u:
 		u.append(id)
 		data["unlocked_routes"] = u
-		save()
+		_request_save()
 
 func is_route_unlocked(id: String) -> bool:
 	return id in data.get("unlocked_routes", [])
@@ -154,7 +184,7 @@ func is_route_unlocked(id: String) -> bool:
 func update_best_score(score: int) -> bool:
 	if score > int(data.get("best_score", 0)):
 		data["best_score"] = score
-		save()
+		_request_save()
 		return true
 	return false
 
@@ -162,7 +192,7 @@ func update_route_best(route_id: String, score: int) -> bool:
 	var key := "best_" + route_id
 	if score > int(data.get(key, 0)):
 		data[key] = score
-		save()
+		_request_save()
 		return true
 	return false
 
@@ -177,13 +207,13 @@ func add_run_stats(distance: float, coins: int, passengers: int, count_run: bool
 	data["total_distance_ever"] = float(data.get("total_distance_ever", 0.0)) + distance
 	data["total_coins_ever"]    = int(data.get("total_coins_ever", 0)) + coins
 	data["total_passengers_ever"] = int(data.get("total_passengers_ever", 0)) + passengers
-	save()
+	_request_save()
 
 func add_route_goal_completion(route_id: String) -> void:
 	data["route_goals_completed"] = int(data.get("route_goals_completed", 0)) + 1
 	var key := "route_goal_" + route_id
 	data[key] = int(data.get(key, 0)) + 1
-	save()
+	_request_save()
 
 # ── Leaderboard ──────────────────────────────────────────────────
 
@@ -200,7 +230,7 @@ func add_to_leaderboard(player_name: String, score: int, route_id: String) -> vo
 	if lb.size() > 5:
 		lb.resize(5)
 	data["leaderboard"] = lb
-	save()
+	_request_save()
 
 func get_leaderboard() -> Array:
 	return data.get("leaderboard", [])

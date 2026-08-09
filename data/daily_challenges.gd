@@ -55,11 +55,13 @@ static func is_completed_today() -> bool:
 	return SaveSystem.get_value("daily_challenge_claimed_date", "") == today_key()
 
 static func mark_completed_today() -> void:
+	SaveSystem.begin_batch()
 	SaveSystem.set_value("daily_challenge_claimed_date", today_key())
 	SaveSystem.set_value(
 		"daily_challenges_completed",
 		int(SaveSystem.get_value("daily_challenges_completed", 0)) + 1
 	)
+	SaveSystem.end_batch()
 
 static func is_met(challenge: Dictionary, stats: Dictionary) -> bool:
 	return _value(String(challenge.get("type", "score")), stats) >= float(challenge.get("target", 0))

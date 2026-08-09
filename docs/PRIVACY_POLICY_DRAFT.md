@@ -1,6 +1,11 @@
-# Privacy Policy Draft
+# Privacy Policy Source
 
-Effective date: June 16, 2026
+Source verified: August 9, 2026.
+
+Keep this copy synchronized with both `privacy-policy.html` and
+`docs/privacy-policy.html`. The public GitHub Pages URL is active.
+
+Effective date: August 9, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -15,9 +20,15 @@ The game stores gameplay progress locally on your device, including:
 - Selected vehicle
 - Language setting
 - Sound and music settings
+- Haptics, reduced-effects, and language settings
+- Routes, missions, achievements, career upgrades, and daily/streak progress
+- Optional local ghost-race, livery, and leaderboard data
+- Local ad pacing and offline analytics-event logs
 
 This local gameplay data is used only to make the game work and remember your
-progress. It is not sold by us.
+progress. The current analytics bridge does not upload its local event log. This
+local data is not sold by us and can be removed by clearing app storage or
+uninstalling the game.
 
 ## Ads
 
@@ -52,10 +63,14 @@ children and families requirements.
 The MVP version uses fake in-game coins only. It does not include real-money
 gambling, betting, or real-money purchases.
 
+Rewarded ads may offer one revive per game run or a double-coins reward after
+a run. These rewards use only in-game coins and have no cash value.
+
 ## Permissions
 
 The app may use internet and network state permissions so ads can load. It may
-also use vibration for gameplay feedback.
+also use vibration for gameplay feedback. The Google Mobile Ads SDK may add the
+advertising ID permission to the merged Android manifest.
 
 ## Contact
 
@@ -65,7 +80,13 @@ For privacy questions, contact:
 support@kadioko.com
 ```
 
+Confirm this mailbox is monitored before publishing the next update.
+
 ## Changes
 
 This policy may be updated when the app changes. Any major updates should be
 reflected on the hosted privacy policy page before uploading a new release.
+
+Current hosted URL:
+
+https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html

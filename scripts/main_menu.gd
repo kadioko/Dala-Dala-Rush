@@ -56,18 +56,22 @@ func _ready() -> void:
 	add_child(overlay)
 
 	# ── UI layer ─────────────────────────────────────────────────
+	var scroll := ScrollContainer.new()
+	scroll.anchor_right = 1.0
+	scroll.anchor_bottom = 1.0
+	scroll.offset_left = 18
+	scroll.offset_right = -18
+	scroll.offset_top = 22 + UIFactory.safe_top_inset(vsize.y)
+	scroll.offset_bottom = -76 - UIFactory.safe_bottom_inset(vsize.y)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	add_child(scroll)
+
 	var v := VBoxContainer.new()
-	v.anchor_left = 0.0
-	v.anchor_top = 0.0
-	v.anchor_right = 1.0
-	v.anchor_bottom = 1.0
-	v.offset_left = 24
-	v.offset_right = -24
-	v.offset_top = 28 + UIFactory.safe_top_inset(vsize.y)
-	v.offset_bottom = -28
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 7)
-	add_child(v)
+	scroll.add_child(v)
 
 	_title = UIFactory.make_title("", 34)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -159,32 +163,48 @@ func _ready() -> void:
 	_btn_missions.pressed.connect(func(): _go("res://scenes/missions.tscn"))
 	info_row.add_child(_btn_missions)
 
+	var utility_grid := GridContainer.new()
+	utility_grid.columns = 2
+	utility_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	utility_grid.add_theme_constant_override("h_separation", 8)
+	utility_grid.add_theme_constant_override("v_separation", 8)
+	v.add_child(utility_grid)
+
 	for pair in [
 		["", "res://scenes/routes.tscn"],
 		["", "res://scenes/garage.tscn"],
 		["", "res://scenes/shop.tscn"],
 		["", "res://scenes/settings.tscn"],
-		["", "res://scenes/how_to_play.tscn"],
 	]:
 		var path: String = pair[1]
 		var btn := UIFactory.make_button("", false)
-		btn.custom_minimum_size = Vector2(0, 58)
+		btn.custom_minimum_size = Vector2(0, 54)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.add_theme_font_size_override("font_size", 20)
+		btn.add_theme_font_size_override("font_size", 18)
 		btn.pressed.connect(func(): _go(path))
-		v.add_child(btn)
+		utility_grid.add_child(btn)
 		match path:
 			"res://scenes/routes.tscn":   _btn_routes   = btn
 			"res://scenes/garage.tscn":   _btn_garage   = btn
 			"res://scenes/shop.tscn":     _btn_shop     = btn
-			"res://scenes/settings.tscn": _btn_settings = btn
-			_:                            _btn_how      = btn
+			_:                            _btn_settings = btn
+
+	_btn_how = UIFactory.make_button("", false)
+	_btn_how.custom_minimum_size = Vector2(0, 52)
+	_btn_how.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_how.add_theme_font_size_override("font_size", 18)
+	_btn_how.pressed.connect(func(): _go("res://scenes/how_to_play.tscn"))
+	v.add_child(_btn_how)
 
 	_pulse_play_btn()
 
 	LocaleManager.locale_changed.connect(_refresh_text)
 	_refresh_text()
+	AdService.show_banner(self, AdService.PLACEMENT_BANNER_MENU)
 	set_process(true)
+
+func _exit_tree() -> void:
+	AdService.hide_banner()
 
 func _process(delta: float) -> void:
 	_scroll_t += delta
@@ -220,7 +240,7 @@ func _spacer(h: int) -> Control:
 
 func _refresh_text(_l := "") -> void:
 	_title.text            = LocaleManager.t("GAME_TITLE")
-	_subtitle.text         = "Dar es Salaam • Endless Run"
+	_subtitle.text         = LocaleManager.t("MAIN_SUBTITLE")
 	_high_score_label.text = "★ %d" % int(SaveSystem.get_value("best_score", 0))
 	_coin_label.text       = "🪙 %d" % int(SaveSystem.get_value("total_coins", 0))
 	_btn_play.text         = LocaleManager.t("PLAY")

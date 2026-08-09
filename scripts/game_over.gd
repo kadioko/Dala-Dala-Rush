@@ -32,27 +32,34 @@ const ANIM_SPEED := 3.5
 var _name_edit: LineEdit = null
 var _submit_btn: Button = null
 var _score_submitted: bool = false
+var _pending_nav_path: String = ""
+var _interstitial_in_progress: bool = false
+var _reward_in_progress: bool = false
+var _ad_row: HBoxContainer
 
 func _ready() -> void:
 	UIFactory.paint_background(self, UIFactory.COL_BG)
 
-	var v := VBoxContainer.new()
-	v.anchor_left = 0.5
-	v.anchor_top = 0.0
-	v.anchor_right = 0.5
-	v.anchor_bottom = 0.0
-	v.offset_left = -210
-	v.offset_right = 210
-	v.offset_top = 18
-	v.add_theme_constant_override("separation", 10)
-	add_child(v)
+	var scroll := ScrollContainer.new()
+	scroll.anchor_right = 1.0
+	scroll.anchor_bottom = 1.0
+	scroll.offset_left = 18
+	scroll.offset_right = -18
+	scroll.offset_top = 12 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	scroll.offset_bottom = -76 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	add_child(scroll)
 
-	# Slide-in entrance
-	v.position.y = 60.0
+	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_theme_constant_override("separation", 10)
+	scroll.add_child(v)
+
+	# A light entrance without fighting ScrollContainer's layout positioning.
 	v.modulate.a = 0.0
 	var entrance := v.create_tween()
-	entrance.tween_property(v, "position:y", 0.0, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	entrance.parallel().tween_property(v, "modulate:a", 1.0, 0.35)
+	entrance.tween_property(v, "modulate:a", 1.0, 0.35)
 
 	# ── Title ──
 	_title_lbl = UIFactory.make_title("", 42)
@@ -142,22 +149,23 @@ func _ready() -> void:
 	_ad_msg_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_ad_msg_lbl)
 
-	var ad_row := HBoxContainer.new()
-	ad_row.add_theme_constant_override("separation", 8)
-	ad_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(ad_row)
+	_ad_row = HBoxContainer.new()
+	_ad_row.add_theme_constant_override("separation", 8)
+	_ad_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(_ad_row)
 
 	_continue_btn = UIFactory.make_button("", false)
 	_continue_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_continue_btn.custom_minimum_size = Vector2(0, 50)
 	_continue_btn.pressed.connect(_on_continue_ad)
-	ad_row.add_child(_continue_btn)
+	_ad_row.add_child(_continue_btn)
+	_continue_btn.visible = not GameState.continue_used
 
 	_double_btn = UIFactory.make_button("", false)
 	_double_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_double_btn.custom_minimum_size = Vector2(0, 50)
 	_double_btn.pressed.connect(_on_double_coins_ad)
-	ad_row.add_child(_double_btn)
+	_ad_row.add_child(_double_btn)
 
 	# ── Buttons ──
 	_play_btn = UIFactory.make_button("")
@@ -177,14 +185,19 @@ func _ready() -> void:
 	v.add_child(_share_btn)
 
 	AdService.rewarded_result.connect(_on_rewarded_result)
+	AdService.interstitial_closed.connect(_on_interstitial_closed)
+	AdService.show_banner(self, AdService.PLACEMENT_BANNER_RESULTS)
 	# Hide ad buttons entirely when no ad (or simulation) is available.
 	if not AdService.is_rewarded_available():
-		ad_row.visible = false
+		_ad_row.visible = false
 		_ad_msg_lbl.visible = false
 
 	LocaleManager.locale_changed.connect(_refresh)
 	_refresh()
 	set_process(true)
+
+func _exit_tree() -> void:
+	AdService.hide_banner()
 
 func _stat_label(parent: Control, col: Color = UIFactory.COL_TEXT, font_size: int = 22) -> Label:
 	var l := UIFactory.make_label("", font_size, col)
@@ -292,35 +305,71 @@ func _on_submit_score() -> void:
 
 func _on_play_again() -> void:
 	AudioManager.play_sfx("click")
-	TransitionManager.go_to("res://scenes/game.tscn")
+	_go_after_optional_interstitial("res://scenes/game.tscn")
 
 func _on_main_menu() -> void:
 	AudioManager.play_sfx("click")
-	TransitionManager.go_to("res://scenes/main_menu.tscn")
+	_go_after_optional_interstitial("res://scenes/main_menu.tscn")
 
 func _on_view_leaderboard() -> void:
 	AudioManager.play_sfx("click")
 	TransitionManager.go_to("res://scenes/leaderboard.tscn")
 
+func _go_after_optional_interstitial(path: String) -> void:
+	if _interstitial_in_progress:
+		return
+	AdService.note_completed_run()
+	if AdService.is_interstitial_available() and AdService.consume_pending_interstitial():
+		_pending_nav_path = path
+		_interstitial_in_progress = true
+		_play_btn.disabled = true
+		_menu_btn.disabled = true
+		_ad_msg_lbl.visible = true
+		_ad_msg_lbl.text = LocaleManager.t("AD_INTERSTITIAL_LOADING")
+		AdService.show_interstitial(AdService.PLACEMENT_INTERSTITIAL_RUN_END)
+		return
+	TransitionManager.go_to(path)
+
+func _on_interstitial_closed(_placement: String) -> void:
+	if not _interstitial_in_progress:
+		return
+	var path := _pending_nav_path
+	_pending_nav_path = ""
+	_interstitial_in_progress = false
+	if path == "":
+		path = "res://scenes/main_menu.tscn"
+	TransitionManager.go_to(path)
+
 func _on_continue_ad() -> void:
 	AudioManager.play_sfx("click")
+	if _reward_in_progress or GameState.continue_used:
+		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
+	_reward_in_progress = true
 	_continue_btn.disabled = true
+	_double_btn.disabled = true
 	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
 	AdService.show_rewarded(AdService.PLACEMENT_CONTINUE)
 
 func _on_double_coins_ad() -> void:
 	AudioManager.play_sfx("click")
+	if _reward_in_progress:
+		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
+	_reward_in_progress = true
 	_double_btn.disabled = true
+	_continue_btn.disabled = true
 	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
 	AdService.show_rewarded(AdService.PLACEMENT_DOUBLE_COINS)
 
 func _on_rewarded_result(placement: String, success: bool) -> void:
+	if not _reward_in_progress:
+		return
+	_reward_in_progress = false
 	if not success:
 		_ad_msg_lbl.text = LocaleManager.t("AD_FAILED")
 		_continue_btn.disabled = false
@@ -328,12 +377,13 @@ func _on_rewarded_result(placement: String, success: bool) -> void:
 		return
 	match placement:
 		AdService.PLACEMENT_CONTINUE:
-			GameState.request_continue()
-			TransitionManager.go_to("res://scenes/game.tscn")
+			if GameState.request_continue():
+				TransitionManager.go_to("res://scenes/game.tscn")
 		AdService.PLACEMENT_DOUBLE_COINS:
 			SaveSystem.add_coins(GameState.last_coins)
 			AudioManager.play_sfx("powerup")
 			_ad_msg_lbl.text = "+%d %s" % [GameState.last_coins, LocaleManager.t("COINS")]
+			_ad_row.visible = false
 
 func _on_share() -> void:
 	AudioManager.play_sfx("click")

@@ -78,6 +78,9 @@ func play_sfx(key: String) -> void:
 	var p: AudioStreamPlayer = _sfx_players[_next_voice]
 	_next_voice = (_next_voice + 1) % VOICE_POOL
 	p.stream = stream as AudioStream
+	# Keep the horn present over music without making pickups feel equally loud.
+	p.volume_db = -1.0 if key == "horn" else (-2.0 if key == "crash" else -4.0)
+	p.pitch_scale = 1.0
 	p.play()
 
 func play_music() -> void:
@@ -131,13 +134,29 @@ func _procedural(key: String) -> AudioStreamWAV:
 			return _render(0.05, func(t: float, d: float) -> float:
 				return sin(t * 440.0 * TAU) * _env(t, d, 0.002, 0.9) * 0.3)
 		"horn":
-			# Classic two-tone daladala horn (detuned pair, vibrato)
-			return _render(0.35, func(t: float, d: float) -> float:
-				var vib: float = 1.0 + 0.012 * sin(t * 9.0 * TAU)
-				var a: float = sin(t * 392.0 * vib * TAU)
-				var b: float = sin(t * 494.0 * vib * TAU)
-				var sq: float = signf(a) * 0.25 + a * 0.45  # slightly brassy
-				return (sq + b * 0.5) * _env(t, d, 0.02, 0.3) * 0.35)
+			# Short two-pulse dala dala honk: bright enough for traffic, not harsh.
+			return _render(0.62, func(t: float, _d: float) -> float:
+				var pulse_start: float = 0.0
+				var pulse_length: float = 0.17
+				if t >= 0.22:
+					pulse_start = 0.22
+					pulse_length = 0.36
+				elif t >= 0.17:
+					return 0.0
+				var local_t: float = t - pulse_start
+				if local_t < 0.0 or local_t > pulse_length:
+					return 0.0
+				var attack: float = smoothstep(0.0, 0.018, local_t)
+				var release: float = smoothstep(0.0, 0.075, pulse_length - local_t)
+				var breath: float = 1.0 + 0.008 * sin(local_t * 7.5 * TAU)
+				var fundamental: float = 311.0 * breath
+				var high_tone: float = 392.0 * breath
+				var brass: float = sin(local_t * fundamental * TAU) * 0.55
+				brass += sin(local_t * fundamental * 2.0 * TAU) * 0.22
+				brass += sin(local_t * fundamental * 3.0 * TAU) * 0.10
+				brass += sin(local_t * high_tone * TAU) * 0.34
+				brass += sin(local_t * high_tone * 2.0 * TAU) * 0.09
+				return clampf(brass * attack * release * 0.56, -0.86, 0.86))
 		"powerup":
 			# Sparkly upward sweep
 			return _render(0.30, func(t: float, d: float) -> float:

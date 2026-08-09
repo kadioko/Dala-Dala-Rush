@@ -10,6 +10,7 @@ var selected_route_id: String = "kariakoo"
 
 # Last completed run — read by GameOver and Leaderboard.
 var last_score: int = 0
+var last_bonus_score: int = 0
 var last_coins: int = 0
 var last_bonus_coins: int = 0
 var last_passengers: int = 0
@@ -34,6 +35,8 @@ var last_missions_completed: Array = []
 # of starting a fresh run.
 var continue_pending: bool = false
 var continue_state: Dictionary = {}
+var continue_used: bool = false
+var _last_resume_state: Dictionary = {}
 
 # Banked totals already credited to the save during this run
 # (prevents double-counting when a run is continued after a crash).
@@ -51,6 +54,7 @@ func _ready() -> void:
 
 ## Grandfather existing players: any route already played stays unlocked.
 func _migrate_route_unlocks() -> void:
+	SaveSystem.begin_batch()
 	for r in Routes.LIST:
 		var rid := String(r.id)
 		if SaveSystem.get_route_best(rid) > 0 and not SaveSystem.is_route_unlocked(rid):
@@ -59,6 +63,7 @@ func _migrate_route_unlocks() -> void:
 	var sel := Routes.get_by_id(selected_route_id)
 	if not Routes.is_unlocked(sel):
 		set_route("kariakoo")
+	SaveSystem.end_batch()
 
 func set_vehicle(id: String) -> void:
 	selected_vehicle_id = id
@@ -72,6 +77,8 @@ func set_route(id: String) -> void:
 func begin_run() -> void:
 	continue_pending = false
 	continue_state = {}
+	continue_used = false
+	_last_resume_state = {}
 	_banked_coins = 0
 	_banked_distance = 0.0
 	_banked_passengers = 0
@@ -80,20 +87,28 @@ func begin_run() -> void:
 	_goal_rewarded = false
 
 ## Called by GameOver when the player watches a rewarded ad to continue.
-func request_continue() -> void:
+func request_continue() -> bool:
+	if continue_used:
+		return false
+	continue_used = true
 	continue_pending = true
 	continue_state = {
 		"distance": last_distance,
+		"bonus_score": last_bonus_score,
 		"coins": last_coins,
 		"passengers": last_passengers,
 		"near_misses": last_near_misses,
 		"dropoffs": last_dropoffs,
 		"fares": last_fares,
 	}
+	continue_state.merge(_last_resume_state, true)
+	return true
 
 func record_run(score: int, coins: int, passengers: int, distance: float,
 		near_misses: int = 0, extra: Dictionary = {}) -> void:
+	SaveSystem.begin_batch()
 	last_score      = score
+	last_bonus_score = maxi(0, score - int(distance * 0.1))
 	last_coins      = coins
 	last_dropoffs   = int(extra.get("dropoffs", 0))
 	last_fares      = int(extra.get("fares", 0))
@@ -104,6 +119,19 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 	last_passengers = passengers
 	last_distance   = distance
 	last_near_misses = near_misses
+	_last_resume_state = {
+		"onboard": int(extra.get("onboard", 0)),
+		"fuel": float(extra.get("fuel", 0.6)),
+		"elapsed": float(extra.get("elapsed", 0.0)),
+		"horn_uses": int(extra.get("horn_uses", 0)),
+		"boosts": int(extra.get("boosts", 0)),
+		"horn_charges": int(extra.get("horn_charges", 0)),
+		"max_horn_charges": int(extra.get("max_horn_charges", 3)),
+		"horn_regen_timer": float(extra.get("horn_regen_timer", 0.0)),
+		"fuel_drain_mult": float(extra.get("fuel_drain_mult", 1.0)),
+		"condition": String(extra.get("condition", "day")),
+		"rush_hour": bool(extra.get("rush_hour", false)),
+	}
 	last_is_new_record   = SaveSystem.update_best_score(score)
 	last_is_route_record = SaveSystem.update_route_best(selected_route_id, score)
 
@@ -170,3 +198,4 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 	_banked_distance = distance
 	_banked_passengers = passengers
 	_run_counted = true
+	SaveSystem.end_batch()

@@ -22,6 +22,7 @@ var strings: Dictionary = {
 		"QUIT": "Ondoka",
 		"PAUSE": "Pumzika",
 		"RESUME": "Endelea",
+		"RESTART": "Anza Upya",
 		"MAIN_MENU": "Menyu Kuu",
 		"PLAY_AGAIN": "Cheza Tena",
 		"SHARE_SCORE": "Shiriki Score",
@@ -46,8 +47,10 @@ var strings: Dictionary = {
 		"MUSIC": "Muziki",
 		"SFX": "Sauti",
 		"HAPTICS": "Mtetemo",
+		"REDUCED_EFFECTS": "Athari Chache",
 		"LANGUAGE": "Lugha",
 		"SELECT_LANGUAGE": "Chagua Lugha",
+		"PRIVACY_POLICY": "Sera ya Faragha",
 		"ON": "Washa",
 		"OFF": "Zima",
 		"SWAHILI": "Kiswahili",
@@ -56,6 +59,8 @@ var strings: Dictionary = {
 		"CONTINUE_AD": "Endelea kwa Ad",
 		"ADS_SOON": "Ad bado haijawashwa kwenye MVP",
 		"AD_PLACEHOLDER": "Matangazo ni placeholder tu",
+		"AD_BANNER_LABEL": "Tangazo",
+		"AD_INTERSTITIAL_LOADING": "Tangazo fupi linakuja...",
 		"SHARE_COPIED": "Ujumbe umewekwa kwenye clipboard",
 		"HOW_TEXT": "Sogeza kushoto au kulia kwa kuvuta kidole. Epuka magari, mashimo, na bodaboda. Kusanya sarafu na abiria kuongeza score.",
 		"COLLECT_PASSENGERS": "Kusanya Abiria",
@@ -63,6 +68,10 @@ var strings: Dictionary = {
 		"ON_FIRE": "Uko kwenye moto!",
 		"TRAFFIC_JAM": "Traffic imekubana!",
 		"TAP_TO_START": "Gusa kuanza",
+		"START_HINT": "Vuta kidole au gusa mishale kubadili njia!",
+		"MAIN_SUBTITLE": "Dar es Salaam • Mbio zisizoisha",
+		"SPLASH_SUBTITLE": "Foleni, nauli, na mwendo wa jiji",
+		"SPLASH_SKIP": "Gusa kuruka",
 		"SHARE_TEXT": "Nimekimbiza Dala Dala Rush TZ na kupata score ya {score}! Unaweza kunipita?",
 		"ROUTE_KARIAKOO": "Kariakoo Rush",
 		"ROUTE_MWENGE": "Mwenge Madness",
@@ -112,6 +121,29 @@ var strings: Dictionary = {
 		"CTRL_BUTTONS": "Bonyeza vitufe  ◀  ▶  chini",
 		"CTRL_PAUSE": "Bonyeza  II  kusimama mchezo",
 		"CTRL_LANE": "Njia 3 za kuendesha",
+		"HOW_INTRO": "Badilisha njia, kusanya abiria, na epuka foleni.",
+		"TIP_INTRO": "Mbinu ndogo, nauli kubwa. Cheza kwa akili.",
+		"TIP_GROUP_DRIVE": "UENDESHAJI",
+		"TIP_GROUP_SURVIVE": "USALAMA",
+		"TIP_GROUP_DALADALA": "MAISHA YA DALA DALA",
+		"NAME_BODABODA": "Bodaboda",
+		"NAME_BAJAJI": "Bajaji",
+		"NAME_CAR": "Gari",
+		"NAME_POTHOLE": "Shimo",
+		"NAME_CONE": "Koni",
+		"NAME_POLICE": "Polisi",
+		"NAME_BARRIER": "Kizuizi",
+		"NAME_TRUCK": "Lori",
+		"NAME_PEDESTRIAN": "Wavuka Barabara",
+		"NAME_TIRE": "Tairi",
+		"NAME_MBUZI": "Mbuzi",
+		"NAME_COIN": "Sarafu",
+		"NAME_PASSENGER": "Abiria",
+		"NAME_FUEL": "Mafuta",
+		"NAME_SHIELD": "Ngao",
+		"NAME_MAGNET": "Sumaku",
+		"NAME_SPEED": "Kasi Juu",
+		"NAME_SLOW": "Polepole",
 		# Obstacle descriptions
 		"OBS_BODABODA": "Pikipiki ya haraka sana!",
 		"OBS_BAJAJI": "Magurudumu matatu",
@@ -203,6 +235,7 @@ var strings: Dictionary = {
 		"HORN_BTN": "📯",
 		"HORN_CHARGES": "Pembe",
 		"HORN_EMPTY": "Pembe imeisha!",
+		"HORN_BLAST": "PEMBE!",
 		"PREP": "Jiandae...",
 		"LANE_WARNING": "ANGALIA!",
 		# Login streak
@@ -228,6 +261,8 @@ var strings: Dictionary = {
 		"ITEM_FUEL_D": "Mafuta hupungua polepole 20% mchezo ujao",
 		# Vituo passenger loop
 		"KITUO_AHEAD": "KITUO mbele!",
+		"KITUO_LEFT": "Kituo kushoto!",
+		"KITUO_RIGHT": "Kituo kulia!",
 		"KITUO_MISSED": "Kituo kimepita!",
 		"FARE": "NAULI",
 		"FINE": "FAINI!",
@@ -307,6 +342,7 @@ var strings: Dictionary = {
 		"QUIT": "Quit",
 		"PAUSE": "Pause",
 		"RESUME": "Resume",
+		"RESTART": "Restart",
 		"MAIN_MENU": "Main Menu",
 		"PLAY_AGAIN": "Play Again",
 		"SHARE_SCORE": "Share Score",
@@ -331,8 +367,10 @@ var strings: Dictionary = {
 		"MUSIC": "Music",
 		"SFX": "Sound FX",
 		"HAPTICS": "Vibration",
+		"REDUCED_EFFECTS": "Reduced Effects",
 		"LANGUAGE": "Language",
 		"SELECT_LANGUAGE": "Choose Language",
+		"PRIVACY_POLICY": "Privacy Policy",
 		"ON": "On",
 		"OFF": "Off",
 		"SWAHILI": "Swahili",
@@ -341,6 +379,8 @@ var strings: Dictionary = {
 		"CONTINUE_AD": "Continue with Ad",
 		"ADS_SOON": "Ads are not wired in the MVP yet",
 		"AD_PLACEHOLDER": "Ads are placeholder only",
+		"AD_BANNER_LABEL": "Ad",
+		"AD_INTERSTITIAL_LOADING": "Short ad coming...",
 		"SHARE_COPIED": "Share text copied to clipboard",
 		"HOW_TEXT": "Swipe left or right to switch lanes. Dodge cars, potholes, and bodabodas. Collect coins and passengers to boost your score.",
 		"COLLECT_PASSENGERS": "Collect Passengers",
@@ -348,6 +388,10 @@ var strings: Dictionary = {
 		"ON_FIRE": "You're on fire!",
 		"TRAFFIC_JAM": "Traffic jam!",
 		"TAP_TO_START": "Tap to start",
+		"START_HINT": "Swipe or tap the arrows to change lanes!",
+		"MAIN_SUBTITLE": "Dar es Salaam • Endless Run",
+		"SPLASH_SUBTITLE": "Traffic, fares, and city speed",
+		"SPLASH_SKIP": "Tap to skip",
 		"SHARE_TEXT": "I just scored {score} on Dala Dala Rush TZ! Can you beat me?",
 		"ROUTE_KARIAKOO": "Kariakoo Rush",
 		"ROUTE_MWENGE": "Mwenge Madness",
@@ -397,6 +441,29 @@ var strings: Dictionary = {
 		"CTRL_BUTTONS": "Tap  ◀  ▶  buttons at screen bottom",
 		"CTRL_PAUSE": "Tap  II  to pause the game",
 		"CTRL_LANE": "3 lanes to drive between",
+		"HOW_INTRO": "Change lanes, collect passengers, and escape the traffic.",
+		"TIP_INTRO": "Small moves, bigger fares. Drive smart.",
+		"TIP_GROUP_DRIVE": "DRIVING MOVES",
+		"TIP_GROUP_SURVIVE": "STAY SAFE",
+		"TIP_GROUP_DALADALA": "DALA DALA LIFE",
+		"NAME_BODABODA": "Bodaboda",
+		"NAME_BAJAJI": "Bajaji",
+		"NAME_CAR": "Car",
+		"NAME_POTHOLE": "Pothole",
+		"NAME_CONE": "Cone",
+		"NAME_POLICE": "Police",
+		"NAME_BARRIER": "Barrier",
+		"NAME_TRUCK": "Truck",
+		"NAME_PEDESTRIAN": "Pedestrian",
+		"NAME_TIRE": "Tire",
+		"NAME_MBUZI": "Goat",
+		"NAME_COIN": "Coin",
+		"NAME_PASSENGER": "Passenger",
+		"NAME_FUEL": "Fuel",
+		"NAME_SHIELD": "Shield",
+		"NAME_MAGNET": "Magnet",
+		"NAME_SPEED": "Speed Boost",
+		"NAME_SLOW": "Slow Motion",
 		# Obstacle descriptions
 		"OBS_BODABODA": "Super fast motorbike!",
 		"OBS_BAJAJI": "Three-wheel bajaji",
@@ -488,6 +555,7 @@ var strings: Dictionary = {
 		"HORN_BTN": "📯",
 		"HORN_CHARGES": "Horn",
 		"HORN_EMPTY": "No horn left!",
+		"HORN_BLAST": "HONK!",
 		"PREP": "Get ready...",
 		"LANE_WARNING": "WATCH OUT!",
 		# Login streak
@@ -513,6 +581,8 @@ var strings: Dictionary = {
 		"ITEM_FUEL_D": "Fuel drains 20% slower next run",
 		# Vituo passenger loop
 		"KITUO_AHEAD": "BUS STOP ahead!",
+		"KITUO_LEFT": "Bus stop left!",
+		"KITUO_RIGHT": "Bus stop right!",
 		"KITUO_MISSED": "Missed the stop!",
 		"FARE": "FARE",
 		"FINE": "FINE!",
@@ -581,11 +651,15 @@ var strings: Dictionary = {
 }
 
 func _ready() -> void:
-	current_locale = SaveSystem.get_value("locale", "sw")
+	var saved_locale := String(SaveSystem.get_value("locale", "sw"))
+	current_locale = saved_locale if strings.has(saved_locale) else "sw"
+	if current_locale != saved_locale:
+		SaveSystem.set_value("locale", current_locale)
 
 func t(key: String) -> String:
 	var locale_dict: Dictionary = strings.get(current_locale, strings["sw"])
-	return locale_dict.get(key, key)
+	# Swahili is the complete base copy, so it is the safe fallback for new UI.
+	return String(locale_dict.get(key, strings["sw"].get(key, key)))
 
 func set_locale(locale: String) -> void:
 	if locale == current_locale:

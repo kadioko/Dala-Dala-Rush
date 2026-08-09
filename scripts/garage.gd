@@ -19,8 +19,9 @@ func _ready() -> void:
 	root.anchor_bottom = 1.0
 	root.offset_left = 24
 	root.offset_right = -24
-	root.offset_top = 40
-	root.offset_bottom = -24
+	var safe_bottom := UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	root.offset_top = 40 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	root.offset_bottom = -24 - safe_bottom
 	root.add_theme_constant_override("separation", 12)
 	add_child(root)
 
@@ -105,11 +106,13 @@ func _on_vehicle_pressed(id: String) -> void:
 		_refresh()
 		return
 	var v: Dictionary = Vehicles.get_by_id(id)
+	SaveSystem.begin_batch()
 	if SaveSystem.spend_coins(int(v.price)):
 		SaveSystem.unlock_vehicle(id)
 		GameState.set_vehicle(id)
 		AudioManager.play_sfx("powerup")
 		_build_rows()
+	SaveSystem.end_batch()
 	_refresh()
 
 func _on_back() -> void:

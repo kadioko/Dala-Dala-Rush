@@ -31,6 +31,7 @@ static func claim_today() -> Dictionary:
 	var gap := _day_number(today) - _day_number(last)
 	streak = streak + 1 if gap == 1 else 1
 
+	SaveSystem.begin_batch()
 	SaveSystem.set_value("streak_last_date", today)
 	SaveSystem.set_value("streak_count", streak)
 
@@ -39,5 +40,6 @@ static func claim_today() -> Dictionary:
 
 	if streak >= 3:
 		AchievementManager.try_unlock("streak_3")
+	SaveSystem.end_batch()
 
 	return {"streak": streak, "reward": reward, "claimed_now": true}

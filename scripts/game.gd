@@ -37,11 +37,13 @@ const POOL_COL := 28
 var base_speed: float = 340.0
 var speed: float = 340.0
 var distance: float = 0.0
+var bonus_score: int = 0
 var coins: int = 0
 var passengers: int = 0
 var elapsed: float = 0.0
 var spawn_timer: float = 0.0
 var passenger_timer: float = 0.0
+var _last_safe_lane: int = 1
 var difficulty_mult: float = 1.0
 var current_route: Dictionary = {}
 var current_vehicle: Dictionary = {}
@@ -51,6 +53,7 @@ var coin_mult: float = 1.0
 var paused: bool = false
 var game_over: bool = false
 var near_miss_done: Dictionary = {}
+var reduced_effects: bool = false
 
 # ── Career upgrades (permanent, read at run start) ───────────────
 var _upg_engine: int = 0     # +4% score per level
@@ -64,6 +67,7 @@ var rush_hour: bool = false
 var _headlights: Node2D = null
 var _rain: CPUParticles2D = null
 var _fuel_warned: bool = false
+var _fuel_visual_state: int = -1
 
 # ── Ghost racing ──────────────────────────────────────────────────
 # Records the lane timeline of every fresh run; best run is saved and
@@ -100,6 +104,8 @@ const POLICE_FINE_PER_EXCESS := 5    # coins lost per excess at a checkpoint
 var kituo: Kituo = null
 var kituo_timer: float = 9.0         # first kituo arrives early to teach the mechanic
 var _kituo_warned: bool = false
+var _kituo_hint_time: float = 0.0
+var _kituo_hint_key: String = "KITUO_AHEAD"
 var _base_lane_time: float = 0.14
 
 # ── Power-ups ─────────────────────────────────────────────────────
@@ -113,7 +119,12 @@ const SLOW_MAX   := 4.0
 const BOOST_MAX  := 3.0
 const BOOST_SPEED_MULT := 1.45
 const GRACE_TIME := 2.5
-var _boost_used: bool = false
+const STARTER_WINDOW := 12.0
+const START_HINT_DURATION := 4.0
+const MAX_SPEED_RAMPS := 7
+const MIN_SPAWN_INTERVAL := 0.52
+var _total_boost_uses: int = 0
+var starter_hint_time: float = 0.0
 
 # ── Fuel ──────────────────────────────────────────────────────────
 var fuel: float = 1.0
@@ -131,7 +142,6 @@ var horn_charges: int = 3
 var horn_regen_timer: float = 0.0
 const HORN_REGEN_TIME := 14.0
 var max_horn_charges: int = 3
-var _horn_dots: Array = []
 var _horn_btn: Button
 var _total_horn_uses: int = 0
 
@@ -154,6 +164,8 @@ var _run_near_misses: int = 0
 var swipe_start: Vector2 = Vector2.ZERO
 var swipe_threshold: float = 40.0
 var swipe_active_id: int = -1
+var swipe_consumed: bool = false
+var mouse_swipe_active: bool = false
 
 # ── HUD nodes ─────────────────────────────────────────────────────
 var score_label: Label
@@ -168,7 +180,7 @@ var fuel_bar: ProgressBar
 var magnet_bar: ProgressBar
 var slow_bar: ProgressBar
 var boost_bar: ProgressBar
-var shield_icon: Label
+var shield_icon: Control
 var pause_overlay: Control
 var near_miss_flash: ColorRect
 
@@ -189,14 +201,27 @@ func _ready() -> void:
 	current_route = Routes.get_by_id(GameState.selected_route_id)
 	difficulty_mult = float(current_route.difficulty)
 	spawn_interval_mult = float(current_route.get("spawn_interval_mult", 1.0))
+	reduced_effects = bool(SaveSystem.get_value("reduced_effects", false))
+	var resume_state: Dictionary = {}
+	if GameState.continue_pending:
+		resume_state = GameState.continue_state.duplicate(true)
+	var is_continuing: bool = GameState.continue_pending and not resume_state.is_empty()
 
-	# ── Living city: roll this run's conditions ──────────────────
-	var roll := randf()
-	if roll < 0.40:   condition = "day"
-	elif roll < 0.60: condition = "dusk"
-	elif roll < 0.80: condition = "night"
-	else:             condition = "rain"
-	rush_hour = randf() < 0.25
+	# Give new drivers two clear runs before introducing weather and rush hour.
+	var completed_runs: int = int(SaveSystem.get_value("total_runs", 0))
+	if is_continuing:
+		condition = String(resume_state.get("condition", "day"))
+		rush_hour = bool(resume_state.get("rush_hour", false))
+	elif completed_runs < 2:
+		condition = "day"
+		rush_hour = false
+	else:
+		var roll: float = randf()
+		if roll < 0.40:   condition = "day"
+		elif roll < 0.60: condition = "dusk"
+		elif roll < 0.80: condition = "night"
+		else:             condition = "rain"
+		rush_hour = randf() < 0.25
 	if rush_hour:
 		spawn_interval_mult *= 0.85
 
@@ -229,7 +254,7 @@ func _ready() -> void:
 	add_child(entity_layer)
 
 	speed_lines = SpeedLinesCls.new()
-	speed_lines.setup(view_size)
+	speed_lines.setup(view_size, reduced_effects)
 	entity_layer.add_child(speed_lines)
 
 	_upg_engine = Career.upgrade_level("upg_engine")
@@ -244,9 +269,13 @@ func _ready() -> void:
 	horn_charges = max_horn_charges
 
 	player = PlayerCls.new()
+	player.reduced_motion = reduced_effects
 	entity_layer.add_child(player)
 	player.setup(lanes, current_vehicle)
-	player.position.y = view_size.y - 160
+	# The bus needs its own clear road space above the driving dock.
+	# Include gesture-navigation clearance so Android devices keep the same gap.
+	var gameplay_bottom_inset: float = UIFactory.safe_bottom_inset(view_size.y)
+	player.position.y = view_size.y - 246 - gameplay_bottom_inset
 	_base_lane_time = player.lane_switch_time
 	if condition == "rain":
 		_base_lane_time *= 1.18  # wet road: heavier steering
@@ -260,7 +289,7 @@ func _ready() -> void:
 	# Rain: streaking particles across the screen
 	if condition == "rain":
 		_rain = CPUParticles2D.new()
-		_rain.amount = 90
+		_rain.amount = 36 if reduced_effects else 90
 		_rain.lifetime = 0.7
 		_rain.preprocess = 0.7
 		_rain.position = Vector2(view_size.x * 0.5, -20)
@@ -290,20 +319,28 @@ func _ready() -> void:
 			_ghost_node = _GhostBus.new()
 			_ghost_node.modulate = Color(1, 1, 1, 0.38)
 			entity_layer.add_child(_ghost_node)
-			_ghost_node.position = Vector2(lanes[1], view_size.y - 290)
+			_ghost_node.position = Vector2(lanes[1], player.position.y - 94.0)
 	_ghost_events = [[0.0, 1]]
 
 	# Ad-continue: restore the crashed run's progress, else start fresh.
-	if GameState.continue_pending:
-		var cs: Dictionary = GameState.continue_state
-		distance        = float(cs.get("distance", 0.0))
-		coins           = int(cs.get("coins", 0))
-		passengers      = int(cs.get("passengers", 0))
-		_run_near_misses = int(cs.get("near_misses", 0))
-		dropoffs        = int(cs.get("dropoffs", 0))
-		fares_earned    = int(cs.get("fares", 0))
-		elapsed         = distance / max(1.0, base_speed * difficulty_mult)
-		fuel            = max(fuel, 0.6)
+	if is_continuing:
+		distance         = float(resume_state.get("distance", 0.0))
+		bonus_score      = int(resume_state.get("bonus_score", 0))
+		coins            = int(resume_state.get("coins", 0))
+		passengers       = int(resume_state.get("passengers", 0))
+		onboard          = clampi(int(resume_state.get("onboard", 0)), 0, CAPACITY + OVERLOAD_MAX)
+		_run_near_misses = int(resume_state.get("near_misses", 0))
+		dropoffs         = int(resume_state.get("dropoffs", 0))
+		fares_earned     = int(resume_state.get("fares", 0))
+		elapsed          = maxf(0.0, float(resume_state.get("elapsed", 0.0)))
+		fuel             = clampf(maxf(float(resume_state.get("fuel", 0.0)), 0.6), 0.0, 1.0)
+		_total_horn_uses = int(resume_state.get("horn_uses", 0))
+		_total_boost_uses = int(resume_state.get("boosts", 0))
+		max_horn_charges = maxi(1, int(resume_state.get("max_horn_charges", max_horn_charges)))
+		horn_charges     = clampi(int(resume_state.get("horn_charges", 0)), 0, max_horn_charges)
+		horn_regen_timer = clampf(float(resume_state.get("horn_regen_timer", HORN_REGEN_TIME)), 0.0, HORN_REGEN_TIME)
+		fuel_drain_mult  = maxf(0.1, float(resume_state.get("fuel_drain_mult", fuel_drain_mult)))
+		_update_handling()
 		grace_time      = GRACE_TIME
 		_was_continued  = true
 		GameState.continue_pending = false
@@ -332,6 +369,7 @@ func _ready() -> void:
 var _used_items: Array = []
 
 func _apply_consumables() -> void:
+	SaveSystem.begin_batch()
 	if SaveSystem.use_consumable("head_start_shield"):
 		shield_active = true
 		_used_items.append("ITEM_SHIELD")
@@ -342,6 +380,7 @@ func _apply_consumables() -> void:
 	if SaveSystem.use_consumable("fuel_saver"):
 		fuel_drain_mult *= 0.8
 		_used_items.append("ITEM_FUEL")
+	SaveSystem.end_batch()
 
 func _compute_lanes() -> void:
 	var road_w: float = view_size.x * 0.8
@@ -370,7 +409,7 @@ func _build_countdown() -> void:
 	add_child(_countdown_layer)
 
 	_countdown_bg = ColorRect.new()
-	_countdown_bg.color = Color(0, 0, 0, 0.55)
+	_countdown_bg.color = Color(0.02, 0.04, 0.07, 0.42)
 	_countdown_bg.anchor_right = 1.0
 	_countdown_bg.anchor_bottom = 1.0
 	_countdown_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -391,6 +430,33 @@ func _build_countdown() -> void:
 	_countdown_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
 	_countdown_layer.add_child(_countdown_label)
 
+	# Route card: establish where this particular run is happening before launch.
+	var route_title := UIFactory.make_title(
+		LocaleManager.t(String(current_route.get("name_key", "ROUTE_KARIAKOO"))), 30)
+	route_title.anchor_left = 0.5
+	route_title.anchor_right = 0.5
+	route_title.anchor_top = 0.5
+	route_title.anchor_bottom = 0.5
+	route_title.offset_left = -210
+	route_title.offset_right = 210
+	route_title.offset_top = -230
+	route_title.offset_bottom = -185
+	route_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_countdown_layer.add_child(route_title)
+
+	var route_detail := UIFactory.make_label(
+		LocaleManager.t(String(current_route.get("flavor_key", "ROUTE_KARIAKOO_D"))), 16, UIFactory.COL_TEXT)
+	route_detail.anchor_left = 0.5
+	route_detail.anchor_right = 0.5
+	route_detail.anchor_top = 0.5
+	route_detail.anchor_bottom = 0.5
+	route_detail.offset_left = -210
+	route_detail.offset_right = 210
+	route_detail.offset_top = -182
+	route_detail.offset_bottom = -138
+	route_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_countdown_layer.add_child(route_detail)
+
 	# Condition banner ("Usiku" / "Mvua" / "Rush Hour"...)
 	var cond_parts: Array = []
 	if condition != "day":
@@ -405,14 +471,27 @@ func _build_countdown() -> void:
 		cond_lbl.anchor_bottom = 0.5
 		cond_lbl.offset_left = -180
 		cond_lbl.offset_right = 180
-		cond_lbl.offset_top = 110
-		cond_lbl.offset_bottom = 150
+		cond_lbl.offset_top = -134
+		cond_lbl.offset_bottom = -96
 		_countdown_layer.add_child(cond_lbl)
+
+	# The dala dala rolls into its starting position while the route is introduced.
+	var launch_y: float = player.position.y
+	player.position.y = launch_y + 34.0
+	player.modulate.a = 0.55
+	var bus_intro := player.create_tween()
+	bus_intro.set_parallel(true)
+	bus_intro.tween_property(player, "position:y", launch_y, 0.50).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	bus_intro.tween_property(player, "modulate:a", 1.0, 0.34)
 
 	_show_countdown_num(3)
 
 func _show_countdown_num(n: int) -> void:
 	if n <= 0:
+		# Give new players a moment to orient themselves before traffic arrives.
+		spawn_timer = maxf(spawn_timer, 1.25)
+		passenger_timer = maxf(passenger_timer, 1.0)
+		starter_hint_time = START_HINT_DURATION
 		_countdown_label.text = LocaleManager.t("GO_TEXT")
 		AudioManager.play_sfx("voice_twende")
 		_countdown_label.add_theme_color_override("font_color", Color("#2ecc71"))
@@ -454,6 +533,7 @@ func _build_hud() -> void:
 
 	# Top bar
 	var safe_top := UIFactory.safe_top_inset(view_size.y)
+	var safe_bottom := UIFactory.safe_bottom_inset(view_size.y)
 	var top := HBoxContainer.new()
 	top.anchor_right = 1.0
 	top.offset_left = 60
@@ -467,10 +547,19 @@ func _build_hud() -> void:
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	top.add_child(score_label)
 
+	var coin_stat := HBoxContainer.new()
+	coin_stat.add_theme_constant_override("separation", 5)
+	coin_stat.add_child(_make_game_icon(_GameIcon.IconKind.COIN, UIFactory.COL_ACCENT, Vector2(22, 22)))
 	coins_label = UIFactory.make_label("", 18, UIFactory.COL_ACCENT)
-	top.add_child(coins_label)
+	coin_stat.add_child(coins_label)
+	top.add_child(coin_stat)
+
+	var passenger_stat := HBoxContainer.new()
+	passenger_stat.add_theme_constant_override("separation", 5)
+	passenger_stat.add_child(_make_game_icon(_GameIcon.IconKind.PASSENGER, UIFactory.COL_TEXT, Vector2(22, 22)))
 	pass_label = UIFactory.make_label("", 18, UIFactory.COL_TEXT)
-	top.add_child(pass_label)
+	passenger_stat.add_child(pass_label)
+	top.add_child(passenger_stat)
 
 	pause_btn = UIFactory.make_button("II", false)
 	pause_btn.custom_minimum_size = Vector2(56, 48)
@@ -510,14 +599,15 @@ func _build_hud() -> void:
 	_style_bar(fuel_bar, Color("#2ecc71"))
 	hud_layer.add_child(fuel_bar)
 
-	var fuel_icon := UIFactory.make_label("⛽", 14, UIFactory.COL_MUTED)
+	var fuel_icon := _make_game_icon(_GameIcon.IconKind.FUEL, Color("#e74c3c"), Vector2(28, 28))
 	fuel_icon.anchor_top = 0.74
 	fuel_icon.offset_left = 4
-	fuel_icon.offset_right = 36
+	fuel_icon.offset_right = 32
 	fuel_icon.offset_top = 3
+	fuel_icon.offset_bottom = 31
 	hud_layer.add_child(fuel_icon)
 
-	# Power-up row (above horn/lane buttons)
+	# Power-ups sit in the deliberate gap between the bus and control dock.
 	var powerup_row := HBoxContainer.new()
 	powerup_row.anchor_left = 0.5
 	powerup_row.anchor_right = 0.5
@@ -525,45 +615,27 @@ func _build_hud() -> void:
 	powerup_row.anchor_bottom = 1.0
 	powerup_row.offset_left = -140
 	powerup_row.offset_right = 140
-	powerup_row.offset_top = -190
-	powerup_row.offset_bottom = -155
+	powerup_row.offset_top = -183 - safe_bottom
+	powerup_row.offset_bottom = -148 - safe_bottom
 	powerup_row.add_theme_constant_override("separation", 8)
 	hud_layer.add_child(powerup_row)
 
-	shield_icon = _make_powerup_badge("★ ", UIFactory.COL_MUTED)
+	shield_icon = _make_game_icon(_GameIcon.IconKind.SHIELD, Color("#1f8fff"), Vector2(58, 24))
 	powerup_row.add_child(shield_icon)
 
-	var mc := _powerup_col("🧲", Color("#a55eea"))
+	var mc := _powerup_col(_GameIcon.IconKind.MAGNET, Color("#a55eea"))
 	magnet_bar = mc[1] as ProgressBar
 	powerup_row.add_child(mc[0])
 
-	var sc := _powerup_col("❄", Color("#74b9ff"))
+	var sc := _powerup_col(_GameIcon.IconKind.SLOW, Color("#74b9ff"))
 	slow_bar = sc[1] as ProgressBar
 	powerup_row.add_child(sc[0])
 
-	var bc := _powerup_col("⚡", Color("#2ecc71"))
+	var bc := _powerup_col(_GameIcon.IconKind.BOOST, Color("#2ecc71"))
 	boost_bar = bc[1] as ProgressBar
 	powerup_row.add_child(bc[0])
 
 	# ── Horn charges row ──────────────────────────────────────────
-	var horn_row := HBoxContainer.new()
-	horn_row.anchor_left = 0.5
-	horn_row.anchor_right = 0.5
-	horn_row.anchor_top = 1.0
-	horn_row.anchor_bottom = 1.0
-	horn_row.offset_left = -56
-	horn_row.offset_right = 56
-	horn_row.offset_top = -148
-	horn_row.offset_bottom = -120
-	horn_row.add_theme_constant_override("separation", 6)
-	hud_layer.add_child(horn_row)
-
-	for i in range(max_horn_charges):
-		var dot := _HornDot.new()
-		dot.custom_minimum_size = Vector2(22, 22)
-		horn_row.add_child(dot)
-		_horn_dots.append(dot)
-
 	# ── Lane warning triangles ─────────────────────────────────────
 	for i in range(num_lanes):
 		var w := _LaneWarning.new()
@@ -572,34 +644,58 @@ func _build_hud() -> void:
 		hud_layer.add_child(w)
 		_lane_warnings.append(w)
 
+	# One stable driving dock keeps controls clear of the bus on portrait phones.
+	var drive_dock := PanelContainer.new()
+	drive_dock.anchor_left = 0.5; drive_dock.anchor_right = 0.5
+	drive_dock.anchor_top = 1.0; drive_dock.anchor_bottom = 1.0
+	drive_dock.offset_left = -204; drive_dock.offset_right = 204
+	drive_dock.offset_top = -130 - safe_bottom; drive_dock.offset_bottom = -18 - safe_bottom
+	drive_dock.mouse_filter = Control.MOUSE_FILTER_PASS
+	var dock_style := StyleBoxFlat.new()
+	dock_style.bg_color = Color(0.035, 0.055, 0.078, 0.94)
+	dock_style.border_color = Color(0.45, 0.64, 0.76, 0.42)
+	dock_style.border_width_top = 1; dock_style.border_width_bottom = 1
+	dock_style.border_width_left = 1; dock_style.border_width_right = 1
+	dock_style.corner_radius_top_left = 8; dock_style.corner_radius_top_right = 8
+	dock_style.corner_radius_bottom_left = 8; dock_style.corner_radius_bottom_right = 8
+	dock_style.content_margin_left = 12.0; dock_style.content_margin_right = 12.0
+	dock_style.content_margin_top = 12.0; dock_style.content_margin_bottom = 12.0
+	drive_dock.add_theme_stylebox_override("panel", dock_style)
+	hud_layer.add_child(drive_dock)
+
+	var drive_row := HBoxContainer.new()
+	drive_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	drive_row.add_theme_constant_override("separation", 12)
+	drive_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	drive_dock.add_child(drive_row)
+
 	# ── Lane tap buttons ──────────────────────────────────────────
-	btn_left = UIFactory.make_button("◀", false)
-	btn_left.anchor_left = 0.0;   btn_left.anchor_right = 0.0
-	btn_left.anchor_top = 1.0;    btn_left.anchor_bottom = 1.0
-	btn_left.offset_left = 16;    btn_left.offset_right = 116
-	btn_left.offset_top = -110;   btn_left.offset_bottom = -32
-	btn_left.modulate.a = 0.65
+	btn_left = _DriveButton.new()
+	(btn_left as _DriveButton).icon_kind = _DriveButton.IconKind.LEFT
+	btn_left.custom_minimum_size = Vector2(104, 82)
+	btn_left.tooltip_text = LocaleManager.t("CTRL_SWIPE")
+	_style_drive_button(btn_left, Color("#1f78bd"))
 	btn_left.pressed.connect(_move_left)
-	hud_layer.add_child(btn_left)
+	drive_row.add_child(btn_left)
 
 	# Horn button (centre)
-	_horn_btn = UIFactory.make_button(LocaleManager.t("HORN_BTN"), false)
-	_horn_btn.anchor_left = 0.5;  _horn_btn.anchor_right = 0.5
-	_horn_btn.anchor_top = 1.0;   _horn_btn.anchor_bottom = 1.0
-	_horn_btn.offset_left = -44;  _horn_btn.offset_right = 44
-	_horn_btn.offset_top = -110;  _horn_btn.offset_bottom = -32
-	_horn_btn.modulate.a = 0.7
+	_horn_btn = _DriveButton.new()
+	var horn_control := _horn_btn as _DriveButton
+	horn_control.icon_kind = _DriveButton.IconKind.HORN
+	horn_control.charge_capacity = max_horn_charges
+	_horn_btn.custom_minimum_size = Vector2(128, 82)
+	_horn_btn.tooltip_text = LocaleManager.t("HORN_CHARGES")
+	_style_drive_button(_horn_btn, Color("#d98218"))
 	_horn_btn.pressed.connect(_use_horn)
-	hud_layer.add_child(_horn_btn)
+	drive_row.add_child(_horn_btn)
 
-	btn_right = UIFactory.make_button("▶", false)
-	btn_right.anchor_left = 1.0;  btn_right.anchor_right = 1.0
-	btn_right.anchor_top = 1.0;   btn_right.anchor_bottom = 1.0
-	btn_right.offset_left = -116; btn_right.offset_right = -16
-	btn_right.offset_top = -110;  btn_right.offset_bottom = -32
-	btn_right.modulate.a = 0.65
+	btn_right = _DriveButton.new()
+	(btn_right as _DriveButton).icon_kind = _DriveButton.IconKind.RIGHT
+	btn_right.custom_minimum_size = Vector2(104, 82)
+	btn_right.tooltip_text = LocaleManager.t("CTRL_SWIPE")
+	_style_drive_button(btn_right, Color("#1f78bd"))
 	btn_right.pressed.connect(_move_right)
-	hud_layer.add_child(btn_right)
+	drive_row.add_child(btn_right)
 
 	_update_hud()
 
@@ -615,18 +711,44 @@ func _style_bar(bar: ProgressBar, col: Color) -> void:
 	fg.corner_radius_bottom_left = 4; fg.corner_radius_bottom_right = 4
 	bar.add_theme_stylebox_override("fill", fg)
 
-func _make_powerup_badge(text: String, col: Color) -> Label:
-	var l := UIFactory.make_label(text, 20, col)
-	l.custom_minimum_size = Vector2(40, 32)
-	return l
+func _style_drive_button(button: Button, color: Color) -> void:
+	button.text = ""
+	button.focus_mode = Control.FOCUS_NONE
+	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.055, 0.085, 0.12, 0.98)
+	normal.border_color = color
+	normal.border_width_top = 2; normal.border_width_bottom = 2
+	normal.border_width_left = 2; normal.border_width_right = 2
+	normal.corner_radius_top_left = 8; normal.corner_radius_top_right = 8
+	normal.corner_radius_bottom_left = 8; normal.corner_radius_bottom_right = 8
+	button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = Color(0.08, 0.13, 0.18, 1.0)
+	hover.border_color = color.lightened(0.16)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate() as StyleBoxFlat
+	pressed.bg_color = color.darkened(0.38)
+	pressed.border_color = color.lightened(0.26)
+	button.add_theme_stylebox_override("pressed", pressed)
+	var disabled_style := normal.duplicate() as StyleBoxFlat
+	disabled_style.bg_color = Color(0.045, 0.055, 0.07, 0.86)
+	disabled_style.border_color = Color(0.28, 0.34, 0.39, 0.72)
+	button.add_theme_stylebox_override("disabled", disabled_style)
 
-func _powerup_col(icon: String, col: Color) -> Array:
+func _make_game_icon(kind: _GameIcon.IconKind, col: Color, icon_size: Vector2) -> _GameIcon:
+	var icon := _GameIcon.new()
+	icon.icon_kind = kind
+	icon.tint = col
+	icon.custom_minimum_size = icon_size
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return icon
+
+func _powerup_col(kind: _GameIcon.IconKind, col: Color) -> Array:
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 2)
 	vb.custom_minimum_size = Vector2(58, 0)
-	var lbl := UIFactory.make_label(icon, 16, col)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vb.add_child(lbl)
+	vb.add_child(_make_game_icon(kind, col, Vector2(58, 24)))
 	var bar := ProgressBar.new()
 	bar.custom_minimum_size = Vector2(58, 8)
 	bar.min_value = 0.0; bar.max_value = 1.0; bar.value = 0.0
@@ -661,6 +783,13 @@ func _build_pause_overlay() -> void:
 	rs.pressed.connect(_toggle_pause)
 	v.add_child(rs)
 
+	var restart := UIFactory.make_button(LocaleManager.t("RESTART"), false)
+	restart.pressed.connect(func():
+		AudioManager.play_sfx("click")
+		TransitionManager.go_to("res://scenes/game.tscn")
+	)
+	v.add_child(restart)
+
 	var mb := UIFactory.make_button(LocaleManager.t("MAIN_MENU"), false)
 	mb.pressed.connect(func(): TransitionManager.go_to("res://scenes/main_menu.tscn"))
 	v.add_child(mb)
@@ -671,25 +800,37 @@ func _toggle_pause() -> void:
 	pause_overlay.visible = paused
 	AudioManager.play_sfx("click")
 
+func _notification(what: int) -> void:
+	if what not in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
+		return
+	if game_over or _counting_down or paused or not is_instance_valid(pause_overlay):
+		return
+	paused = true
+	pause_overlay.visible = true
+
 # ═════════════════════════ HUD UPDATE ═════════════════════════════
 
 func _update_hud() -> void:
-	score_label.text = "%d" % int(distance * 0.1)
-	coins_label.text = "🪙 %d" % coins
-	pass_label.text  = "👤 %d/%d" % [onboard, CAPACITY + OVERLOAD_MAX]
+	score_label.text = "%d" % _current_score()
+	coins_label.text = "%d" % coins
+	pass_label.text  = "%d/%d" % [onboard, CAPACITY + OVERLOAD_MAX]
 	pass_label.add_theme_color_override("font_color",
 		UIFactory.COL_DANGER if onboard > CAPACITY else UIFactory.COL_TEXT)
 
 	fuel_bar.value = fuel
+	var fuel_state: int = 2
 	if fuel < FUEL_LOW_THRESHOLD * 0.5:
-		_style_bar(fuel_bar, Color("#e74c3c"))
+		fuel_state = 0
 	elif fuel < FUEL_LOW_THRESHOLD:
-		_style_bar(fuel_bar, Color("#f1c40f"))
-	else:
-		_style_bar(fuel_bar, Color("#2ecc71"))
+		fuel_state = 1
+	if fuel_state != _fuel_visual_state:
+		_fuel_visual_state = fuel_state
+		var fuel_color: Color = Color("#e74c3c") if fuel_state == 0 else (Color("#f1c40f") if fuel_state == 1 else Color("#2ecc71"))
+		_style_bar(fuel_bar, fuel_color)
 
-	shield_icon.modulate = UIFactory.COL_ACCENT if shield_active else UIFactory.COL_MUTED
-	shield_icon.text = "★ %s" % (LocaleManager.t("SHIELD_ON") if shield_active else "  ")
+	var shield_badge := shield_icon as _GameIcon
+	shield_badge.active = shield_active
+	shield_badge.queue_redraw()
 	magnet_bar.value = magnet_time / MAGNET_MAX
 	slow_bar.value   = slow_time   / slow_max
 	boost_bar.value  = boost_time  / BOOST_MAX
@@ -700,16 +841,30 @@ func _update_hud() -> void:
 	else:
 		combo_label.visible = false
 
-	# Horn dots
-	for i in range(_horn_dots.size()):
-		(_horn_dots[i] as _HornDot).filled = (i < horn_charges)
-		(_horn_dots[i] as _HornDot).queue_redraw()
+	var horn_control := _horn_btn as _DriveButton
+	horn_control.charge_count = horn_charges
+	horn_control.queue_redraw()
+	_horn_btn.disabled = horn_charges <= 0
+
+	# Dim unavailable lane buttons so touch controls communicate their limits.
+	var can_move_left: bool = player.current_lane > 0
+	var can_move_right: bool = player.current_lane < num_lanes - 1
+	btn_left.disabled = not can_move_left
+	btn_right.disabled = not can_move_right
+	btn_left.queue_redraw()
+	btn_right.queue_redraw()
 
 func _update_status() -> void:
-	var sc: int = int(distance * 0.1)
+	var sc: int = _current_score()
 	if fuel < FUEL_LOW_THRESHOLD * 0.5:
 		status_label.text = LocaleManager.t("FUEL_LOW")
 		status_label.add_theme_color_override("font_color", Color("#e74c3c"))
+	elif _kituo_hint_time > 0.0:
+		status_label.text = LocaleManager.t(_kituo_hint_key)
+		status_label.add_theme_color_override("font_color", UIFactory.COL_PRIMARY)
+	elif starter_hint_time > 0.0:
+		status_label.text = LocaleManager.t("START_HINT")
+		status_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
 	elif sc > SCORE_JAM:
 		status_label.text = LocaleManager.t("TRAFFIC_JAM")
 		status_label.add_theme_color_override("font_color", UIFactory.COL_DANGER)
@@ -722,11 +877,17 @@ func _update_status() -> void:
 # ═════════════════════════ MAIN LOOP ══════════════════════════════
 
 func _process(delta: float) -> void:
-	if _counting_down or paused or game_over:
+	if _counting_down:
+		# Keep the city alive behind the route intro without spawning danger yet.
+		road.advance(72.0 * delta)
+		speed_lines.advance(72.0 * delta)
+		return
+	if paused or game_over:
 		return
 
 	elapsed += delta
-	var ramps: int = int(elapsed / 20.0)
+	# Escalate every 20 seconds, then hold a demanding but readable end-game pace.
+	var ramps: int = mini(int(elapsed / 20.0), MAX_SPEED_RAMPS)
 	speed = base_speed * difficulty_mult * (1.0 + 0.15 * ramps)
 	speed_lines.speed_ref = speed
 	AudioManager.set_music_intensity(clampf(elapsed / 160.0, 0.0, 1.0))
@@ -735,6 +896,8 @@ func _process(delta: float) -> void:
 	if slow_time  > 0: slow_time   = max(0.0, slow_time  - delta)
 	if boost_time > 0: boost_time  = max(0.0, boost_time - delta)
 	if grace_time > 0: grace_time  = max(0.0, grace_time - delta)
+	if starter_hint_time > 0: starter_hint_time = maxf(0.0, starter_hint_time - delta)
+	if _kituo_hint_time > 0: _kituo_hint_time = maxf(0.0, _kituo_hint_time - delta)
 
 	if combo > 0:
 		combo_timer -= delta
@@ -786,7 +949,7 @@ func _process(delta: float) -> void:
 	if distance >= 1000.0 and not _ach_1km_done:
 		_ach_1km_done = true
 		AchievementManager.try_unlock("dist_1km")
-	var sc: int = int(distance * 0.1)
+	var sc: int = _current_score()
 	if sc >= 1000 and not _ach_s1000_done:
 		_ach_s1000_done = true
 		AchievementManager.try_unlock("score_1000")
@@ -796,7 +959,8 @@ func _process(delta: float) -> void:
 
 	spawn_timer -= delta
 	if spawn_timer <= 0.0:
-		var interval: float = max(0.55, 1.75 - elapsed * 0.014) * spawn_interval_mult / difficulty_mult
+		var scaled_interval: float = (1.75 - elapsed * 0.014) * spawn_interval_mult / difficulty_mult
+		var interval: float = maxf(MIN_SPAWN_INTERVAL, scaled_interval)
 		spawn_timer = interval
 		_spawn_wave()
 
@@ -810,7 +974,7 @@ func _process(delta: float) -> void:
 		var g_end: float = float(_ghost_data.get("end", 0.0))
 		if elapsed >= g_end and not _ghost_beaten:
 			_ghost_beaten = true
-			distance += 150.0
+			bonus_score += 150
 			_spawn_float_label(LocaleManager.t("GHOST_BEATEN"),
 				_ghost_node.position, Color("#2ecc71"))
 			AudioManager.play_sfx("powerup")
@@ -844,7 +1008,11 @@ func _process(delta: float) -> void:
 		# Approach warning once it's getting close
 		if not _kituo_warned and kituo.position.y > player.position.y - 420.0:
 			_kituo_warned = true
-			_spawn_float_label("🚏 " + LocaleManager.t("KITUO_AHEAD"),
+			_kituo_hint_time = 3.0
+			_kituo_hint_key = "KITUO_LEFT" if kituo.lane_idx == 0 else "KITUO_RIGHT"
+			if kituo.lane_idx < _lane_warnings.size():
+				(_lane_warnings[kituo.lane_idx] as _LaneWarning).flash(1.20)
+			_spawn_float_label("🚏 " + LocaleManager.t(_kituo_hint_key),
 				Vector2(kituo.position.x, kituo.position.y + 80), UIFactory.COL_ACCENT)
 			AudioManager.play_sfx("voice_kituo")
 		# Serve: player in the adjacent lane as the kituo passes
@@ -855,6 +1023,7 @@ func _process(delta: float) -> void:
 		# Missed it
 		if not kituo.served and not kituo.missed and kituo.position.y > player.position.y + 130.0:
 			kituo.missed = true
+			_kituo_hint_time = 0.0
 			if onboard > 0:
 				_spawn_float_label(LocaleManager.t("KITUO_MISSED"),
 					player.position + Vector2(0, -50), UIFactory.COL_MUTED)
@@ -884,20 +1053,27 @@ func _move_entities(move: float, delta: float) -> void:
 				elif o.position.x > road_right:
 					o.position.x = road_right
 					o.walk_dir = -1
+		# Telegraph the lane as the obstacle reaches the visible road, rather
+		# than flashing while it is still above the screen.
+		if not o.warning_announced and o.position.y >= 118.0:
+			o.warning_announced = true
+			var warning_lane: int = _nearest_lane_index(o.position.x)
+			if warning_lane < _lane_warnings.size():
+				(_lane_warnings[warning_lane] as _LaneWarning).flash(0.82)
 		if o.position.y > view_size.y + 140:
 			_despawn_obstacle(o)
 	for c in collectibles_active.duplicate():
 		c.position.y += move
-		if magnet_time > 0.0:
+		if magnet_time > 0.0 and c.type_id == "coin":
 			var dx: float = player.position.x - c.position.x
 			c.position.x += sign(dx) * min(abs(dx), 380.0 * delta)
 		if c.position.y > view_size.y + 140:
 			_despawn_collectible(c)
 
 func _check_collisions() -> void:
-	var prect: Rect2 = player.get_aabb()
+	var prect: Rect2 = player.get_collision_aabb()
 	for o in obstacles_active.duplicate():
-		var orect: Rect2 = o.get_aabb()
+		var orect: Rect2 = o.get_collision_aabb()
 		if not near_miss_done.get(o.get_instance_id(), false) and o.position.y > player.position.y + 20:
 			var h_gap: float = abs(o.position.x - player.position.x)
 			if h_gap < 92.0 and not prect.intersects(orect):
@@ -912,14 +1088,14 @@ func _check_collisions() -> void:
 					AudioManager.play_sfx("crash")
 					FeedbackManager.crash()
 				else:
-					distance += 80.0
+					bonus_score += 80
 					_on_near_miss(o.position)
 		if prect.intersects(orect):
 			if grace_time > 0.0:
 				continue
 			if boost_time > 0.0:
 				# Boosting: smash through the obstacle.
-				distance += 50.0
+				bonus_score += 50
 				_burst(o.position, Color("#2ecc71"), 10)
 				_spawn_float_label("+50", o.position, Color("#2ecc71"))
 				_screen_shake(5.0, 0.15)
@@ -976,7 +1152,7 @@ func _on_collect(c: Collectible) -> void:
 			if onboard < CAPACITY + OVERLOAD_MAX:
 				onboard += 1
 				passengers += 1
-				distance += 100.0
+				bonus_score += 200
 				_update_handling()
 				if onboard > CAPACITY:
 					bonus_text = LocaleManager.t("OVERLOAD")
@@ -986,7 +1162,7 @@ func _on_collect(c: Collectible) -> void:
 					label_col = Color("#fab1a0")
 			else:
 				# Bus completely full — they wave you past
-				distance += 50.0
+				bonus_score += 50
 				bonus_text = LocaleManager.t("BUS_FULL")
 				label_col = UIFactory.COL_MUTED
 			AudioManager.play_sfx("passenger")
@@ -994,7 +1170,7 @@ func _on_collect(c: Collectible) -> void:
 			if passengers >= 10: AchievementManager.try_unlock("pass_10")
 		"fuel":
 			fuel = min(1.0, fuel + FUEL_RESTORE)
-			distance += 300.0
+			bonus_score += 300
 			bonus_text = "+300"
 			label_col = Color("#e74c3c")
 			AudioManager.play_sfx("powerup")
@@ -1013,13 +1189,13 @@ func _on_collect(c: Collectible) -> void:
 			FeedbackManager.powerup()
 		"speed_boost":
 			boost_time = BOOST_MAX
-			distance += 150.0
-			bonus_text = LocaleManager.t("BOOST_ON")
+			bonus_score += 150
+			bonus_text = "+150  " + LocaleManager.t("BOOST_ON")
 			label_col = Color("#2ecc71")
 			AudioManager.play_sfx("powerup")
 			FeedbackManager.powerup()
-			if not _boost_used:
-				_boost_used = true
+			_total_boost_uses += 1
+			if _total_boost_uses == 1:
 				AchievementManager.try_unlock("boost_use")
 		"slow":
 			slow_time = slow_max
@@ -1035,9 +1211,9 @@ func _on_near_miss(world_pos: Vector2) -> void:
 	_run_near_misses += 1
 	_spawn_float_label(LocaleManager.t("NEAR_MISS"), world_pos, Color("#f1c40f"))
 	if near_miss_flash:
-		near_miss_flash.color = Color(1.0, 0.9, 0.1, 0.38)
+		near_miss_flash.color = Color(1.0, 0.9, 0.1, 0.16 if reduced_effects else 0.38)
 		var tw := near_miss_flash.create_tween()
-		tw.tween_property(near_miss_flash, "color:a", 0.0, 0.30)
+		tw.tween_property(near_miss_flash, "color:a", 0.0, 0.18 if reduced_effects else 0.30)
 	if _run_near_misses >= 5:
 		AchievementManager.try_unlock("near_miss_5")
 
@@ -1067,8 +1243,10 @@ func _use_horn() -> void:
 				nearest_d = d
 				nearest = o
 	if nearest:
-		_spawn_float_label("PEMBE! 📯", nearest.position, Color("#ffd23f"))
-		# Shrink-out animation
+		_spawn_float_label(LocaleManager.t("HORN_BLAST"), nearest.position, Color("#ffd23f"))
+		# Stop collision immediately; return the visual to the pool after it exits.
+		obstacles_active.erase(nearest)
+		near_miss_done.erase(nearest.get_instance_id())
 		var tw := nearest.create_tween()
 		tw.tween_property(nearest, "scale", Vector2(0.0, 0.0), 0.22).set_trans(Tween.TRANS_BACK)
 		tw.tween_callback(func():
@@ -1148,6 +1326,7 @@ func _spawn_kituo() -> void:
 
 func _serve_kituo() -> void:
 	kituo.served = true
+	_kituo_hint_time = 0.0
 	var excess: int = max(0, onboard - CAPACITY)
 	var normal: int = onboard - excess
 	var fare: int = normal * FARE_NORMAL + excess * FARE_OVERLOAD + 2 * _upg_sound
@@ -1155,7 +1334,7 @@ func _serve_kituo() -> void:
 		coins += fare
 		fares_earned += fare
 		dropoffs += onboard
-		distance += onboard * 60.0
+		bonus_score += onboard * 60
 		_spawn_float_label("%s +%d 🪙" % [LocaleManager.t("FARE"), fare],
 			player.position + Vector2(0, -56), UIFactory.COL_ACCENT)
 		_burst(kituo.position, UIFactory.COL_ACCENT, 8)
@@ -1186,12 +1365,33 @@ func _overload_excess() -> int:
 func _spawn_wave() -> void:
 	var max_blocked: int = clamp(int(1 + elapsed / 30.0), 1, num_lanes - 1)
 	var to_block: int = randi_range(1, max_blocked)
-	var indices: Array = range(num_lanes)
-	indices.shuffle()
-	for i in range(to_block):
-		_spawn_obstacle_in_lane(indices[i])
-	if to_block < num_lanes and randf() < 0.65:
-		var free_lane: int = indices[to_block]
+	var blocked_lanes: Array = []
+	var free_lane: int = -1
+	if to_block == num_lanes - 1:
+		# A touch player should never need to cross two lanes between consecutive
+		# forced-choice waves. Keep the next safe lane current or adjacent.
+		var safe_choices: Array = [_last_safe_lane]
+		if _last_safe_lane > 0:
+			safe_choices.append(_last_safe_lane - 1)
+		if _last_safe_lane < num_lanes - 1:
+			safe_choices.append(_last_safe_lane + 1)
+		safe_choices.shuffle()
+		free_lane = int(safe_choices[0])
+		_last_safe_lane = free_lane
+		for lane_idx in range(num_lanes):
+			if lane_idx != free_lane:
+				blocked_lanes.append(lane_idx)
+		blocked_lanes.shuffle()
+	else:
+		var indices: Array = range(num_lanes)
+		indices.shuffle()
+		for i in range(to_block):
+			blocked_lanes.append(indices[i])
+		free_lane = int(indices[to_block])
+
+	for lane_idx in blocked_lanes:
+		_spawn_obstacle_in_lane(int(lane_idx))
+	if free_lane >= 0 and randf() < 0.65:
 		# 35% of pickups become a satisfying coin trail down the lane
 		if randf() < 0.35:
 			_spawn_coin_trail(free_lane)
@@ -1199,6 +1399,8 @@ func _spawn_wave() -> void:
 			_spawn_collectible_in_lane(free_lane, _pick_collectible_type(false))
 
 func _spawn_coin_trail(lane_idx: int) -> void:
+	if not _pickup_corridor_clear(lane_idx, -500.0, -50.0):
+		return
 	var count: int = randi_range(4, 6)
 	for i in range(count):
 		if collectibles_free.is_empty():
@@ -1213,18 +1415,59 @@ func _spawn_obstacle_in_lane(lane_idx: int) -> void:
 	var t: String = _pick_obstacle_type()
 	o.setup(t, lanes[lane_idx], -130.0)
 	obstacles_active.append(o)
-	# Flash lane warning
-	if lane_idx < _lane_warnings.size():
-		(_lane_warnings[lane_idx] as _LaneWarning).flash()
+
+func _nearest_lane_index(world_x: float) -> int:
+	var closest_index: int = 0
+	var closest_distance: float = INF
+	for i in range(lanes.size()):
+		var lane_distance: float = absf(float(lanes[i]) - world_x)
+		if lane_distance < closest_distance:
+			closest_distance = lane_distance
+			closest_index = i
+	return closest_index
 
 func _spawn_collectible(t: String) -> void:
-	_spawn_collectible_in_lane(randi() % num_lanes, t)
+	var lane_idx: int = _pick_collectible_lane()
+	if lane_idx >= 0:
+		_spawn_collectible_in_lane(lane_idx, t)
+
+func _pick_collectible_lane() -> int:
+	# A pickup should always look attainable when it enters the road.
+	var clear_lanes: Array = []
+	const spawn_y := -90.0
+	for lane_idx in range(num_lanes):
+		var blocked := false
+		for candidate in obstacles_active:
+			var obstacle: Obstacle = candidate as Obstacle
+			if _nearest_lane_index(obstacle.position.x) == lane_idx \
+			and absf(obstacle.position.y - spawn_y) < 130.0:
+				blocked = true
+				break
+		if not blocked:
+			clear_lanes.append(lane_idx)
+	if clear_lanes.is_empty():
+		return -1
+	return int(clear_lanes[randi() % clear_lanes.size()])
 
 func _spawn_collectible_in_lane(lane_idx: int, t: String) -> void:
-	if collectibles_free.is_empty(): return
+	if lane_idx < 0 or lane_idx >= num_lanes or collectibles_free.is_empty():
+		return
+	if not _pickup_corridor_clear(lane_idx, -150.0, -30.0):
+		return
 	var c: Collectible = collectibles_free.pop_back()
 	c.setup(t, lanes[lane_idx], -90.0)
 	collectibles_active.append(c)
+
+func _pickup_corridor_clear(lane_idx: int, top_y: float, bottom_y: float) -> bool:
+	for candidate in obstacles_active:
+		var obstacle := candidate as Obstacle
+		if _nearest_lane_index(obstacle.position.x) != lane_idx:
+			continue
+		var half_height: float = obstacle.size.y * 0.5 + 36.0
+		if obstacle.position.y + half_height >= top_y \
+		and obstacle.position.y - half_height <= bottom_y:
+			return false
+	return true
 
 func _pick_collectible_type(passenger_allowed: bool) -> String:
 	var allowed := BASE_COLLECTIBLE_TYPES.duplicate()
@@ -1235,6 +1478,9 @@ func _pick_collectible_type(passenger_allowed: bool) -> String:
 
 func _pick_obstacle_type() -> String:
 	var weights: Dictionary = current_route.get("obstacle_weights", {})
+	if elapsed < STARTER_WINDOW:
+		var starter_types: Array = ["bodaboda", "bajaji", "car", "pothole", "cone", "tire"]
+		return Routes.weighted_pick(weights, starter_types, "car")
 	return Routes.weighted_pick(weights, OBSTACLE_TYPES, "car")
 
 func _despawn_obstacle(o: Obstacle) -> void:
@@ -1253,6 +1499,8 @@ func _despawn_collectible(c: Collectible) -> void:
 var _shake_tween: Tween
 
 func _screen_shake(strength: float, duration: float) -> void:
+	if reduced_effects:
+		return
 	if _shake_tween and _shake_tween.is_valid():
 		_shake_tween.kill()
 	camera.offset = Vector2.ZERO
@@ -1265,12 +1513,16 @@ func _screen_shake(strength: float, duration: float) -> void:
 
 ## Brief slow-motion freeze on crash for impact feel.
 func _hit_stop() -> void:
+	if reduced_effects:
+		return
 	Engine.time_scale = 0.2
 	var t := get_tree().create_timer(0.09, true, false, true)  # ignores time_scale
 	t.timeout.connect(func(): Engine.time_scale = 1.0)
 
 ## One-shot particle burst at a world position.
 func _burst(world_pos: Vector2, col: Color, amount: int) -> void:
+	if reduced_effects:
+		amount = mini(amount, 5)
 	var p := CPUParticles2D.new()
 	p.position = world_pos
 	p.amount = amount
@@ -1319,38 +1571,72 @@ func _input(event: InputEvent) -> void:
 	if _counting_down or paused or game_over: return
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			if _is_hud_interaction(event.position):
+				swipe_active_id = -1
+				return
 			swipe_start = event.position
 			swipe_active_id = event.index
+			swipe_consumed = false
 		elif event.index == swipe_active_id:
 			swipe_active_id = -1
-	elif event is InputEventScreenDrag and event.index == swipe_active_id:
+			swipe_consumed = false
+	elif event is InputEventScreenDrag and event.index == swipe_active_id and not swipe_consumed:
 		var dx: float = event.position.x - swipe_start.x
 		if abs(dx) > swipe_threshold:
 			if dx > 0: _move_right()
 			else: _move_left()
+			swipe_consumed = true
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if _is_hud_interaction(event.position):
+				mouse_swipe_active = false
+				return
 			swipe_start = event.position
-	elif event is InputEventMouseButton:
-		if event.pressed: swipe_start = event.position
+			mouse_swipe_active = true
 		else:
+			if not mouse_swipe_active:
+				return
+			mouse_swipe_active = false
 			var dx2: float = event.position.x - swipe_start.x
 			if abs(dx2) > swipe_threshold:
 				if dx2 > 0: _move_right()
 				else: _move_left()
-	elif event.is_action_pressed("ui_left"):        _move_left()
-	elif event.is_action_pressed("ui_right"):       _move_right()
-	elif event.is_action_pressed("pause_action"):   _toggle_pause()
+	elif event is InputEventKey and not event.echo:
+		if event.is_action_pressed("ui_left"):
+			_move_left()
+		elif event.is_action_pressed("ui_right"):
+			_move_right()
+		elif event.is_action_pressed("pause_action"):
+			_toggle_pause()
+		elif event.is_action_pressed("horn_action"):
+			_use_horn()
+
+func _is_hud_interaction(screen_position: Vector2) -> bool:
+	for control in [pause_btn, btn_left, btn_right, _horn_btn]:
+		if is_instance_valid(control) and control.visible and control.get_global_rect().has_point(screen_position):
+			return true
+	return false
 
 func _move_left() -> void:
+	var previous_lane: int = player.current_lane
 	player.move_left()
+	if player.current_lane == previous_lane:
+		return
 	_ghost_events.append([elapsed, player.current_lane])
 	AudioManager.play_sfx("click")
 	FeedbackManager.tap()
 
 func _move_right() -> void:
+	var previous_lane: int = player.current_lane
 	player.move_right()
+	if player.current_lane == previous_lane:
+		return
 	_ghost_events.append([elapsed, player.current_lane])
 	AudioManager.play_sfx("click")
 	FeedbackManager.tap()
+
+func _current_score() -> int:
+	return int(distance * 0.1) + bonus_score
 
 ## Android hardware back button → pause (called by TransitionManager).
 func handle_back() -> void:
@@ -1366,7 +1652,7 @@ func _end_run() -> void:
 	game_over = true
 	AchievementManager.try_unlock("first_run")
 	AnalyticsService.log_event("run_end", {
-		"score": int(distance * 0.1),
+		"score": _current_score(),
 		"coins": coins,
 		"dropoffs": dropoffs,
 		"route": String(current_route.id),
@@ -1375,7 +1661,7 @@ func _end_run() -> void:
 	})
 	# Save ghost of best fresh (non-continued) run
 	if not _was_continued:
-		var score_now: int = int(distance * 0.1)
+		var score_now: int = _current_score()
 		var best: Variant = SaveSystem.get_value("ghost_best", null)
 		if typeof(best) != TYPE_DICTIONARY or score_now > int((best as Dictionary).get("score", 0)):
 			SaveSystem.set_value("ghost_best", {
@@ -1384,11 +1670,20 @@ func _end_run() -> void:
 				"score": score_now,
 				"name": "MIMI",
 			})
-	GameState.record_run(int(distance * 0.1), coins, passengers, distance, _run_near_misses, {
+	GameState.record_run(_current_score(), coins, passengers, distance, _run_near_misses, {
 		"dropoffs": dropoffs,
 		"fares": fares_earned,
+		"onboard": onboard,
+		"fuel": fuel,
+		"elapsed": elapsed,
 		"horn_uses": _total_horn_uses,
-		"boosts": 1 if _boost_used else 0,
+		"boosts": _total_boost_uses,
+		"horn_charges": horn_charges,
+		"max_horn_charges": max_horn_charges,
+		"horn_regen_timer": horn_regen_timer,
+		"fuel_drain_mult": fuel_drain_mult,
+		"condition": condition,
+		"rush_hour": rush_hour,
 	})
 	await get_tree().create_timer(0.55).timeout
 	TransitionManager.go_to("res://scenes/game_over.tscn")
@@ -1411,16 +1706,29 @@ class _ChaseCop extends Node2D:
 	func _draw() -> void:
 		var s := Vector2(72, 104)
 		var tl := -s * 0.5
-		draw_rect(Rect2(tl, s), Color("#1f4e79"))
-		draw_rect(Rect2(tl + Vector2(6, 14), Vector2(s.x - 12, 18)), Color("#a8d0ff"))
-		draw_rect(Rect2(tl + Vector2(6, s.y - 30), Vector2(s.x - 12, 16)), Color("#a8d0ff"))
+		draw_rect(Rect2(tl + Vector2(4, 7), s), Color(0.02, 0.03, 0.04, 0.30), true)
+		for wheel_y in [tl.y + 17.0, tl.y + s.y - 37.0]:
+			draw_rect(Rect2(Vector2(tl.x - 4, wheel_y), Vector2(8, 21)), Color("#15191d"), true)
+			draw_rect(Rect2(Vector2(tl.x + s.x - 4, wheel_y), Vector2(8, 21)), Color("#15191d"), true)
+		var shell := PackedVector2Array([
+			Vector2(tl.x + 8, tl.y), Vector2(tl.x + s.x - 8, tl.y),
+			Vector2(tl.x + s.x, tl.y + 10), Vector2(tl.x + s.x, tl.y + s.y - 11),
+			Vector2(tl.x + s.x - 8, tl.y + s.y), Vector2(tl.x + 8, tl.y + s.y),
+			Vector2(tl.x, tl.y + s.y - 11), Vector2(tl.x, tl.y + 10),
+		])
+		draw_colored_polygon(shell, Color("#1f4e79"))
+		draw_rect(Rect2(tl + Vector2(10, 18), Vector2(s.x - 20, 20)), Color("#8fd3e8"), true)
+		draw_rect(Rect2(tl + Vector2(10, 51), Vector2(s.x - 20, 20)), Color("#8fd3e8"), true)
+		draw_line(Vector2(0, tl.y + 19), Vector2(0, tl.y + 70), Color("#405f75"), 2.0)
+		draw_rect(Rect2(Vector2(tl.x + 1, tl.y + 43), Vector2(s.x - 2, 10)), Color.WHITE, true)
 		# Flashing light bar
 		var phase: bool = fmod(_t * 5.0, 1.0) > 0.5
-		draw_rect(Rect2(tl + Vector2(s.x * 0.18, -6), Vector2(s.x * 0.3, 8)),
+		draw_rect(Rect2(tl + Vector2(s.x * 0.18, 40), Vector2(s.x * 0.3, 8)),
 			Color("#e74c3c") if phase else Color("#7f1d1d"))
-		draw_rect(Rect2(tl + Vector2(s.x * 0.52, -6), Vector2(s.x * 0.3, 8)),
+		draw_rect(Rect2(tl + Vector2(s.x * 0.52, 40), Vector2(s.x * 0.3, 8)),
 			Color("#1f8fff") if phase else Color("#0a3d62"))
-		draw_rect(Rect2(tl + Vector2(0, 36), Vector2(s.x, 12)), Color.WHITE)
+		for light_x in [tl.x + 9.0, tl.x + s.x - 17.0]:
+			draw_rect(Rect2(Vector2(light_x, tl.y + s.y - 8), Vector2(8, 5)), Color("#fff3a6"), true)
 
 ## Headlight cones drawn in front of the player's bus on night runs.
 class _Headlights extends Node2D:
@@ -1439,20 +1747,126 @@ class _Headlights extends Node2D:
 				Color(1.0, 0.97, 0.75, 0.0),
 			]))
 
-## Coloured dot representing one horn charge.
-class _HornDot extends Control:
-	var filled: bool = true
+## Consistent vector icons for HUD stats and active power-ups.
+class _GameIcon extends Control:
+	enum IconKind { COIN, PASSENGER, FUEL, SHIELD, MAGNET, SLOW, BOOST }
+	var icon_kind: IconKind = IconKind.COIN
+	var tint: Color = Color.WHITE
+	var active: bool = true
+
 	func _draw() -> void:
-		var r: float = min(size.x, size.y) * 0.44
-		var c: Vector2 = size * 0.5
-		draw_circle(c, r, Color("#e67e22") if filled else Color(0.3, 0.3, 0.3, 0.5))
+		var color := tint if active else Color(0.38, 0.44, 0.49, 0.72)
+		var c := size * 0.5
+		var scale_factor: float = minf(size.x, size.y) / 24.0
+		match icon_kind:
+			IconKind.COIN:
+				draw_circle(c, 9.0 * scale_factor, color)
+				draw_arc(c, 6.0 * scale_factor, 0.0, TAU, 20, color.darkened(0.32), 2.0 * scale_factor, true)
+				draw_line(c + Vector2(0, -4) * scale_factor, c + Vector2(0, 4) * scale_factor,
+					color.lightened(0.36), 1.6 * scale_factor, true)
+			IconKind.PASSENGER:
+				draw_circle(c + Vector2(0, -5) * scale_factor, 4.2 * scale_factor, color)
+				draw_arc(c + Vector2(0, 8) * scale_factor, 8.0 * scale_factor, PI, TAU,
+					18, color, 5.0 * scale_factor, true)
+			IconKind.FUEL:
+				draw_rect(Rect2(c + Vector2(-7, -8) * scale_factor, Vector2(13, 17) * scale_factor), color, true)
+				draw_rect(Rect2(c + Vector2(-3, -5) * scale_factor, Vector2(6, 4) * scale_factor),
+					Color(0.95, 0.97, 0.98, 0.9), true)
+				draw_line(c + Vector2(6, -5) * scale_factor, c + Vector2(9, -2) * scale_factor,
+					color, 2.5 * scale_factor, true)
+			IconKind.SHIELD:
+				var shield := PackedVector2Array([
+					c + Vector2(0, -10) * scale_factor, c + Vector2(9, -6) * scale_factor,
+					c + Vector2(7, 5) * scale_factor, c + Vector2(0, 11) * scale_factor,
+					c + Vector2(-7, 5) * scale_factor, c + Vector2(-9, -6) * scale_factor,
+				])
+				draw_colored_polygon(shield, color)
+				draw_polyline(PackedVector2Array([shield[0], shield[1], shield[2], shield[3], shield[4], shield[5], shield[0]]),
+					color.lightened(0.35), 1.5 * scale_factor, true)
+			IconKind.MAGNET:
+				draw_arc(c + Vector2(0, 1) * scale_factor, 8.0 * scale_factor, 0.0, PI,
+					20, color, 5.0 * scale_factor, true)
+				draw_line(c + Vector2(-8, 1) * scale_factor, c + Vector2(-8, -8) * scale_factor,
+					color, 5.0 * scale_factor, true)
+				draw_line(c + Vector2(8, 1) * scale_factor, c + Vector2(8, -8) * scale_factor,
+					color, 5.0 * scale_factor, true)
+				draw_line(c + Vector2(-10, -8) * scale_factor, c + Vector2(-6, -8) * scale_factor,
+					Color.WHITE, 3.0 * scale_factor, true)
+				draw_line(c + Vector2(6, -8) * scale_factor, c + Vector2(10, -8) * scale_factor,
+					Color.WHITE, 3.0 * scale_factor, true)
+			IconKind.SLOW:
+				for angle in [0.0, PI / 3.0, PI * 2.0 / 3.0]:
+					var arm := Vector2(cos(angle), sin(angle)) * 10.0 * scale_factor
+					draw_line(c - arm, c + arm, color, 2.2 * scale_factor, true)
+				draw_circle(c, 2.8 * scale_factor, Color.WHITE)
+			IconKind.BOOST:
+				var bolt := PackedVector2Array([
+					c + Vector2(2, -11) * scale_factor, c + Vector2(-8, 2) * scale_factor,
+					c + Vector2(-1, 2) * scale_factor, c + Vector2(-4, 11) * scale_factor,
+					c + Vector2(9, -4) * scale_factor, c + Vector2(2, -4) * scale_factor,
+				])
+				draw_colored_polygon(bolt, color)
+
+## Font-independent driving control with built-in horn charge display.
+class _DriveButton extends Button:
+	enum IconKind { LEFT, HORN, RIGHT }
+	var icon_kind: IconKind = IconKind.LEFT
+	var charge_count: int = 0
+	var charge_capacity: int = 0
+
+	func _draw() -> void:
+		var icon_color := Color("#f4f8fb") if not disabled else Color(0.56, 0.61, 0.66, 0.78)
+		var center := Vector2(size.x * 0.5, size.y * 0.45)
+		if icon_kind == IconKind.HORN:
+			_draw_horn(center, icon_color)
+			_draw_charges(icon_color)
+		else:
+			_draw_arrow(center, -1.0 if icon_kind == IconKind.LEFT else 1.0, icon_color)
+
+	func _draw_arrow(center: Vector2, direction: float, color: Color) -> void:
+		var tip := center + Vector2(25.0 * direction, 0.0)
+		var inner_x := center.x - 2.0 * direction
+		var points := PackedVector2Array([
+			tip,
+			Vector2(inner_x, center.y - 23.0),
+			Vector2(inner_x, center.y - 9.0),
+			Vector2(center.x - 27.0 * direction, center.y - 9.0),
+			Vector2(center.x - 27.0 * direction, center.y + 9.0),
+			Vector2(inner_x, center.y + 9.0),
+			Vector2(inner_x, center.y + 23.0),
+		])
+		draw_colored_polygon(points, color)
+
+	func _draw_horn(center: Vector2, color: Color) -> void:
+		var c := center + Vector2(-3.0, -2.0)
+		var body := PackedVector2Array([
+			c + Vector2(-27.0, -8.0),
+			c + Vector2(-10.0, -8.0),
+			c + Vector2(12.0, -22.0),
+			c + Vector2(12.0, 22.0),
+			c + Vector2(-10.0, 8.0),
+			c + Vector2(-27.0, 8.0),
+		])
+		draw_colored_polygon(body, color)
+		draw_line(c + Vector2(-12.0, 9.0), c + Vector2(-7.0, 23.0), color, 6.0, true)
+		draw_arc(c + Vector2(12.0, 0.0), 13.0, -0.72, 0.72, 12, color, 3.0, true)
+		draw_arc(c + Vector2(12.0, 0.0), 22.0, -0.62, 0.62, 12, color, 3.0, true)
+
+	func _draw_charges(color: Color) -> void:
+		if charge_capacity <= 0:
+			return
+		var spacing := 13.0
+		var start_x := size.x * 0.5 - spacing * float(charge_capacity - 1) * 0.5
+		for i in range(charge_capacity):
+			var dot_color := color if i < charge_count else Color(0.28, 0.32, 0.36, 0.92)
+			draw_circle(Vector2(start_x + float(i) * spacing, size.y - 10.0), 3.5, dot_color)
 
 ## Flashing downward triangle shown at top of lane when obstacle is spawning.
 class _LaneWarning extends Control:
 	var _t: float = 0.0
 	var _on: bool = false
-	func flash() -> void:
-		_t = 0.52
+	func flash(duration: float = 0.52) -> void:
+		_t = duration
 		_on = true
 		queue_redraw()
 	func _process(delta: float) -> void:

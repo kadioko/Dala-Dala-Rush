@@ -1,6 +1,9 @@
 # Audio Assets
 
-The game runs with procedural placeholder audio. To use real sounds, drop files
+Last verified: August 9, 2026.
+
+No custom audio files are currently present in `res://audio/`; the game ships
+working procedural music and sound fallbacks. To use recorded sounds, drop files
 into `res://audio/` with these exact names — they are picked up automatically
 (`.ogg` preferred, `.wav` and `.mp3` also work). Anything missing keeps its
 procedural fallback.
@@ -38,6 +41,23 @@ silent until the recording exists — no placeholder beep):
 
 To add more: append the key to `VOICE_KEYS` in `autoload/audio_manager.gd`
 and call `AudioManager.play_sfx("voice_x")` at the trigger.
+
+## Current Input Feedback
+
+The horn is available from the center driving-dock button and only while it
+has charges. On desktop/editor builds, `H` is the horn shortcut. Keep the horn
+sample short enough that repeated charges remain distinct rather than becoming
+a continuous wall of sound.
+
+## Release Priority
+
+1. Replace `horn.ogg`, `crash.ogg`, and `coin.ogg` first; these are heard most.
+2. Add a licensed original music loop and verify seamless looping after app
+   background/resume.
+3. Record Swahili voice lines with clear permission from each performer.
+4. Verify every asset's licence and keep attribution records when required.
+5. Test volume balance through a phone speaker, cheap earphones, and with
+   music/SFX toggles in both languages.
 
 ## Where to get audio
 

@@ -1,6 +1,84 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-## Wave 3 — "10x" feature wave (latest)
+Current Play baseline: version 1.0.4 (code 5). Waves 5-7 are included in the
+signed local Godot 4.7.1 / API 36 candidate for version 1.0.5 (code 6). This is
+a historical implementation log; release readiness is tracked in `ROADMAP.md`.
+
+## Wave 7 - Save integrity and low-end storage performance (August 9, 2026)
+
+- Added nested save batching so a run result is committed as one coherent disk
+  write after scores, route goals, daily challenges, missions, season rewards,
+  coins, and lifetime statistics have all settled.
+- Batched multi-step login streaks, career rewards, upgrades, vehicle and route
+  unlocks, shop purchases, consumable use, ad pacing, and purchase grants.
+- In-memory values still update immediately inside a batch; only repeated JSON
+  serialization and backup rotation are deferred.
+- Failed writes remain marked for a later retry, while the existing last-good
+  `.bak` recovery remains intact.
+- This removes result-screen storage bursts that could cause a visible hitch on
+  low-end Android phones and reduces the chance of partially settled rewards.
+
+## Wave 6 - Fair traffic and reliable pooling (August 9, 2026)
+
+- Fixed the magnet so it attracts coins only, matching its description and
+  preventing unintended passenger, fuel, shield, and power-up collection.
+- Horn-cleared obstacles stop colliding immediately while their exit animation
+  finishes, removing the chance of crashing into something already "cleared."
+- Pickups and coin trails are skipped when their entrance corridor overlaps an
+  obstacle; the game no longer falls back to a knowingly blocked lane.
+- Late two-lane traffic waves keep the next safe lane current or adjacent, so
+  touch players are never forced from the far-left lane directly to far-right.
+- Pooled obstacles, collectibles, and vituo now reset transform, color, depth,
+  and animation state whenever reused.
+- Horn feedback is localized as "PEMBE!" and "HONK!".
+
+## Wave 5 - Fair scoring and Android playability (August 9, 2026)
+
+- Corrected bonus-score accounting: near misses, passengers, fuel cans,
+  boosts, obstacle smashes, ghost wins, and kituo service now award the exact
+  score shown to the player instead of being divided by the distance formula.
+- Rewarded revives now preserve bonus score as well as distance, coins,
+  passengers, fares, and near misses.
+- Limited each touch swipe to one lane change for predictable phone controls;
+  deliberate second swipes are still accepted immediately.
+- Forced the first two completed runs to daytime without rush hour so new
+  players learn the road before rain, darkness, and dense traffic appear.
+- Added automatic pause when Android backgrounds the game or the window loses
+  focus, protecting runs during calls, notifications, and app switching.
+- Removed repeated fuel-bar style allocation from the frame loop to reduce
+  avoidable UI work on low-end Android devices.
+- Updated the opening control hint in both Swahili and English.
+- Rebuilt rewarded-revive continuity: onboard passengers, exact elapsed time,
+  weather, rush hour, fuel and fuel-saver state, horn capacity/charges/recharge,
+  plus cumulative horn and boost mission progress now survive the revive.
+- Revives restore at least 60% fuel without reducing a healthier fuel tank.
+- Rebuilt Settings as compact switch rows so all options remain readable on
+  small portrait screens in both Swahili and English.
+- Added a saved Reduced Effects / Athari Chache option for motion comfort,
+  battery life, and low-end phones. It reduces rain particles, speed lines,
+  screen flashes, bus tilt, impact particles, camera shake, and hit-stop while
+  leaving gameplay timing, warnings, collisions, and scoring unchanged.
+## Wave 4 - Mobile stability and release polish (July 22, 2026)
+
+- Rebuilt the portrait driving dock: clear bus-to-HUD spacing, grouped
+  left/horn/right controls, gesture-bar clearance, and visible horn-charge
+  state. Desktop controls are A/left, D/right, H/horn, and Esc/pause.
+- Fixed emulator mouse input so a Horn click cannot end as a lane swipe;
+  Android touch controls follow the same HUD exclusion path.
+- Added a safe start: route intro, bus roll-in, first-traffic delay, and a
+  beginner-friendly obstacle pool.
+- Tuned long runs: speed ramps cap after seven steps and obstacle waves never
+  fall below the readable spawn interval floor.
+- Added pickup lane checks so independent collectibles do not spawn inside a
+  nearby obstacle.
+- Reward-result state is protected: one revive per run and one rewarded action
+  at a time; Double Coins hides the exhausted reward row.
+- Applied notch and gesture-bar safe areas to Garage, Shop, Routes, Stats,
+  Settings, Livery, Leaderboard, and Missions.
+- Reworked How to Play entity previews and grouped the Tips tab. Locale sets
+  are aligned and English falls back to Swahili for future missing keys.
+
+## Wave 3 — "10x" feature wave
 
 **Core loop rework — vituo:**
 - Passengers now board the bus (capacity 8 + overload 4, HUD 👤 X/12).

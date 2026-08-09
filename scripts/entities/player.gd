@@ -17,6 +17,7 @@ var accent_color: Color = Color("#ffd23f")
 var pattern: String = "none"
 var slogan: String = ""
 var lane_switch_time: float = 0.14
+var reduced_motion: bool = false
 var _tilt_tween: Tween
 
 func setup(lane_xs: Array, vehicle: Dictionary) -> void:
@@ -50,7 +51,7 @@ func _tween_to_lane(direction: int = 0) -> void:
 	tween = create_tween()
 	tween.tween_property(self, "position:x", lanes[current_lane], lane_switch_time).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	# Juice: lean into the turn, then settle back upright.
-	if direction != 0:
+	if direction != 0 and not reduced_motion:
 		if _tilt_tween and _tilt_tween.is_valid():
 			_tilt_tween.kill()
 		rotation = 0.13 * direction
@@ -60,6 +61,11 @@ func _tween_to_lane(direction: int = 0) -> void:
 
 func get_aabb() -> Rect2:
 	return Rect2(global_position - SIZE * 0.5, SIZE)
+
+## Slightly smaller than the painted bus so near-edge dodges feel earned.
+func get_collision_aabb() -> Rect2:
+	var hit_size: Vector2 = SIZE * Vector2(0.78, 0.84)
+	return Rect2(global_position - hit_size * 0.5, hit_size)
 
 func _draw() -> void:
 	var s := SIZE

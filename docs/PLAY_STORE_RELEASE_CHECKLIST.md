@@ -2,20 +2,34 @@
 
 Use this as the launch checklist for Dala Dala Rush TZ.
 
+Last verified against local configuration: August 9, 2026.
+
+Build the signed bundle with `docs/ANDROID_RELEASE_BUILD.md`, then return here
+for store assets, declarations, and rollout checks.
+
 ## Build Status
 
 - Package name: `com.kadioko.daladalarush`
-- Version name: `1.0.0`
-- Version code: `1`
+- Current closed-testing version: `1.0.4`
+- Current closed-testing version code: `5`
+- Next planned version: `1.0.5`
+- Next required version code: `6`
+- Local candidate: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
 - Min SDK: `24`
-- Target SDK: `35`
+- Target SDK: `36`
 - Export format: Android App Bundle (`.aab`)
 - Gradle/custom build: enabled for AdMob
 - Release AAB path: `exports/android/DalaDalaRushTZ-release.aab`
 - Debug APK path: `exports/android/DalaDalaRushTZ-debug.apk`
+- Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
 
-Google Play currently requires new apps and app updates to target Android 15
-API 35 or higher. This project targets API 35.
+Before each upload, increment `version/code` in `export_presets.cfg`; Google
+Play rejects a bundle whose code is not higher than the active release.
+
+Starting August 31, 2026, new mobile apps and updates must target Android 16 /
+API 36 or higher. This project already targets API 36. Recheck the official
+policy before later releases:
+https://support.google.com/googleplay/android-developer/answer/11926878
 
 ## Signing
 
@@ -31,7 +45,9 @@ Signing recovery is configured.
 
 ## Store Listing Copy
 
-Short description:
+### Kiswahili
+
+Short description (80 characters maximum):
 
 ```text
 Kimbiza dala dala, epuka foleni, kusanya abiria na coins Dar style!
@@ -60,11 +76,52 @@ Vipengele:
 Unaweza kunipita?
 ```
 
+### English
+
+Short description (80 characters maximum):
+
+```text
+Dodge Dar traffic, collect passengers and build your dala dala legend!
+```
+
+Full description:
+
+```text
+Dala Dala Rush TZ is a colorful 2D endless driving game inspired by the energy
+of Tanzanian city traffic.
+
+Steer your dala dala across three lanes, dodge bodabodas, bajajis, cars,
+potholes, roadworks and checkpoints, then collect passengers, coins, fuel and
+power-ups. Stop at vituo to drop off passengers for fares, but watch your fuel
+and avoid overloading when traffic gets serious.
+
+Take on Kariakoo Rush, Mwenge Madness, Mbezi Express, Posta Traffic, Kigamboni
+Run and Ubungo Chaos. Unlock new dala dala styles using coins earned in the
+game, complete daily challenges and missions, improve your career rank, and
+chase a new high score.
+
+Features:
+- Simple swipe or button lane controls
+- Swahili and English language options
+- Offline-friendly gameplay
+- Multiple routes, vehicles, missions and upgrades
+- Optional rewarded ads for revive or double coins
+- No gambling, betting, chat or real-money wagering
+
+Traffic imekubana. Can you become the king of the road?
+```
+
 ## Required Store Assets
 
-- App icon: 512 x 512 PNG.
-- Feature graphic: 1024 x 500 PNG.
-- Phone screenshots: at least 2, recommended 6-8 portrait screenshots.
+- Draft app icon exists: `assets/store_listing/icon-512.png` (512 x 512).
+- Draft feature graphic exists:
+  `assets/store_listing/feature-graphic-1024x500.png` (1024 x 500).
+- Four draft phone screenshots exist at 1080 x 1920 under
+  `assets/store_listing/`.
+- Recapture screenshots after the final UI/gameplay pass so the listing matches
+  the uploaded bundle.
+- The standard Android launcher icon uses the prepared 512 x 512 artwork. A
+  dedicated adaptive foreground/background pair remains recommended.
 - Recommended screenshots:
   - Main menu
   - Gameplay with lanes and obstacles
@@ -78,7 +135,9 @@ Unaweza kunipita?
 Detailed copy/paste answers are in
 `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md`.
 
-- App category: Game, Racing or Arcade.
+- App category: Game, **Racing** (Arcade is the fallback).
+- Suggested tags: Endless runner, Driving, Casual, Offline, limited to tags
+  currently offered by Play Console.
 - Contains ads: Yes.
 - App access: No login required.
 - Target audience: likely general audience/family-friendly. Answer the Play
@@ -92,8 +151,9 @@ Detailed copy/paste answers are in
   - AdMob may collect device/ad identifiers, diagnostics, approximate location,
     and ad interaction data according to Google Mobile Ads SDK behavior.
   - Complete the Data safety form based on the final SDKs enabled at release.
-- Privacy policy URL: required because the app uses ads. Host a simple privacy
-  policy page before production upload.
+- Privacy policy URL:
+  `https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html`.
+  It returned HTTP 200 on August 9, 2026; recheck before submission.
 - Content rating: complete the Play questionnaire. Expected result should be
   low/family-friendly if no violent, sexual, gambling, or user-generated content
   is added.
@@ -107,12 +167,20 @@ Detailed copy/paste answers are in
 - Do not click live ads during development.
 - Confirm the release AAB uploads successfully to an internal testing track.
 - Run a closed/internal test before production.
+- Verify the merged release manifest contains
+  `com.google.android.gms.permission.AD_ID` and the AdMob application ID.
+- Complete a reward-heavy run, force-close from results, and confirm every
+  settled reward restores together after restart.
+- Test both ABIs through Play delivery where practical.
 
-## Known Follow-Ups
+## Remaining Before Version 1.0.5 Upload
 
-- Replace placeholder icon with final 512 x 512 artwork.
-- Capture final Play Store screenshots from the current build.
-- Publish privacy policy URL.
-- Review final data safety answers after testing AdMob on device.
-- Consider adding 32-bit ABI support later if you want broader support for very
-  old Android devices; the current release AAB was built for `arm64-v8a`.
+- Set version name `1.0.5` and version code `6` in both Android presets.
+- Review the generated store icon/feature graphic and capture fresh screenshots
+  from the final code 6 build.
+- Produce a dedicated adaptive foreground/background icon pair.
+- Verify the in-app Privacy Policy link on the release build.
+- Confirm `support@kadioko.com` is monitored.
+- Test real AdMob callbacks and consent behavior on a registered test device.
+- Review final Data safety answers against the exact SDK version.
+- Upload the signed v6 AAB and inspect Play Console warnings before rollout.

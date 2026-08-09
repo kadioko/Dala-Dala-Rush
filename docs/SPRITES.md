@@ -1,9 +1,23 @@
 # Sprite Assets
 
-The game draws all entities as vector shapes in code, so it runs with zero
-image files. To upgrade the look, drop PNGs into `res://sprites/` — each one
-is used automatically (loaded by `scripts/sprite_lib.gd`); anything missing
-keeps the vector fallback. Mix and match freely.
+Last verified: August 9, 2026.
+
+No optional gameplay PNG overrides are currently present. The current build
+uses the improved procedural/vector artwork in the entity and road scripts.
+Files under `assets/store_listing/` are Play Store graphics, not gameplay
+sprite overrides.
+
+Current build note: the same sprite lookup is used by the How to Play entity
+previews, so a new sprite improves both gameplay and the teaching screen
+automatically.
+
+The game draws all entities as detailed vector shapes in code, so it runs with
+zero gameplay image files. The built-in set includes distinct top-down cars,
+trucks, police vehicles, bodabodas, bajajis, dala dalas, road hazards, people,
+power-ups, animated coins, bus stops, and route scenery. To replace any item,
+drop a PNG into `res://sprites/` — it is used automatically (loaded by
+`scripts/sprite_lib.gd`); anything missing keeps the polished vector fallback.
+Mix and match freely.
 
 All sprites should face **up** (driving away from the camera) and include
 transparency. They are stretched to the entity's logical size, so match the
@@ -54,3 +68,12 @@ aspect ratios below. Use 2x the logical size for crispness.
 - Bold flat colours with dark outlines read best at small sizes on cheap screens.
 - Keep the vehicle accent colours close to the in-game palette (data/vehicles.gd) so the garage previews still match.
 - Pixel art at 2x–3x scale also works well with the project's nearest-neighbour filtering (`default_texture_filter=0`).
+
+## Import QA
+
+- Use transparent PNGs with tight bounds and no baked background.
+- Verify the same asset in gameplay, Garage/How to Play where applicable, and
+  both day and night conditions.
+- Keep collision sizes in code unchanged unless the new visual genuinely needs
+  a gameplay change.
+- Test memory and frame pacing on a low-end phone after adding a full set.

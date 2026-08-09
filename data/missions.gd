@@ -28,12 +28,14 @@ const XP_PER_LEVEL := 120
 static func get_active() -> Array:
 	var active: Array = SaveSystem.get_value("missions_active", [])
 	if active.size() < ACTIVE_COUNT:
+		SaveSystem.begin_batch()
 		var next_idx := int(SaveSystem.get_value("missions_next", 0))
 		while active.size() < ACTIVE_COUNT:
 			active.append({"tid": TEMPLATES[next_idx % TEMPLATES.size()].id, "progress": 0})
 			next_idx += 1
 		SaveSystem.set_value("missions_next", next_idx)
 		SaveSystem.set_value("missions_active", active)
+		SaveSystem.end_batch()
 	return active
 
 static func template(tid: String) -> Dictionary:
@@ -44,6 +46,7 @@ static func template(tid: String) -> Dictionary:
 
 ## Apply one run's stats. Returns array of completed template dicts.
 static func update_from_run(stats: Dictionary) -> Array:
+	SaveSystem.begin_batch()
 	var active := get_active()
 	var completed: Array = []
 	var next_idx := int(SaveSystem.get_value("missions_next", 0))
@@ -68,6 +71,7 @@ static func update_from_run(stats: Dictionary) -> Array:
 
 	SaveSystem.set_value("missions_next", next_idx)
 	SaveSystem.set_value("missions_active", active)
+	SaveSystem.end_batch()
 	return completed
 
 # ─── Season track ─────────────────────────────────────────────────
@@ -83,11 +87,13 @@ static func season_progress() -> float:
 
 ## Adds XP; pays out level-up coin rewards automatically.
 static func add_season_xp(amount: int) -> void:
+	SaveSystem.begin_batch()
 	var before := season_level()
 	SaveSystem.set_value("season_xp", season_xp() + amount)
 	var after := season_level()
 	if after > before:
 		SaveSystem.add_coins(30 * after)
+	SaveSystem.end_batch()
 
 static func describe(t: Dictionary) -> String:
 	return LocaleManager.t(String(t.key)).replace("{n}", str(int(t.target)))

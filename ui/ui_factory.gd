@@ -76,6 +76,18 @@ static func safe_top_inset(viewport_height: float = 960.0) -> float:
 		return 0.0
 	return clampf(float(sa.position.y) * viewport_height / float(win.y), 0.0, 80.0)
 
+## Bottom inset for Android gesture bars and iOS home indicators.
+static func safe_bottom_inset(viewport_height: float = 960.0) -> float:
+	var os_name := OS.get_name()
+	if os_name != "Android" and os_name != "iOS":
+		return 0.0
+	var sa := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y <= 0:
+		return 0.0
+	var bottom_pixels: float = float(win.y - (sa.position.y + sa.size.y))
+	return clampf(bottom_pixels * viewport_height / float(win.y), 0.0, 80.0)
+
 static func paint_background(control: Control, color: Color = COL_BG) -> void:
 	var bg := ColorRect.new()
 	bg.color = color

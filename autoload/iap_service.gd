@@ -31,9 +31,11 @@ func purchase(product_id: String) -> void:
 	# On success: _grant(product_id); acknowledge/consume; emit purchase_completed.
 
 func _grant(product_id: String) -> void:
+	SaveSystem.begin_batch()
 	for p in CATALOG:
 		if p.id == product_id and int(p.coins) > 0:
 			SaveSystem.add_coins(int(p.coins))
 	# vip_bundle: unlock the VIP vehicle outright
 	if product_id == "vip_bundle":
 		SaveSystem.unlock_vehicle("vip")
+	SaveSystem.end_batch()

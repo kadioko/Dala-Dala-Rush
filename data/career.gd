@@ -61,9 +61,11 @@ static func check_rank_up() -> Dictionary:
 	var stored := int(SaveSystem.get_value("career_rank", 0))
 	if current <= stored:
 		return {}
+	SaveSystem.begin_batch()
 	SaveSystem.set_value("career_rank", current)
 	var reward := 50 * current
 	SaveSystem.add_coins(reward)
+	SaveSystem.end_batch()
 	return {"rank": current, "key": rank_key(current), "reward": reward}
 
 # ─── Upgrades ─────────────────────────────────────────────────────
@@ -83,7 +85,12 @@ static func upgrade_cost(id: String) -> int:
 
 static func buy_upgrade(id: String) -> bool:
 	var cost := upgrade_cost(id)
-	if cost < 0 or not SaveSystem.spend_coins(cost):
+	if cost < 0:
+		return false
+	SaveSystem.begin_batch()
+	if not SaveSystem.spend_coins(cost):
+		SaveSystem.end_batch()
 		return false
 	SaveSystem.set_value(id, upgrade_level(id) + 1)
+	SaveSystem.end_batch()
 	return true
