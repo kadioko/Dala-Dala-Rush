@@ -83,8 +83,14 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 ## Current Build Notes
 
 - The project is validated with Godot 4.7.1 in headless scene startup checks.
-- Current Play baseline: version `1.0.4`, code `5`. A signed local candidate
-  for version `1.0.5`, code `6` has been built for closed testing.
+- A headless logic-contract suite now verifies localization parity, catalog
+  integrity, save repair, selection guards, rewarded-claim idempotency, ghost
+  validation, and the gameplay distance scale.
+- Current local closed-testing artifact: version `1.0.5`, code `6`.
+  `DalaDalaRushTZ-closed-testing-v6.aab` was built, signature-verified, and
+  checked for its AdMob and Advertising ID manifest entries on August 9, 2026.
+  The current source contains Waves 8-13 and is newer than that artifact; the
+  next Play upload must use version code `7` or higher.
 - Android export is configured for package `com.kadioko.daladalarush`, minimum
   API 24, target API 36, Gradle custom build, and AAB output.
 - AdMob is wired with production unit IDs; real-device loading, consent, and
@@ -120,6 +126,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   ├── consumables.gd     #   one-run shop items
 │   ├── missions.gd        #   mission templates + season track
 │   ├── career.gd          #   ranks + bus upgrades
+│   ├── ghost_data.gd      #   bounded validation + sharing codec
 │   ├── daily_challenges.gd
 │   └── login_streak.gd
 ├── scripts/
@@ -131,6 +138,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   └── *_screen.gd        #   menu, garage, livery, shop, routes, missions,
 │                          #   stats, leaderboard (ghost codes), settings, etc.
 ├── scenes/                # Minimal .tscn files (UI is built in code)
+├── tests/                 # Headless gameplay/data contract checks
 ├── docs/                  # All guides — see index below
 ├── sprites/               # (optional) PNG overrides — docs/SPRITES.md
 └── audio/                 # (optional) real audio — docs/AUDIO_ASSETS.md
@@ -150,7 +158,11 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |
 | `docs/SPRITES.md` | Sprite filenames/sizes for the art pass |
 | `docs/AUDIO_ASSETS.md` | Audio filenames/specs incl. Swahili voice lines |
-| `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Current closed-testing and upload checklist |
+| `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Current closed-testing artifact, store assets, and upload checklist |
+| `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Current Play policy-form answers |
+| `docs/PRIVACY_POLICY_DRAFT.md` | Source copy for the public privacy page |
+| `docs/RELEASE_NOTES_NEXT.md` | Draft bilingual notes for the next source build |
+| `docs/RELEASE_NOTES_1.0.5.md` | Historical bilingual notes for the code 6 artifact |
 | `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Suggested Play Console declarations |
 
 ---
@@ -173,10 +185,28 @@ Gameplay constants are named and grouped at the top of `scripts/game.gd`
 Catalog numbers live in `data/`. Remote-tunable knobs go through
 `autoload/remote_config.gd`.
 
+World movement stays visually fast, while distance uses
+`METERS_PER_WORLD_UNIT = 0.15`. At the opening speed this is about 51 m/s,
+so distance goals and the 1 km achievement take meaningful play time.
+
+## Logic Validation
+
+Run the strict Godot 4.7.1 parser and headless contract suite before a build:
+
+```powershell
+godot --headless --editor --path . --quit
+godot --headless --path . res://tests/logic_contracts.tscn -- --logic-contracts
+```
+
+The second command exits non-zero when a core data or progression contract is
+broken, making it suitable for a future CI check.
+
 ## Save Data
 
 `user://save.json` with batched multi-reward commits, automatic `.bak` rotation,
-and corruption recovery.
+type/range normalization, and corruption recovery. Loading the backup repairs
+the primary immediately without rotating the corrupt primary over the known-good
+backup.
 On Windows during development:
 `%APPDATA%\Godot\app_userdata\Dala Dala Rush TZ\save.json`.
 

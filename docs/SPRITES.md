@@ -1,6 +1,6 @@
 # Sprite Assets
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 No optional gameplay PNG overrides are currently present. The current build
 uses the improved procedural/vector artwork in the entity and road scripts.

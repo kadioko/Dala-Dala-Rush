@@ -1,6 +1,6 @@
 # Content Guide
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 This project is designed so most new content can be added through small data/script edits.
 
@@ -195,6 +195,13 @@ Single changes can call `SaveSystem.set_value()` or another typed helper
 directly. Wrap multi-step rewards, purchases, unlocks, or migrations with
 `SaveSystem.begin_batch()` and `SaveSystem.end_batch()` so they commit once.
 Every success and failure return path must close the batch. Batches may nest.
+
+## Ghost Data
+
+Treat imported ghost codes as untrusted input. Encode and decode only through
+`data/ghost_data.gd`; do not parse clipboard JSON directly. New ghost event
+fields must retain duration, count, lane-range, numeric, and ordering limits,
+and must be covered by `tests/logic_contracts.gd`.
 
 ## Content Tone
 

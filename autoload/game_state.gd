@@ -2,6 +2,7 @@ extends Node
 ## Tracks selections that survive between scenes and the most recent run.
 
 const Routes := preload("res://data/routes.gd")
+const Vehicles := preload("res://data/vehicles.gd")
 const DailyChallengesData := preload("res://data/daily_challenges.gd")
 const MissionsData := preload("res://data/missions.gd")
 
@@ -29,6 +30,7 @@ var last_daily_challenge_key: String = ""
 var last_daily_challenge_progress: String = ""
 var last_daily_bonus_coins: int = 0
 var last_missions_completed: Array = []
+var last_end_reason: String = "unknown"
 
 # ── Continue-after-crash (rewarded ad) ───────────────────────────
 # When continue_pending is true, game.gd restores this state instead
@@ -36,6 +38,7 @@ var last_missions_completed: Array = []
 var continue_pending: bool = false
 var continue_state: Dictionary = {}
 var continue_used: bool = false
+var rewarded_choice_used: String = ""
 var _last_resume_state: Dictionary = {}
 
 # Banked totals already credited to the save during this run
@@ -48,9 +51,10 @@ var _run_counted: bool = false
 var _goal_rewarded: bool = false
 
 func _ready() -> void:
-	selected_vehicle_id = SaveSystem.get_value("selected_vehicle", "classic_blue")
-	selected_route_id   = SaveSystem.get_value("selected_route", "kariakoo")
+	selected_vehicle_id = String(SaveSystem.get_value("selected_vehicle", "classic_blue"))
+	selected_route_id   = String(SaveSystem.get_value("selected_route", "kariakoo"))
 	_migrate_route_unlocks()
+	_validate_selections()
 
 ## Grandfather existing players: any route already played stays unlocked.
 func _migrate_route_unlocks() -> void:
@@ -59,25 +63,39 @@ func _migrate_route_unlocks() -> void:
 		var rid := String(r.id)
 		if SaveSystem.get_route_best(rid) > 0 and not SaveSystem.is_route_unlocked(rid):
 			SaveSystem.unlock_route(rid)
-	# Never strand the player on a locked selected route.
-	var sel := Routes.get_by_id(selected_route_id)
-	if not Routes.is_unlocked(sel):
-		set_route("kariakoo")
 	SaveSystem.end_batch()
 
-func set_vehicle(id: String) -> void:
+func _validate_selections() -> void:
+	var vehicle := Vehicles.get_by_id(selected_vehicle_id)
+	if String(vehicle.id) != selected_vehicle_id \
+		or not SaveSystem.is_vehicle_unlocked(selected_vehicle_id):
+		set_vehicle("classic_blue")
+	var route := Routes.get_by_id(selected_route_id)
+	if String(route.id) != selected_route_id or not Routes.is_unlocked(route):
+		set_route("kariakoo")
+
+func set_vehicle(id: String) -> bool:
+	var vehicle := Vehicles.get_by_id(id)
+	if String(vehicle.id) != id or not SaveSystem.is_vehicle_unlocked(id):
+		return false
 	selected_vehicle_id = id
 	SaveSystem.set_value("selected_vehicle", id)
+	return true
 
-func set_route(id: String) -> void:
+func set_route(id: String) -> bool:
+	var route := Routes.get_by_id(id)
+	if String(route.id) != id or not Routes.is_unlocked(route):
+		return false
 	selected_route_id = id
 	SaveSystem.set_value("selected_route", id)
+	return true
 
 ## Called by game.gd when a brand-new run starts (not an ad-continue).
 func begin_run() -> void:
 	continue_pending = false
 	continue_state = {}
 	continue_used = false
+	rewarded_choice_used = ""
 	_last_resume_state = {}
 	_banked_coins = 0
 	_banked_distance = 0.0
@@ -88,9 +106,10 @@ func begin_run() -> void:
 
 ## Called by GameOver when the player watches a rewarded ad to continue.
 func request_continue() -> bool:
-	if continue_used:
+	if continue_used or not rewarded_choice_used.is_empty():
 		return false
 	continue_used = true
+	rewarded_choice_used = "continue"
 	continue_pending = true
 	continue_state = {
 		"distance": last_distance,
@@ -103,6 +122,19 @@ func request_continue() -> bool:
 	}
 	continue_state.merge(_last_resume_state, true)
 	return true
+
+## Grants the second copy of coins collected during this run. Keeping the
+## claim here makes it atomic and prevents duplicate SDK callbacks or a later
+## results scene from combining Double Coins with a rewarded revive.
+func claim_double_coins() -> int:
+	if not rewarded_choice_used.is_empty() or last_coins <= 0:
+		return 0
+	rewarded_choice_used = "double_coins"
+	SaveSystem.add_coins(last_coins)
+	return last_coins
+
+func can_claim_rewarded_choice() -> bool:
+	return rewarded_choice_used.is_empty()
 
 func record_run(score: int, coins: int, passengers: int, distance: float,
 		near_misses: int = 0, extra: Dictionary = {}) -> void:
@@ -119,6 +151,7 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 	last_passengers = passengers
 	last_distance   = distance
 	last_near_misses = near_misses
+	last_end_reason = String(extra.get("end_reason", "unknown"))
 	_last_resume_state = {
 		"onboard": int(extra.get("onboard", 0)),
 		"fuel": float(extra.get("fuel", 0.6)),

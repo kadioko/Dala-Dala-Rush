@@ -1,8 +1,124 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-Current Play baseline: version 1.0.4 (code 5). Waves 5-7 are included in the
-signed local Godot 4.7.1 / API 36 candidate for version 1.0.5 (code 6). This is
-a historical implementation log; release readiness is tracked in `ROADMAP.md`.
+Current local closed-testing artifact: version 1.0.5 (code 6). Waves 5-7 are
+included in the signed, locally verified Godot 4.7.1 / API 36 bundle. This is a
+historical implementation log; release readiness is tracked in `ROADMAP.md`.
+
+## Wave 13 - Core logic and data-contract audit (August 19, 2026)
+
+- Made scene transitions single-owner: repeated navigation input is ignored
+  while a fade is active, the overlay blocks touches during the handoff, and a
+  failed scene change restores input instead of leaving the app stuck.
+- Hardened save recovery so a valid backup repairs the primary immediately
+  without copying a corrupt primary over the good backup on the next write.
+- Added load-time type/range normalization for core totals, starter unlocks,
+  locale, consumables, achievements, and leaderboard rows. Negative reward
+  mutations and empty unlock IDs are now rejected.
+- Validated saved route and vehicle selections against both catalog existence
+  and unlock state, preventing invalid personal-best keys and locked starts.
+- Centralized ghost-code validation with bounds for code size, event count,
+  duration, lane values, ordering, and numeric values before playback.
+- Made results navigation single-fire and applied the same completed-run
+  interstitial policy to Leaderboard navigation as Replay and Main Menu.
+- A purchased route is selected immediately, matching the garage unlock flow.
+- Separated visual world speed from measured distance with a `0.15` conversion;
+  the opening rate is now about 51 m/s instead of 340 m/s, giving route goals
+  and the 1 km achievement meaningful duration.
+- Added a clean headless logic-contract suite for locales, catalogs, save repair,
+  invalid selections, rewarded idempotency, ghost codes, and distance tuning.
+
+## Wave 12 - Interruption-safe pause flow (August 18, 2026)
+
+- Rebuilt Pause as a focused driver-break screen with the current route,
+  distance, collected coins, and onboard passenger load visible at a glance.
+- Restart and Main Menu no longer discard a live run immediately. Both now
+  open a clear confirmation state explaining exactly what will not be saved.
+- Android Back first closes an open exit confirmation, then resumes the run on
+  the next press, preventing an accidental navigation chain.
+- Fixed the matching desktop/emulator Escape path: pause input is now handled
+  before gameplay's paused-input guard, so the same key can pause and resume.
+- Escape now accepts logical and physical keycodes, covering USB keyboards and
+  emulator/desktop input layers that report the same key differently.
+- Automatic pause after app backgrounding or focus loss always returns to the
+  safe main pause state rather than preserving a stale destructive prompt.
+- Added complete Swahili and English interruption and confirmation copy.
+
+## Wave 11 - Rewarded-ad integrity (August 18, 2026)
+
+- Enforced one rewarded choice per run across scene changes: a player can use
+  either the one-time revive or Double Coins, never both on the same journey.
+- Moved the Double Coins grant into `GameState`, where the claim is atomic and
+  duplicate SDK reward callbacks cannot pay the same run twice.
+- Zero-coin runs no longer offer a Double Coins ad, avoiding a worthless reward
+  and protecting player trust.
+- Replaced the debug placeholder message on results with concise bilingual
+  guidance that clearly explains the one-reward choice and shows the exact
+  coin amount that will be doubled.
+- Failed ad attempts do not consume the choice; the valid actions are restored
+  so the player can retry safely.
+
+## Wave 10 - Route intent and crash coaching (August 18, 2026)
+
+- Added the selected route objective and coin reward to the pre-run countdown,
+  so every route begins with a clear purpose before traffic starts moving.
+- The run now records the exact obstacle or fuel state that ended it and carries
+  that context into the results screen.
+- Added a compact `Driver Note` panel to Game Over with practical guidance for
+  bodabodas, bajajis, cars, potholes, road works, checkpoints, trucks,
+  pedestrians, loose tires, roadside goats, and empty fuel.
+- Added scroll-safe clearance beneath the final results action so every button
+  can sit fully above the fixed menu/results banner on short portrait phones.
+- Added complete Swahili and English copy for the new coaching flow. Unknown or
+  future hazards safely fall back to general lane-reading advice.
+
+## Wave 9 - How To Play route briefing (August 18, 2026)
+
+- Rebuilt How To Play as a focused portrait-first route briefing rather than a
+  plain reference list. The Controls tab now presents a three-step run plan,
+  a clearer three-lane road view, and a miniature representation of the live
+  left, horn, and right driving dock.
+- Replaced text-symbol placeholders with lightweight drawn control and tip
+  glyphs. They are consistent with the vehicle and pickup previews already
+  used elsewhere in the screen and need no additional art downloads.
+- Added concise bilingual context panels to the Avoid and Collect tabs, plus
+  explicit `DODGE` / `PICK UP` markers so the player understands the purpose
+  of each item while scanning it.
+- Reworked Tips into a practical pre-run checklist followed by color-coded
+  driving, safety, and dala dala-life guidance. All new copy is localized for
+  Swahili and English.
+- Centered the screen title and turned the return control into a familiar
+  compact back icon with a localized tooltip, giving the header more room on
+  narrow Android devices.
+
+## Wave 8 - Touch fidelity and fair late-run traffic (August 18, 2026)
+
+- Added a compact live route-goal chip to the driving HUD. It shows the
+  selected route's current run progress and coin reward, yields to urgent
+  driving messages, and celebrates when the run reaches the goal.
+- Added a one-time first-run practice shield. It gives a brand-new driver one
+  protected mistake while they learn the road and is clearly identified as an
+  onboarding assist rather than a rewarded-ad continue.
+- Every 20-second speed increase now has a localized status cue, floating
+  feedback, a light haptic, and a small audio signal so escalation feels fair.
+- Shield hits now grant a short visible recovery window and delay the next
+  hazard wave, preventing clustered traffic from causing an immediate second
+  crash after the shield correctly absorbed the first one.
+- Reframed the fuel meter as a compact upper-left gauge, freeing the road edge
+  for traffic readability on portrait phones.
+- Floating score and pickup feedback now stays above the power-up and driving
+  dock, is centered to its real label width, and uses an outline for contrast.
+- Shortened the opening steering hint in Swahili and English so it stays clean
+  within the narrow portrait HUD.
+- The entire lower driving dock is now a no-swipe zone, including the spacing
+  around the left, horn, and right buttons. A thumb beginning inside the dock
+  cannot leak into a steering gesture.
+- Lane changes are now atomic: while the bus is completing its one-lane move,
+  another steer cannot cancel or reverse it. The direction buttons dim briefly
+  to show that the input has been accepted.
+- Two-lane traffic waves now reserve a clear lane that is reachable in one
+  deliberate move from the player's current lane and the prior safe lane.
+- When existing traffic occupies every valid decision corridor, the game
+  defers the next wave instead of manufacturing an impossible road choice.
 
 ## Wave 7 - Save integrity and low-end storage performance (August 9, 2026)
 
@@ -150,7 +266,8 @@ a historical implementation log; release readiness is tracked in `ROADMAP.md`.
 ## Balancing Notes (current values)
 
 Run economy:
-- Base speed `340 × route.difficulty`, +15% every 20 s.
+- Visual speed `340 × route.difficulty`, +15% every 20 s; measured distance is
+  visual travel × `0.15` (about 51 m/s on the starter route).
 - Score = distance × 0.1; engine upgrade adds +4%/lvl to distance gain.
 - Coin pickups: 1 + combo bonus, × vehicle `coin_mult`.
 

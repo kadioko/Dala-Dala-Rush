@@ -1,6 +1,6 @@
 # Android Release Build Runbook
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 Use this document to create and validate a signed Android App Bundle for Google
 Play closed testing. Store-listing work and Play Console declarations are in
@@ -19,8 +19,9 @@ Play closed testing. Store-listing work and Play Console declarations are in
 | Architectures | `armeabi-v7a`, `arm64-v8a` |
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
-| Current Play baseline | Version 1.0.4, code 5 |
-| Next planned upload | Version 1.0.5, code 6 |
+| Latest local closed-testing artifact | Version 1.0.5, code 6 |
+| Artifact status | Built and locally verified, but older than current source |
+| Next source build | Version code 7 or higher; proposed version name 1.0.6 |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
 31, 2026. Recheck the current policy before future releases:
@@ -28,7 +29,7 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 
 ## Release Gates
 
-Complete these before treating the bundle as upload-ready:
+Complete these before rolling the verified bundle out to testers:
 
 - [ ] All intended code and documentation changes are present.
 - [ ] Settings includes an in-app Privacy Policy link.
@@ -45,9 +46,9 @@ Markdown, commits, screenshots, terminal transcripts, or Play release notes.
 `export_presets.cfg` is intentionally ignored by Git because it contains local
 signing configuration.
 
-## 1. Set The Version
+## 1. Confirm The Version
 
-Open `Project > Export` in Godot and update both Android presets:
+The current verified local artifact was exported from both Android presets with:
 
 ```text
 Version name: 1.0.5
@@ -56,7 +57,8 @@ Version code: 6
 
 The code must be greater than every active artifact in every Play track,
 including internal, closed, open, and production tracks. If code 6 has already
-been uploaded, use code 7 even if that release was never promoted.
+been uploaded, use code 7 for a replacement build even if code 6 was never
+promoted.
 
 Confirm the local preset without displaying signing values:
 
@@ -83,6 +85,14 @@ Also check the worktree for whitespace errors:
 git diff --check
 ```
 
+Run the core logic contracts:
+
+```powershell
+& $godot --headless --path '.' res://tests/logic_contracts.tscn -- --logic-contracts
+```
+
+This must print `LOGIC CONTRACTS: PASS` and exit with code 0.
+
 ## 3. Confirm Android And Signing Setup
 
 In Godot, open `Editor > Editor Settings > Export > Android` and verify:
@@ -106,10 +116,10 @@ Preferred editor path:
 Project > Export > Android AAB Release > Export Project
 ```
 
-Use this output name for the next closed-testing artifact:
+The next source build should use a new filename:
 
 ```text
-exports/android/DalaDalaRushTZ-closed-testing-v6.aab
+exports/android/DalaDalaRushTZ-closed-testing-v7.aab
 ```
 
 Equivalent command-line export:
@@ -118,7 +128,7 @@ Equivalent command-line export:
 $godot = 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe'
 & $godot --headless --path '.' `
   --export-release 'Android AAB Release' `
-  'exports/android/DalaDalaRushTZ-closed-testing-v6.aab'
+  'exports/android/DalaDalaRushTZ-closed-testing-v7.aab'
 ```
 
 Do not interrupt the process. A successful command must return exit code 0 and
@@ -129,7 +139,7 @@ the requested AAB must have a new modification time.
 Set the artifact path once:
 
 ```powershell
-$aab = 'exports/android/DalaDalaRushTZ-closed-testing-v6.aab'
+$aab = 'exports/android/DalaDalaRushTZ-closed-testing-v7.aab'
 ```
 
 Confirm it exists, record its size, and create a checksum:
@@ -188,12 +198,12 @@ Use the complete device matrix in `ANDROID_EXPORT.md`.
 
 ## 7. Upload Checklist
 
-- [ ] Upload `DalaDalaRushTZ-closed-testing-v6.aab` to Closed testing.
-- [ ] Confirm Play Console reads version 1.0.5, code 6, and target API 36.
+- [ ] Upload the newly verified versioned AAB to the intended Play track.
+- [ ] Confirm Play Console reads version code 7 or higher and target API 36.
 - [ ] Confirm the Advertising ID warning is absent for the new artifact.
 - [ ] Review native-code debug-symbol and deobfuscation notices. These are
   warnings unless obfuscation is enabled, but record the decision.
-- [ ] Add localized notes from `RELEASE_NOTES_1.0.5_DRAFT.md`.
+- [ ] Finalize and add localized notes from `RELEASE_NOTES_NEXT.md`.
 - [ ] Recheck Ads, Data safety, target audience, content rating, app access,
   financial, health, and government declarations.
 - [ ] Confirm the public privacy URL opens:

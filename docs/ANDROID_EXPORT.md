@@ -1,6 +1,6 @@
 # Android Export Guide
 
-Last verified: August 9, 2026 with Godot 4.7.1.
+Last verified: August 19, 2026 with Godot 4.7.1.
 
 For the exact signed AAB procedure, artifact verification commands, and Play
 upload handoff, use `docs/ANDROID_RELEASE_BUILD.md`.
@@ -14,8 +14,10 @@ upload handoff, use `docs/ANDROID_RELEASE_BUILD.md`.
 - Offline-first: no required network access for MVP.
 - Target phones: low to mid-range Android devices common in Tanzania.
 - Package: `com.kadioko.daladalarush`.
-- Current closed-testing baseline: `1.0.4` / version code `5`.
-- Next planned release: `1.0.5` / version code `6`.
+- Current local closed-testing artifact: `1.0.5` / version code `6`.
+- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`.
+- Current source is newer than that artifact. The next replacement build must
+  use version code `7` or higher after checking every Play track.
 
 API 36 meets Google Play's Android 16 requirement for new apps and app updates
 starting August 31, 2026. Recheck the policy before later releases:
@@ -30,10 +32,11 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 5. Use the existing `Android AAB Release` or `Android APK Debug` preset.
 6. Confirm package name: `com.kadioko.daladalarush`.
 7. Set orientation to portrait.
-8. Keep Gradle/custom build enabled and export **AAB** for Google Play. The current
-   release preset writes `exports/android/DalaDalaRushTZ-release.aab`.
-9. Before the next upload, set version name `1.0.5` and version code `6` in
-   both Android presets. Every Play upload needs a higher version code.
+8. Keep Gradle/custom build enabled and export **AAB** for Google Play. Use a
+   unique output name such as `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`.
+9. The current local presets are version name `1.0.5` and version code `6`.
+   Before making a replacement build, first check Play Console: every upload
+   needs a never-before-used higher version code.
 
 The 4.7.1 Android template is installed and identified by
 `android/.build_version`. Both `armeabi-v7a` and `arm64-v8a` are enabled in the
@@ -50,7 +53,7 @@ Project > Export > Android > Export Project
 From CLI if Godot is on PATH:
 
 ```bash
-godot --export-release "Android AAB Release" exports/android/DalaDalaRushTZ-release.aab
+godot --export-release "Android AAB Release" exports/android/DalaDalaRushTZ-closed-testing-v7.aab
 ```
 
 The editor export is preferred when signing settings or plugin state have
@@ -73,7 +76,10 @@ Run through this on a real phone before each release:
 
 - [ ] Swipe left/right feels responsive at high speed (adjust `swipe_threshold` in game.gd if not).
 - [ ] On-screen left / horn / right controls are reachable with a thumb and
-  do not move the bus when Horn is tapped.
+  do not move the bus when Horn is tapped. A completed lane move must not be
+  cancelled by a second touch while its animation is still playing.
+- [ ] Starting a swipe anywhere in the lower driving dock, including its empty
+  padding, does not steer the bus.
 - [ ] Android gesture bar and camera cutout do not cover gameplay HUD or any
   secondary-screen button.
 - [ ] Hardware back button: pauses during a run, returns to menu from sub-screens, quits from main menu (handled in `transition_manager.gd`).

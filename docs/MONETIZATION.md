@@ -1,6 +1,6 @@
 # Monetization Plan
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 Ads are the only enabled monetization in the current game. Play Billing and a
 premium season track are optional future work and must not be declared as live

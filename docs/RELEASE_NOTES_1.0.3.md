@@ -1,7 +1,7 @@
 # Dala Dala Rush TZ 1.0.3 Release Notes
 
 Status: archived closed-testing release record. Do not use these notes for the
-next upload; use `RELEASE_NOTES_1.0.5_DRAFT.md`.
+next upload; use `RELEASE_NOTES_NEXT.md`.
 
 Use the matching locale in Google Play Console for this closed-testing update.
 

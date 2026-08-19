@@ -125,6 +125,7 @@ func _select(id: String) -> void:
 		SaveSystem.begin_batch()
 		if SaveSystem.spend_coins(price):
 			SaveSystem.unlock_route(id)
+			GameState.set_route(id)
 			AudioManager.play_sfx("powerup")
 			_msg.text = LocaleManager.t("ROUTE_UNLOCKED")
 		else:

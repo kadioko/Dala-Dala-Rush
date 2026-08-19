@@ -1,7 +1,7 @@
 # Dala Dala Rush TZ 1.0.4 Release Notes
 
-Status: current closed-testing baseline (version code 5). These notes describe
-the existing artifact and should remain unchanged in Play Console history.
+Status: archived closed-testing release record (version code 5). These notes
+describe the existing artifact and should remain unchanged in Play Console history.
 
 Use the matching locale in Google Play Console for this closed-testing update.
 

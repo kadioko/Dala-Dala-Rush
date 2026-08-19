@@ -18,22 +18,31 @@ func _ready() -> void:
 
 func go_to(path: String) -> void:
 	if _busy:
-		# Still do the change even if somehow busy, just skip animation.
-		get_tree().change_scene_to_file(path)
+		# Ignore duplicate taps while the current transition owns navigation.
+		# Changing immediately here leaves the first tween's stale callback alive.
 		return
 	_busy = true
+	_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tw := create_tween()
 	tw.tween_property(_overlay, "modulate:a", 1.0, 0.20).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_callback(func(): _do_change(path))
 
 func _do_change(path: String) -> void:
-	get_tree().change_scene_to_file(path)
+	var error: Error = get_tree().change_scene_to_file(path)
+	if error != OK:
+		push_error("Transition: failed to open %s (error %d)." % [path, error])
+		_overlay.modulate.a = 0.0
+		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_busy = false
+		return
 	# Wait two frames for the new scene to render before fading back in.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var tw := create_tween()
 	tw.tween_property(_overlay, "modulate:a", 0.0, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func(): _busy = false)
+	tw.tween_callback(func():
+		_busy = false
+		_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
 # ─── Android hardware back button ─────────────────────────────────
 

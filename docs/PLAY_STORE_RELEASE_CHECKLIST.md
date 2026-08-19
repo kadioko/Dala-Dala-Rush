@@ -2,7 +2,7 @@
 
 Use this as the launch checklist for Dala Dala Rush TZ.
 
-Last verified against local configuration: August 9, 2026.
+Last verified against local configuration: August 19, 2026.
 
 Build the signed bundle with `docs/ANDROID_RELEASE_BUILD.md`, then return here
 for store assets, declarations, and rollout checks.
@@ -10,21 +10,23 @@ for store assets, declarations, and rollout checks.
 ## Build Status
 
 - Package name: `com.kadioko.daladalarush`
-- Current closed-testing version: `1.0.4`
-- Current closed-testing version code: `5`
-- Next planned version: `1.0.5`
-- Next required version code: `6`
-- Local candidate: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
+- Current local closed-testing artifact: `1.0.5`
+- Current local version code: `6`
+- Artifact status: signed and locally verified; not tracked in Git
+- Local artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
 - Min SDK: `24`
 - Target SDK: `36`
 - Export format: Android App Bundle (`.aab`)
 - Gradle/custom build: enabled for AdMob
-- Release AAB path: `exports/android/DalaDalaRushTZ-release.aab`
+- Next release AAB path: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
 - Debug APK path: `exports/android/DalaDalaRushTZ-debug.apk`
 - Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
+- Source status: Waves 8-13 are newer than code 6; the next upload requires
+  version code `7` or higher and a newly exported AAB.
 
-Before each upload, increment `version/code` in `export_presets.cfg`; Google
-Play rejects a bundle whose code is not higher than the active release.
+Before a replacement upload, check every Play track first. Google Play rejects
+a bundle whose code is not higher than every previously uploaded artifact. If
+code `6` has reached Play, use code `7` or higher for a replacement.
 
 Starting August 31, 2026, new mobile apps and updates must target Android 16 /
 API 36 or higher. This project already targets API 36. Recheck the official
@@ -153,7 +155,7 @@ Detailed copy/paste answers are in
   - Complete the Data safety form based on the final SDKs enabled at release.
 - Privacy policy URL:
   `https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html`.
-  It returned HTTP 200 on August 9, 2026; recheck before submission.
+  It returned HTTP 200 on August 19, 2026; recheck before submission.
 - Content rating: complete the Play questionnaire. Expected result should be
   low/family-friendly if no violent, sexual, gambling, or user-generated content
   is added.
@@ -173,14 +175,15 @@ Detailed copy/paste answers are in
   settled reward restores together after restart.
 - Test both ABIs through Play delivery where practical.
 
-## Remaining Before Version 1.0.5 Upload
+## Remaining Before The Next Tester Rollout
 
-- Set version name `1.0.5` and version code `6` in both Android presets.
 - Review the generated store icon/feature graphic and capture fresh screenshots
-  from the final code 6 build.
+  from the next release candidate.
 - Produce a dedicated adaptive foreground/background icon pair.
 - Verify the in-app Privacy Policy link on the release build.
 - Confirm `support@kadioko.com` is monitored.
 - Test real AdMob callbacks and consent behavior on a registered test device.
 - Review final Data safety answers against the exact SDK version.
-- Upload the signed v6 AAB and inspect Play Console warnings before rollout.
+- Increment to version code `7` or higher, export and verify a fresh signed AAB,
+  then inspect Play Console warnings before rollout.
+- Finalize bilingual notes from `docs/RELEASE_NOTES_NEXT.md`.

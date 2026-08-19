@@ -1,6 +1,6 @@
 # Privacy Policy Source
 
-Source verified: August 9, 2026.
+Source verified: August 19, 2026. The public URL returned HTTP 200.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.

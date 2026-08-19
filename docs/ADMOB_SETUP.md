@@ -1,6 +1,6 @@
 # AdMob Setup
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 `autoload/ad_service.gd` is the single integration point for ads. The Poing
 Studios plugin and Android library are installed, production IDs are configured,
@@ -83,8 +83,10 @@ This is the most ad-heavy game in the portfolio, but the rules stay fair:
    - The Android build template is installed in `android/build/`.
    - Gradle/custom build is enabled so the plugin can add AARs, dependencies,
      and the AdMob App ID manifest entry.
-   - Release output is an Android App Bundle at
-     `exports/android/DalaDalaRushTZ-release.aab`.
+   - The latest verified output is the historical code 6 artifact. Current
+     source is newer; the next export should use a unique filename such as
+     `exports/android/DalaDalaRushTZ-closed-testing-v7.aab` after incrementing
+     the preset version code to 7 or higher.
 4. Register test devices or use AdMob test mode while developing. Never click
    live ads during development.
 5. On a real Android build, test ad load, close, failure, app resume, and reward

@@ -3,6 +3,7 @@ extends Control
 
 const UIFactory := preload("res://ui/ui_factory.gd")
 const Routes    := preload("res://data/routes.gd")
+const GhostDataLib := preload("res://data/ghost_data.gd")
 
 var _title: Label
 var _back_btn: Button
@@ -132,22 +133,17 @@ func _rebuild() -> void:
 func _on_copy_ghost() -> void:
 	AudioManager.play_sfx("click")
 	var ghost: Variant = SaveSystem.get_value("ghost_best", null)
-	if typeof(ghost) != TYPE_DICTIONARY:
+	var code := GhostDataLib.encode(ghost)
+	if code.is_empty():
 		_ghost_msg.text = LocaleManager.t("GHOST_NONE")
 		return
-	var code := Marshalls.utf8_to_base64(JSON.stringify(ghost))
-	DisplayServer.clipboard_set("DDRTZ-GHOST:" + code)
+	DisplayServer.clipboard_set(code)
 	_ghost_msg.text = LocaleManager.t("GHOST_COPIED")
 
 func _on_import_ghost() -> void:
 	AudioManager.play_sfx("click")
-	var clip := DisplayServer.clipboard_get().strip_edges()
-	if not clip.begins_with("DDRTZ-GHOST:"):
-		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
-		return
-	var json_text := Marshalls.base64_to_utf8(clip.trim_prefix("DDRTZ-GHOST:"))
-	var parsed: Variant = JSON.parse_string(json_text)
-	if typeof(parsed) != TYPE_DICTIONARY or not (parsed as Dictionary).has("events"):
+	var parsed := GhostDataLib.decode(DisplayServer.clipboard_get())
+	if parsed.is_empty():
 		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
 		return
 	SaveSystem.set_value("ghost_rival", parsed)

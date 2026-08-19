@@ -19,6 +19,7 @@ var slogan: String = ""
 var lane_switch_time: float = 0.14
 var reduced_motion: bool = false
 var _tilt_tween: Tween
+var _lane_switching: bool = false
 
 func setup(lane_xs: Array, vehicle: Dictionary) -> void:
 	lanes = lane_xs
@@ -33,23 +34,33 @@ func setup(lane_xs: Array, vehicle: Dictionary) -> void:
 	_vehicle_id = String(vehicle.get("id", ""))
 	_tex = SpriteLib.get_tex("vehicle", _vehicle_id)
 	position.x = lanes[current_lane]
+	_lane_switching = false
 	queue_redraw()
 
 func move_left() -> void:
+	if _lane_switching:
+		return
 	if current_lane > 0:
 		current_lane -= 1
 		_tween_to_lane(-1)
 
 func move_right() -> void:
+	if _lane_switching:
+		return
 	if current_lane < lanes.size() - 1:
 		current_lane += 1
 		_tween_to_lane(1)
 
+func is_lane_switching() -> bool:
+	return _lane_switching
+
 func _tween_to_lane(direction: int = 0) -> void:
 	if tween and tween.is_valid():
 		tween.kill()
+	_lane_switching = true
 	tween = create_tween()
 	tween.tween_property(self, "position:x", lanes[current_lane], lane_switch_time).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_callback(func(): _lane_switching = false)
 	# Juice: lean into the turn, then settle back upright.
 	if direction != 0 and not reduced_motion:
 		if _tilt_tween and _tilt_tween.is_valid():

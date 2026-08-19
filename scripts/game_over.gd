@@ -15,6 +15,8 @@ var _best_lbl: Label
 var _goal_lbl: Label
 var _daily_lbl: Label
 var _tagline_lbl: Label
+var _coach_title_lbl: Label
+var _coach_body_lbl: Label
 var _play_btn: Button
 var _menu_btn: Button
 var _lb_btn: Button
@@ -35,7 +37,23 @@ var _score_submitted: bool = false
 var _pending_nav_path: String = ""
 var _interstitial_in_progress: bool = false
 var _reward_in_progress: bool = false
+var _navigation_in_progress: bool = false
 var _ad_row: HBoxContainer
+
+const END_TIP_KEYS := {
+	"bodaboda": "RUN_TIP_BODABODA",
+	"bajaji": "RUN_TIP_BAJAJI",
+	"car": "RUN_TIP_CAR",
+	"pothole": "RUN_TIP_POTHOLE",
+	"cone": "RUN_TIP_ROADWORKS",
+	"police": "RUN_TIP_POLICE",
+	"barrier": "RUN_TIP_ROADWORKS",
+	"truck": "RUN_TIP_TRUCK",
+	"pedestrian": "RUN_TIP_PEDESTRIAN",
+	"tire": "RUN_TIP_TIRE",
+	"mbuzi": "RUN_TIP_MBUZI",
+	"fuel": "RUN_TIP_FUEL",
+}
 
 func _ready() -> void:
 	UIFactory.paint_background(self, UIFactory.COL_BG)
@@ -91,6 +109,33 @@ func _ready() -> void:
 	_tagline_lbl = UIFactory.make_label("", 20, UIFactory.COL_MUTED)
 	_tagline_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_tagline_lbl)
+
+	# Contextual coaching turns a failed run into a useful next decision.
+	var coach_panel := PanelContainer.new()
+	var coach_style := StyleBoxFlat.new()
+	coach_style.bg_color = Color("#2b191c")
+	coach_style.border_color = UIFactory.COL_DANGER.darkened(0.20)
+	coach_style.border_width_left = 4
+	coach_style.corner_radius_top_left = 8
+	coach_style.corner_radius_top_right = 8
+	coach_style.corner_radius_bottom_left = 8
+	coach_style.corner_radius_bottom_right = 8
+	coach_style.content_margin_left = 12
+	coach_style.content_margin_right = 12
+	coach_style.content_margin_top = 8
+	coach_style.content_margin_bottom = 8
+	coach_panel.add_theme_stylebox_override("panel", coach_style)
+	v.add_child(coach_panel)
+	var coach_content := VBoxContainer.new()
+	coach_content.add_theme_constant_override("separation", 3)
+	coach_panel.add_child(coach_content)
+	_coach_title_lbl = UIFactory.make_label("", 13, UIFactory.COL_ACCENT)
+	_coach_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	coach_content.add_child(_coach_title_lbl)
+	_coach_body_lbl = UIFactory.make_label("", 15, UIFactory.COL_TEXT)
+	_coach_body_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_coach_body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	coach_content.add_child(_coach_body_lbl)
 
 	# ── Stats panel ──
 	var panel := UIFactory.make_panel()
@@ -159,7 +204,6 @@ func _ready() -> void:
 	_continue_btn.custom_minimum_size = Vector2(0, 50)
 	_continue_btn.pressed.connect(_on_continue_ad)
 	_ad_row.add_child(_continue_btn)
-	_continue_btn.visible = not GameState.continue_used
 
 	_double_btn = UIFactory.make_button("", false)
 	_double_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -183,14 +227,14 @@ func _ready() -> void:
 	_share_btn = UIFactory.make_button("", false)
 	_share_btn.pressed.connect(_on_share)
 	v.add_child(_share_btn)
+	# Keep the final action comfortably above the fixed results banner after the
+	# player scrolls to the bottom on short portrait screens.
+	v.add_child(_spacer(18))
 
 	AdService.rewarded_result.connect(_on_rewarded_result)
 	AdService.interstitial_closed.connect(_on_interstitial_closed)
 	AdService.show_banner(self, AdService.PLACEMENT_BANNER_RESULTS)
-	# Hide ad buttons entirely when no ad (or simulation) is available.
-	if not AdService.is_rewarded_available():
-		_ad_row.visible = false
-		_ad_msg_lbl.visible = false
+	_refresh_reward_actions()
 
 	LocaleManager.locale_changed.connect(_refresh)
 	_refresh()
@@ -245,16 +289,28 @@ func _refresh(_l := "") -> void:
 	_route_record_lbl.text = LocaleManager.t("ROUTE_RECORD")
 	var star_key := "STARS_%d" % clamp(_calc_stars(), 1, 3)
 	_tagline_lbl.text = LocaleManager.t(star_key)
+	_coach_title_lbl.text = LocaleManager.t("RUN_COACH_TITLE")
+	var tip_key: String = String(END_TIP_KEYS.get(GameState.last_end_reason, "RUN_TIP_GENERAL"))
+	_coach_body_lbl.text = LocaleManager.t(tip_key)
 	_play_btn.text  = LocaleManager.t("PLAY_AGAIN")
 	_menu_btn.text  = LocaleManager.t("MAIN_MENU")
 	_lb_btn.text    = LocaleManager.t("LEADERBOARD")
 	_share_btn.text = LocaleManager.t("SHARE_SCORE")
 	_continue_btn.text = LocaleManager.t("CONTINUE_AD")
-	_double_btn.text = LocaleManager.t("DOUBLE_COINS")
-	_ad_msg_lbl.text = LocaleManager.t("AD_PLACEHOLDER")
+	_double_btn.text = LocaleManager.t("DOUBLE_COINS_VALUE").replace("{n}", str(GameState.last_coins))
+	if _ad_row.visible and not _reward_in_progress:
+		_ad_msg_lbl.text = LocaleManager.t("REWARDED_CHOICE")
 	if _submit_btn and not _score_submitted:
 		_submit_btn.text = LocaleManager.t("SUBMIT")
 	_update_stats_labels()
+
+func _refresh_reward_actions() -> void:
+	var reward_available: bool = AdService.is_rewarded_available()
+	var choice_available: bool = GameState.can_claim_rewarded_choice()
+	_continue_btn.visible = reward_available and choice_available and not GameState.continue_used
+	_double_btn.visible = reward_available and choice_available and GameState.last_coins > 0
+	_ad_row.visible = _continue_btn.visible or _double_btn.visible
+	_ad_msg_lbl.visible = _ad_row.visible
 
 func _calc_stars() -> int:
 	var sc: int = GameState.last_score
@@ -313,17 +369,19 @@ func _on_main_menu() -> void:
 
 func _on_view_leaderboard() -> void:
 	AudioManager.play_sfx("click")
-	TransitionManager.go_to("res://scenes/leaderboard.tscn")
+	_go_after_optional_interstitial("res://scenes/leaderboard.tscn")
 
 func _go_after_optional_interstitial(path: String) -> void:
-	if _interstitial_in_progress:
+	if _navigation_in_progress:
 		return
+	_navigation_in_progress = true
+	_play_btn.disabled = true
+	_menu_btn.disabled = true
+	_lb_btn.disabled = true
 	AdService.note_completed_run()
 	if AdService.is_interstitial_available() and AdService.consume_pending_interstitial():
 		_pending_nav_path = path
 		_interstitial_in_progress = true
-		_play_btn.disabled = true
-		_menu_btn.disabled = true
 		_ad_msg_lbl.visible = true
 		_ad_msg_lbl.text = LocaleManager.t("AD_INTERSTITIAL_LOADING")
 		AdService.show_interstitial(AdService.PLACEMENT_INTERSTITIAL_RUN_END)
@@ -342,7 +400,7 @@ func _on_interstitial_closed(_placement: String) -> void:
 
 func _on_continue_ad() -> void:
 	AudioManager.play_sfx("click")
-	if _reward_in_progress or GameState.continue_used:
+	if _reward_in_progress or GameState.continue_used or not GameState.can_claim_rewarded_choice():
 		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
@@ -355,7 +413,7 @@ func _on_continue_ad() -> void:
 
 func _on_double_coins_ad() -> void:
 	AudioManager.play_sfx("click")
-	if _reward_in_progress:
+	if _reward_in_progress or GameState.last_coins <= 0 or not GameState.can_claim_rewarded_choice():
 		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
@@ -374,16 +432,21 @@ func _on_rewarded_result(placement: String, success: bool) -> void:
 		_ad_msg_lbl.text = LocaleManager.t("AD_FAILED")
 		_continue_btn.disabled = false
 		_double_btn.disabled = false
+		_refresh_reward_actions()
 		return
 	match placement:
 		AdService.PLACEMENT_CONTINUE:
 			if GameState.request_continue():
 				TransitionManager.go_to("res://scenes/game.tscn")
 		AdService.PLACEMENT_DOUBLE_COINS:
-			SaveSystem.add_coins(GameState.last_coins)
-			AudioManager.play_sfx("powerup")
-			_ad_msg_lbl.text = "+%d %s" % [GameState.last_coins, LocaleManager.t("COINS")]
-			_ad_row.visible = false
+			var doubled_amount: int = GameState.claim_double_coins()
+			if doubled_amount > 0:
+				AudioManager.play_sfx("powerup")
+				_ad_msg_lbl.visible = true
+				_ad_msg_lbl.text = "+%d %s" % [doubled_amount, LocaleManager.t("COINS")]
+				_ad_row.visible = false
+			else:
+				_refresh_reward_actions()
 
 func _on_share() -> void:
 	AudioManager.play_sfx("click")

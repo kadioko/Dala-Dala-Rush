@@ -1,8 +1,11 @@
-# Dala Dala Rush TZ 1.0.5 - Draft Release Notes
+# Dala Dala Rush TZ 1.0.5 Release Notes
 
-Planned upload: version `1.0.5`, version code `6`, target API `36`.
-The signed AAB was built locally on August 9, 2026. Finalize these notes only
-after Play processing and device QA.
+Status: historical code 6 artifact record. Current source contains later Waves
+8-13; use `RELEASE_NOTES_NEXT.md` for the next upload.
+
+Release artifact: version `1.0.5`, version code `6`, target API `36`.
+The signed AAB was built and locally verified on August 9, 2026. Use the
+matching language section in Google Play Console for the closed-testing upload.
 
 ## English
 
@@ -55,7 +58,7 @@ Tumeboresha usahihi wa pointi, swipe ya lane moja, mwanzo rahisi wa mchana na au
 - Version name: `1.0.5`
 - Version code: `6`
 - Target SDK: Android 16 / API 36
-- Planned artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
+- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
 - Size: `61,354,280` bytes
 - SHA-256: `DA4716CC8795D66759D761684BD77D66CD47E836E3E56C11AA372C5CA3CF62F7`
 - Signature: verified locally with `jarsigner`

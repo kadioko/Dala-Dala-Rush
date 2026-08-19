@@ -1,6 +1,6 @@
 extends Control
-## How To Play — 3 tabs: Controls | Epuka (Avoid) | Kusanya (Collect) + Tips.
-## All entity cards use drawn colour swatches so no external art is needed.
+## How To Play is a compact route briefing: drive, identify road risks, then master pickups.
+## Everything is drawn in code so it stays lightweight and readable on portrait Android screens.
 
 const UIFactory := preload("res://ui/ui_factory.gd")
 
@@ -120,26 +120,25 @@ func _make_header_bar() -> Control:
 	bar.add_child(bg2)
 
 	_title_lbl = UIFactory.make_title("", 26)
-	_title_lbl.anchor_left = 0.0
 	_title_lbl.anchor_right = 1.0
 	_title_lbl.anchor_top = 0.5
 	_title_lbl.anchor_bottom = 0.5
-	_title_lbl.offset_left = 16
-	_title_lbl.offset_right = -100
+	_title_lbl.offset_left = 60
+	_title_lbl.offset_right = -60
 	_title_lbl.offset_top = -18
 	_title_lbl.offset_bottom = 18
-	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bar.add_child(_title_lbl)
 
 	_back_btn = UIFactory.make_button("", false)
-	_back_btn.custom_minimum_size = Vector2(88, 48)
-	_back_btn.anchor_right = 1.0
+	_back_btn.custom_minimum_size = Vector2(48, 48)
 	_back_btn.anchor_top = 0.5
 	_back_btn.anchor_bottom = 0.5
-	_back_btn.offset_left = -100
-	_back_btn.offset_right = -8
+	_back_btn.offset_left = 8
+	_back_btn.offset_right = 56
 	_back_btn.offset_top = -24
 	_back_btn.offset_bottom = 24
+	_back_btn.add_theme_font_size_override("font_size", 28)
 	_back_btn.pressed.connect(_on_back)
 	bar.add_child(_back_btn)
 	return bar
@@ -178,7 +177,7 @@ func _switch_tab(idx: int) -> void:
 
 func _build_controls_page() -> Control:
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 20)
+	page.add_theme_constant_override("separation", 16)
 	page.offset_left = 16
 	page.offset_right = -16
 
@@ -186,22 +185,22 @@ func _build_controls_page() -> Control:
 	inner.add_theme_constant_override("separation", 12)
 	page.add_child(inner)
 
-	# Lane diagram
 	inner.add_child(_spacer(8))
 	var intro := UIFactory.make_label(LocaleManager.t("HOW_INTRO"), 18, UIFactory.COL_ACCENT)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(intro)
 	_refresh_targets.append({"lbl": intro, "key": "HOW_INTRO"})
-	inner.add_child(_spacer(4))
+	inner.add_child(_build_run_plan())
+	inner.add_child(_spacer(2))
 	inner.add_child(_lane_diagram())
-	inner.add_child(_spacer(4))
+	inner.add_child(_spacer(2))
 
 	# Control rows
 	var ctrl_rows := [
-		["◀  ▶",  "CTRL_SWIPE"],
-		["[ ]",   "CTRL_BUTTONS"],
-		[" II",   "CTRL_PAUSE"],
+		["swipe",  "CTRL_SWIPE"],
+		["buttons", "CTRL_BUTTONS"],
+		["pause",  "CTRL_PAUSE"],
 	]
 	for row in ctrl_rows:
 		inner.add_child(_ctrl_row(row[0], row[1]))
@@ -211,16 +210,81 @@ func _build_controls_page() -> Control:
 
 func _lane_diagram() -> Control:
 	var d := _DrawLaneDiagram.new()
-	d.custom_minimum_size = Vector2(0, 140)
+	d.custom_minimum_size = Vector2(0, 174)
 	d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return d
 
-func _ctrl_row(icon_text: String, desc_key: String) -> Control:
+func _build_run_plan() -> Control:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#17293d")
+	style.border_color = UIFactory.COL_PRIMARY.darkened(0.25)
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 7)
+	panel.add_child(content)
+	var label := UIFactory.make_label(LocaleManager.t("HOW_RUN_PLAN"), 13, UIFactory.COL_ACCENT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	content.add_child(label)
+	_refresh_targets.append({"lbl": label, "key": "HOW_RUN_PLAN"})
+
+	var steps := HBoxContainer.new()
+	steps.add_theme_constant_override("separation", 6)
+	content.add_child(steps)
+	var step_data := [
+		["1", "HOW_STEP_DRIVE", UIFactory.COL_PRIMARY],
+		["2", "HOW_STEP_COLLECT", UIFactory.COL_ACCENT],
+		["3", "HOW_STEP_SURVIVE", Color("#2ecc71")],
+	]
+	for step in step_data:
+		var item := VBoxContainer.new()
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item.add_theme_constant_override("separation", 2)
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 6)
+		line.add_child(_make_step_number(step[0], step[2]))
+		var text := UIFactory.make_label(LocaleManager.t(step[1]), 13, UIFactory.COL_TEXT)
+		text.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(text)
+		item.add_child(line)
+		steps.add_child(item)
+		_refresh_targets.append({"lbl": text, "key": step[1]})
+	return panel
+
+func _make_step_number(number: String, color: Color) -> Control:
+	var badge := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = color.darkened(0.2)
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	badge.add_theme_stylebox_override("panel", style)
+	badge.custom_minimum_size = Vector2(20, 20)
+	var label := UIFactory.make_label(number, 12, Color.WHITE)
+	badge.add_child(label)
+	return badge
+
+func _ctrl_row(control_kind: String, desc_key: String) -> Control:
 	var hb := HBoxContainer.new()
 	hb.add_theme_constant_override("separation", 12)
 
-	var panel := _make_colored_badge(UIFactory.COL_PRIMARY, icon_text, 16)
-	hb.add_child(panel)
+	var glyph := _ControlGlyph.new()
+	glyph.kind = control_kind
+	glyph.custom_minimum_size = Vector2(58, 44)
+	hb.add_child(glyph)
 
 	var lbl := UIFactory.make_label(LocaleManager.t(desc_key), 17, UIFactory.COL_TEXT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -245,6 +309,8 @@ func _build_grid_page(data: Array, entity_kind: String, header_key: String, head
 	header_lbl.add_theme_color_override("font_color", header_color)
 	page.add_child(header_lbl)
 	_refresh_targets.append({"lbl": header_lbl, "key": header_key})
+	var briefing := _make_grid_briefing(entity_kind, header_color)
+	page.add_child(briefing)
 
 	# Full-width rows preserve readable descriptions in both languages.
 	for item in data:
@@ -255,6 +321,29 @@ func _build_grid_page(data: Array, entity_kind: String, header_key: String, head
 
 	page.add_child(_spacer(8))
 	return page
+
+func _make_grid_briefing(entity_kind: String, color: Color) -> Control:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = color.darkened(0.78)
+	style.border_color = color.darkened(0.15)
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	panel.add_theme_stylebox_override("panel", style)
+	var key := "HOW_AVOID_INTRO" if entity_kind == "obstacle" else "HOW_COLLECT_INTRO"
+	var text := UIFactory.make_label(LocaleManager.t(key), 15, UIFactory.COL_TEXT)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	panel.add_child(text)
+	_refresh_targets.append({"lbl": text, "key": key})
+	return panel
 
 func _make_entity_card(entity_kind: String, entity_id: String, entity_color: Color, title_key: String, desc_key: String) -> Control:
 	var panel := PanelContainer.new()
@@ -281,7 +370,7 @@ func _make_entity_card(entity_kind: String, entity_id: String, entity_color: Col
 	preview.entity_kind = entity_kind
 	preview.entity_id = entity_id
 	preview.entity_color = entity_color
-	preview.custom_minimum_size = Vector2(64, 64)
+	preview.custom_minimum_size = Vector2(70, 70)
 	hb.add_child(preview)
 
 	# Name and its gameplay effect.
@@ -291,10 +380,18 @@ func _make_entity_card(entity_kind: String, entity_id: String, entity_color: Col
 	vb.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	hb.add_child(vb)
 
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 7)
+	vb.add_child(title_row)
 	var title_lbl := UIFactory.make_label(LocaleManager.t(title_key), 16, UIFactory.COL_TEXT)
 	title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	vb.add_child(title_lbl)
+	title_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(title_lbl)
 	_refresh_targets.append({"lbl": title_lbl, "key": title_key})
+	var action := UIFactory.make_label(LocaleManager.t("HOW_DODGE") if entity_kind == "obstacle" else LocaleManager.t("HOW_PICKUP"), 11, entity_color.lightened(0.15))
+	action.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	title_row.add_child(action)
+	_refresh_targets.append({"lbl": action, "key": "HOW_DODGE" if entity_kind == "obstacle" else "HOW_PICKUP"})
 
 	var desc_lbl := UIFactory.make_label(LocaleManager.t(desc_key), 13, UIFactory.COL_MUTED)
 	desc_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -318,13 +415,7 @@ func _build_tips_page() -> Control:
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	page.add_child(intro)
 	_refresh_targets.append({"lbl": intro, "key": "TIP_INTRO"})
-	page.add_child(_spacer(4))
-
-	var tip_keys := ["TIP1","TIP2","TIP3","TIP4","TIP5","TIP6","TIP7","TIP8"]
-	var tip_icons := ["◀▶","  ★","  ×","  ★","  ⛽","  ↑","  🚏","  👤"]
-
-	for i in range(0):
-		page.add_child(_tip_row(tip_icons[i], tip_keys[i]))
+	page.add_child(_build_tip_hero())
 
 	var tip_groups: Array = [
 		{"title": "TIP_GROUP_DRIVE", "color": UIFactory.COL_PRIMARY, "tips": [["<>", "TIP1"], ["+", "TIP2"], ["x", "TIP3"]]},
@@ -338,6 +429,35 @@ func _build_tips_page() -> Control:
 
 	page.add_child(_spacer(8))
 	return page
+
+func _build_tip_hero() -> Control:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#2b2110")
+	style.border_color = UIFactory.COL_ACCENT.darkened(0.12)
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 4)
+	panel.add_child(content)
+	var title := UIFactory.make_label(LocaleManager.t("TIP_HERO_TITLE"), 15, UIFactory.COL_ACCENT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	content.add_child(title)
+	_refresh_targets.append({"lbl": title, "key": "TIP_HERO_TITLE"})
+	var body := UIFactory.make_label(LocaleManager.t("TIP_HERO_BODY"), 15, UIFactory.COL_TEXT)
+	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.add_child(body)
+	_refresh_targets.append({"lbl": body, "key": "TIP_HERO_BODY"})
+	return panel
 
 func _tip_section(key: String, color: Color) -> Control:
 	var section := UIFactory.make_label(LocaleManager.t(key), 13, color.lightened(0.15))
@@ -366,7 +486,11 @@ func _tip_card(icon_text: String, key: String, color: Color) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
-	row.add_child(_make_colored_badge(color.darkened(0.15), icon_text, 16))
+	var glyph := _TipGlyph.new()
+	glyph.symbol = icon_text
+	glyph.color = color
+	glyph.custom_minimum_size = Vector2(44, 44)
+	row.add_child(glyph)
 
 	var label := UIFactory.make_label(LocaleManager.t(key), 16, UIFactory.COL_TEXT)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -422,7 +546,8 @@ func _refresh_all(_l := "") -> void:
 	if _title_lbl:
 		_title_lbl.text = LocaleManager.t("HOW_TO_PLAY")
 	if _back_btn:
-		_back_btn.text = LocaleManager.t("BACK")
+		_back_btn.text = "<"
+		_back_btn.tooltip_text = LocaleManager.t("BACK")
 	for entry in _tab_buttons:
 		entry.btn.text = LocaleManager.t(entry.key)
 	for entry in _refresh_targets:
@@ -435,6 +560,104 @@ func _on_back() -> void:
 # ══════════════════════════════════════════════════════════════════
 #  Inner draw helpers (no external files needed)
 # ══════════════════════════════════════════════════════════════════
+
+class _ControlGlyph extends Control:
+	var kind: String = "swipe"
+
+	func _draw() -> void:
+		var frame := Rect2(Vector2(1, 1), size - Vector2(2, 2))
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("#14263b")
+		style.border_color = UIFactory.COL_PRIMARY.darkened(0.18)
+		style.set_border_width_all(1)
+		style.corner_radius_top_left = 7
+		style.corner_radius_top_right = 7
+		style.corner_radius_bottom_left = 7
+		style.corner_radius_bottom_right = 7
+		draw_style_box(style, frame)
+		var c := size * 0.5
+		match kind:
+			"swipe":
+				draw_line(Vector2(12, c.y), Vector2(size.x - 12, c.y), Color("#8fd3e8"), 2)
+				_draw_chevron(Vector2(12, c.y), -1, Color.WHITE)
+				_draw_chevron(Vector2(size.x - 12, c.y), 1, Color.WHITE)
+				draw_circle(c, 4, UIFactory.COL_ACCENT)
+			"buttons":
+				_draw_chevron(Vector2(14, c.y), -1, Color.WHITE)
+				draw_circle(c, 8, UIFactory.COL_ACCENT.darkened(0.12))
+				draw_arc(c, 4, PI, TAU, 10, Color("#31260d"), 2)
+				_draw_chevron(Vector2(size.x - 14, c.y), 1, Color.WHITE)
+			"pause":
+				draw_rect(Rect2(c.x - 9, c.y - 10, 6, 20), Color.WHITE)
+				draw_rect(Rect2(c.x + 3, c.y - 10, 6, 20), Color.WHITE)
+
+	func _draw_chevron(point: Vector2, direction: int, color: Color) -> void:
+		var sign := float(direction)
+		var points := PackedVector2Array([
+			point + Vector2(-sign * 4, -8),
+			point + Vector2(sign * 6, 0),
+			point + Vector2(-sign * 4, 8),
+		])
+		draw_polyline(points, color, 3, true)
+
+class _TipGlyph extends Control:
+	var symbol: String = "<>"
+	var color: Color = UIFactory.COL_PRIMARY
+
+	func _draw() -> void:
+		var frame := Rect2(Vector2(1, 1), size - Vector2(2, 2))
+		var style := StyleBoxFlat.new()
+		style.bg_color = color.darkened(0.72)
+		style.border_color = color.darkened(0.12)
+		style.set_border_width_all(1)
+		style.corner_radius_top_left = 8
+		style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8
+		style.corner_radius_bottom_right = 8
+		draw_style_box(style, frame)
+		var c := size * 0.5
+		match symbol:
+			"<>":
+				_draw_arrow(c + Vector2(-10, 0), -1)
+				_draw_arrow(c + Vector2(10, 0), 1)
+			"+":
+				for angle in [0.0, PI * 0.25, PI * 0.5, PI * 0.75]:
+					var arm := Vector2(cos(angle), sin(angle)) * 12.0
+					draw_line(c - arm, c + arm, Color.WHITE, 2)
+					draw_circle(c, 4, color.lightened(0.25))
+			"x":
+				draw_rect(Rect2(c - Vector2(12, 12), Vector2(24, 24)), Color("#1b2230"), false, 2)
+				draw_line(c + Vector2(-7, -7), c + Vector2(7, 7), Color.WHITE, 3)
+				draw_line(c + Vector2(7, -7), c + Vector2(-7, 7), Color.WHITE, 3)
+			"O":
+				var shield := PackedVector2Array([c + Vector2(0, -14), c + Vector2(-12, -8), c + Vector2(-9, 9), c, c + Vector2(9, 9), c + Vector2(12, -8)])
+				draw_colored_polygon(shield, color.lightened(0.12))
+				draw_line(c + Vector2(-5, 0), c + Vector2(-1, 5), Color.WHITE, 2)
+				draw_line(c + Vector2(-1, 5), c + Vector2(6, -5), Color.WHITE, 2)
+			"S":
+				draw_rect(Rect2(c - Vector2(8, 12), Vector2(16, 24)), color.lightened(0.1))
+				draw_rect(Rect2(c + Vector2(-4, -8), Vector2(8, 5)), Color.WHITE)
+				draw_line(c + Vector2(7, -8), c + Vector2(12, -13), Color.WHITE, 3)
+			"^":
+				var bolt := PackedVector2Array([c + Vector2(3, -15), c + Vector2(-9, 2), c + Vector2(-1, 2), c + Vector2(-5, 15), c + Vector2(11, -3), c + Vector2(3, -3)])
+				draw_colored_polygon(bolt, Color.WHITE)
+			"P":
+				draw_line(c + Vector2(-8, 15), c + Vector2(-8, -13), Color.WHITE, 3)
+				draw_rect(Rect2(c + Vector2(-7, -13), Vector2(17, 12)), color.lightened(0.15))
+				draw_rect(Rect2(c + Vector2(-3, -10), Vector2(8, 5)), Color("#1b2230"))
+			"!":
+				draw_circle(c + Vector2(0, -8), 5, Color("#fab1a0"))
+				draw_rect(Rect2(c + Vector2(-6, -1), Vector2(12, 14)), color.lightened(0.1))
+				draw_line(c + Vector2(-7, 14), c + Vector2(7, 14), Color.WHITE, 2)
+
+	func _draw_arrow(point: Vector2, direction: int) -> void:
+		var sign := float(direction)
+		var points := PackedVector2Array([
+			point + Vector2(-sign * 4, -7),
+			point + Vector2(sign * 6, 0),
+			point + Vector2(-sign * 4, 7),
+		])
+		draw_polyline(points, Color.WHITE, 3, true)
 
 ## Mini versions of the actual road entities used by the game.
 class _EntityPreview extends Control:
@@ -588,23 +811,34 @@ class _DrawLaneDiagram extends Control:
 		var road_x: float = w * 0.1
 		var road_w: float = w * 0.8
 		var lane_w: float = road_w / 3.0
+		var road_h: float = h - 48.0
+		var frame := StyleBoxFlat.new()
+		frame.bg_color = Color("#121b26")
+		frame.border_color = Color("#30445b")
+		frame.set_border_width_all(1)
+		frame.corner_radius_top_left = 8
+		frame.corner_radius_top_right = 8
+		frame.corner_radius_bottom_left = 8
+		frame.corner_radius_bottom_right = 8
+		draw_style_box(frame, Rect2(Vector2.ZERO, size))
 
 		# Road surface
-		draw_rect(Rect2(Vector2(road_x, 0), Vector2(road_w, h)), Color("#3d3d3d"))
+		draw_rect(Rect2(Vector2(road_x, 8), Vector2(road_w, road_h - 8)), Color("#3d3d3d"))
 		# Lane dividers
 		for i in range(1, 3):
 			var lx: float = road_x + lane_w * i
-			var y: float = 0.0
-			while y < h:
+			var y: float = 12.0
+			while y < road_h:
 				draw_rect(Rect2(Vector2(lx - 2, y), Vector2(4, 20)), Color("#fff7b3"))
 				y += 40
 		# Dala dala in centre lane
 		var cx: float = road_x + lane_w * 1.5
-		var cy: float = h * 0.6
+		var cy: float = road_h * 0.6
 		_draw_dala(cx, cy)
 		# Arrows suggesting left/right movement
 		_draw_arrow(road_x + lane_w * 0.5, cy, -1)
 		_draw_arrow(road_x + lane_w * 2.5, cy, 1)
+		_draw_control_dock(road_h, w)
 
 	func _draw_dala(cx: float, cy: float) -> void:
 		var bus_size := Vector2(38, 56)
@@ -627,3 +861,14 @@ class _DrawLaneDiagram extends Control:
 				Vector2(cx - 14, cy + 12),
 			])
 		draw_polygon(pts, PackedColorArray([col, col, col]))
+
+	func _draw_control_dock(top: float, width: float) -> void:
+		draw_rect(Rect2(0, top, width, 48), Color("#101720"))
+		var y := top + 24.0
+		var centers := [width * 0.22, width * 0.5, width * 0.78]
+		for x in centers:
+			draw_circle(Vector2(x, y), 14, Color("#1b2230"))
+		draw_arc(Vector2(centers[0], y), 7, PI * 0.25, PI * 1.75, 8, Color.WHITE, 2)
+		draw_arc(Vector2(centers[2], y), 7, -PI * 0.75, PI * 0.75, 8, Color.WHITE, 2)
+		draw_circle(Vector2(centers[1], y), 7, UIFactory.COL_ACCENT)
+		draw_arc(Vector2(centers[1], y), 4, PI, TAU, 8, Color("#31260d"), 2)

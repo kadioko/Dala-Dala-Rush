@@ -1,6 +1,6 @@
 # Play Console App Content Answers
 
-Last verified against the project: August 9, 2026. Recheck the final SDK list
+Last verified against the project: August 19, 2026. Recheck the final SDK list
 and current Play Console wording before submission; policy forms can change.
 
 Use this while completing **Policy > App content** in Google Play Console for
@@ -43,7 +43,7 @@ Current GitHub Pages URL:
 https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html
 ```
 
-This URL returned HTTP 200 on August 9, 2026. Confirm it still opens publicly,
+This URL returned HTTP 200 on August 19, 2026. Confirm it still opens publicly,
 without login or an editable-document UI, immediately before submission.
 
 ## Sign In Details / App Access

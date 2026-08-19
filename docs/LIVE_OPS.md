@@ -1,6 +1,6 @@
 # Live Ops Foundation
 
-Last verified: August 9, 2026. These systems are offline scaffolds and are not
+Last verified: August 19, 2026. These systems are offline scaffolds and are not
 connected to production services in the current closed-testing build.
 
 ## Remote config (`autoload/remote_config.gd`)

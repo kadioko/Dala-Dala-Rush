@@ -60,6 +60,10 @@ func load_data() -> void:
 	if not _load_from(SAVE_PATH):
 		if _load_from(BACKUP_PATH):
 			push_warning("Save: main file corrupt or missing — restored from backup.")
+			# Restore the primary immediately without rotating the corrupt file over
+			# the known-good backup. The next ordinary save may rotate normally.
+			if not save(false):
+				push_warning("Save: backup loaded, but the primary could not be restored.")
 
 func _load_from(path: String) -> bool:
 	if not FileAccess.file_exists(path):
@@ -73,13 +77,109 @@ func _load_from(path: String) -> bool:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return false
 	for k in parsed.keys():
-		data[k] = parsed[k]
+		var key := String(k)
+		var value: Variant = parsed[k]
+		if DEFAULTS.has(key) and not _is_compatible_value(DEFAULTS[key], value):
+			push_warning("Save: ignored invalid value for '%s'." % key)
+			continue
+		data[key] = value
+	_normalize_core_data()
 	return true
 
-func save() -> bool:
+func _is_compatible_value(default_value: Variant, loaded_value: Variant) -> bool:
+	var expected_type := typeof(default_value)
+	var loaded_type := typeof(loaded_value)
+	if expected_type in [TYPE_INT, TYPE_FLOAT] and loaded_type in [TYPE_INT, TYPE_FLOAT]:
+		return true
+	return expected_type == loaded_type
+
+func _normalize_core_data() -> void:
+	var non_negative_ints: Array[String] = [
+		"best_score", "total_coins", "total_runs", "total_coins_ever",
+		"total_passengers_ever", "route_goals_completed",
+		"daily_challenges_completed", "ads_runs_since_interstitial",
+		"ads_next_interstitial_at", "streak_count",
+		"best_kariakoo", "best_mwenge", "best_mbezi", "best_posta",
+		"best_kigamboni", "best_ubungo",
+	]
+	for key in non_negative_ints:
+		data[key] = maxi(0, int(data.get(key, DEFAULTS.get(key, 0))))
+	data["total_distance_ever"] = maxf(0.0, float(data.get("total_distance_ever", 0.0)))
+
+	data["unlocked_vehicles"] = _normalized_string_array(
+		data.get("unlocked_vehicles", []), "classic_blue"
+	)
+	data["unlocked_routes"] = _normalized_string_array(
+		data.get("unlocked_routes", []), "kariakoo"
+	)
+	data["achievements"] = _normalized_string_array(data.get("achievements", []))
+
+	var locale := String(data.get("locale", "sw"))
+	data["locale"] = locale if locale in ["sw", "en"] else "sw"
+	_normalize_consumables()
+	_normalize_leaderboard()
+
+func _normalized_string_array(value: Variant, required_value: String = "") -> Array[String]:
+	var result: Array[String] = []
+	if value is Array:
+		for item in value:
+			if typeof(item) != TYPE_STRING:
+				continue
+			var text := String(item).strip_edges()
+			if not text.is_empty() and text not in result:
+				result.append(text)
+	if not required_value.is_empty() and required_value not in result:
+		result.push_front(required_value)
+	return result
+
+func _normalize_consumables() -> void:
+	var clean: Dictionary = {}
+	var source: Dictionary = data.get("consumables", {})
+	for raw_id in source.keys():
+		var item_id := String(raw_id).strip_edges()
+		var count_value: Variant = source[raw_id]
+		if typeof(count_value) not in [TYPE_INT, TYPE_FLOAT]:
+			continue
+		var count := maxi(0, int(count_value))
+		if not item_id.is_empty() and count > 0:
+			clean[item_id] = count
+	data["consumables"] = clean
+
+func _normalize_leaderboard() -> void:
+	var clean: Array[Dictionary] = []
+	var source: Array = data.get("leaderboard", [])
+	for value in source:
+		if not value is Dictionary:
+			continue
+		var row: Dictionary = value
+		var score_value: Variant = row.get("score", 0)
+		if typeof(score_value) not in [TYPE_INT, TYPE_FLOAT]:
+			continue
+		var score := maxi(0, int(score_value))
+		if score <= 0:
+			continue
+		var name_value: Variant = row.get("name", "DDD")
+		var player_name := "DDD"
+		if typeof(name_value) == TYPE_STRING:
+			player_name = String(name_value).to_upper().substr(0, 3)
+		if player_name.is_empty():
+			player_name = "DDD"
+		var route_value: Variant = row.get("route", "kariakoo")
+		var route_id := String(route_value) if typeof(route_value) == TYPE_STRING else "kariakoo"
+		clean.append({
+			"name": player_name,
+			"score": score,
+			"route": route_id,
+		})
+	clean.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.score) > int(b.score))
+	if clean.size() > 5:
+		clean.resize(5)
+	data["leaderboard"] = clean
+
+func save(rotate_backup: bool = true) -> bool:
 	# Rotate the last good save to .bak before overwriting,
 	# so a crash mid-write can never lose everything.
-	if FileAccess.file_exists(SAVE_PATH):
+	if rotate_backup and FileAccess.file_exists(SAVE_PATH):
 		DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -119,7 +219,7 @@ func set_value(key: String, value: Variant) -> void:
 # ── Coins ────────────────────────────────────────────────────────
 
 func add_coins(amount: int) -> void:
-	if amount == 0:
+	if amount <= 0:
 		return
 	data["total_coins"] = int(data.get("total_coins", 0)) + amount
 	_request_save()
@@ -135,6 +235,8 @@ func spend_coins(amount: int) -> bool:
 # ── Vehicles ─────────────────────────────────────────────────────
 
 func unlock_vehicle(id: String) -> void:
+	if id.is_empty():
+		return
 	var u: Array = data.get("unlocked_vehicles", [])
 	if id not in u:
 		u.append(id)
@@ -151,6 +253,8 @@ func get_consumable_count(id: String) -> int:
 	return int(inv.get(id, 0))
 
 func add_consumable(id: String, amount: int = 1) -> void:
+	if id.is_empty() or amount <= 0:
+		return
 	var inv: Dictionary = data.get("consumables", {})
 	inv[id] = int(inv.get(id, 0)) + amount
 	data["consumables"] = inv
@@ -170,6 +274,8 @@ func use_consumable(id: String) -> bool:
 # ── Routes ───────────────────────────────────────────────────────
 
 func unlock_route(id: String) -> void:
+	if id.is_empty():
+		return
 	var u: Array = data.get("unlocked_routes", [])
 	if id not in u:
 		u.append(id)

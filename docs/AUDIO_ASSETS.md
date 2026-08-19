@@ -1,6 +1,6 @@
 # Audio Assets
 
-Last verified: August 9, 2026.
+Last verified: August 19, 2026.
 
 No custom audio files are currently present in `res://audio/`; the game ships
 working procedural music and sound fallbacks. To use recorded sounds, drop files

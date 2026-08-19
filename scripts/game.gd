@@ -12,6 +12,7 @@ const RoadCls       := preload("res://scripts/entities/road.gd")
 const SpeedLinesCls := preload("res://scripts/effects/speed_lines.gd")
 const Vehicles      := preload("res://data/vehicles.gd")
 const Routes        := preload("res://data/routes.gd")
+const GhostDataLib  := preload("res://data/ghost_data.gd")
 const UIFactory     := preload("res://ui/ui_factory.gd")
 
 # ── World ─────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ const POOL_COL := 28
 var base_speed: float = 340.0
 var speed: float = 340.0
 var distance: float = 0.0
+const METERS_PER_WORLD_UNIT := 0.15
 var bonus_score: int = 0
 var coins: int = 0
 var passengers: int = 0
@@ -54,6 +56,7 @@ var paused: bool = false
 var game_over: bool = false
 var near_miss_done: Dictionary = {}
 var reduced_effects: bool = false
+var _end_reason: String = "unknown"
 
 # ── Career upgrades (permanent, read at run start) ───────────────
 var _upg_engine: int = 0     # +4% score per level
@@ -119,12 +122,16 @@ const SLOW_MAX   := 4.0
 const BOOST_MAX  := 3.0
 const BOOST_SPEED_MULT := 1.45
 const GRACE_TIME := 2.5
+const SHIELD_RECOVERY_TIME := 1.15
 const STARTER_WINDOW := 12.0
 const START_HINT_DURATION := 4.0
 const MAX_SPEED_RAMPS := 7
 const MIN_SPAWN_INTERVAL := 0.52
 var _total_boost_uses: int = 0
 var starter_hint_time: float = 0.0
+var _starter_shield_hint_time: float = 0.0
+var _speed_ramp_hint_time: float = 0.0
+var _announced_speed_ramps: int = 0
 
 # ── Fuel ──────────────────────────────────────────────────────────
 var fuel: float = 1.0
@@ -172,17 +179,27 @@ var score_label: Label
 var coins_label: Label
 var pass_label: Label
 var status_label: Label
+var goal_label: Label
 var combo_label: Label
 var pause_btn: Button
 var btn_left: Button
 var btn_right: Button
+var drive_dock: Control
 var fuel_bar: ProgressBar
 var magnet_bar: ProgressBar
 var slow_bar: ProgressBar
 var boost_bar: ProgressBar
 var shield_icon: Control
 var pause_overlay: Control
+var _pause_menu: VBoxContainer
+var _pause_confirm: VBoxContainer
+var _pause_route_label: Label
+var _pause_stats_label: Label
+var _pause_confirm_title: Label
+var _pause_confirm_body: Label
+var _pause_pending_path: String = ""
 var near_miss_flash: ColorRect
+var _route_goal_reached: bool = false
 
 const OBSTACLE_TYPES := [
 	"bodaboda","bajaji","car","pothole","cone",
@@ -313,8 +330,10 @@ func _ready() -> void:
 	if bool(SaveSystem.get_value("ghost_on", true)):
 		var rival: Variant = SaveSystem.get_value("ghost_rival", null)
 		var own: Variant = SaveSystem.get_value("ghost_best", null)
-		var g: Variant = rival if typeof(rival) == TYPE_DICTIONARY else own
-		if typeof(g) == TYPE_DICTIONARY and (g as Dictionary).has("events"):
+		var g: Dictionary = GhostDataLib.sanitize(rival)
+		if g.is_empty():
+			g = GhostDataLib.sanitize(own)
+		if not g.is_empty():
 			_ghost_data = g
 			_ghost_node = _GhostBus.new()
 			_ghost_node.modulate = Color(1, 1, 1, 0.38)
@@ -348,6 +367,14 @@ func _ready() -> void:
 	else:
 		GameState.begin_run()
 		_apply_consumables()
+		# A first run should teach the road, not punish one inevitable early bump.
+		# It is intentionally a one-time local onboarding assist, not an ad reward.
+		if completed_runs == 0:
+			shield_active = true
+			_starter_shield_hint_time = 7.0
+
+	if is_continuing:
+		_announced_speed_ramps = mini(int(elapsed / 20.0), MAX_SPEED_RAMPS)
 
 	_build_pools()
 	_build_hud()
@@ -457,6 +484,37 @@ func _build_countdown() -> void:
 	route_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_countdown_layer.add_child(route_detail)
 
+	# Show the run's concrete purpose before the countdown claims the player's
+	# attention. This makes routes feel distinct from the first second.
+	var goal_panel := PanelContainer.new()
+	goal_panel.anchor_left = 0.5
+	goal_panel.anchor_right = 0.5
+	goal_panel.anchor_top = 0.5
+	goal_panel.anchor_bottom = 0.5
+	goal_panel.offset_left = -186
+	goal_panel.offset_right = 186
+	goal_panel.offset_top = -136
+	goal_panel.offset_bottom = -102
+	var goal_style := StyleBoxFlat.new()
+	goal_style.bg_color = Color(0.04, 0.10, 0.16, 0.94)
+	goal_style.border_color = UIFactory.COL_PRIMARY.darkened(0.15)
+	goal_style.set_border_width_all(1)
+	goal_style.corner_radius_top_left = 8
+	goal_style.corner_radius_top_right = 8
+	goal_style.corner_radius_bottom_left = 8
+	goal_style.corner_radius_bottom_right = 8
+	goal_panel.add_theme_stylebox_override("panel", goal_style)
+	var goal_key: String = String(current_route.get("goal_key", "GOAL_KARIAKOO"))
+	var goal_target: int = int(current_route.get("goal_target", 0))
+	var goal_reward: int = int(current_route.get("goal_reward", 0))
+	var goal_text: String = LocaleManager.t(goal_key).replace("{n}", str(goal_target))
+	var goal_intro := UIFactory.make_label(
+		"%s: %s   +%d 🪙" % [LocaleManager.t("ROUTE_GOAL"), goal_text, goal_reward],
+		15, UIFactory.COL_ACCENT)
+	goal_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_panel.add_child(goal_intro)
+	_countdown_layer.add_child(goal_panel)
+
 	# Condition banner ("Usiku" / "Mvua" / "Rush Hour"...)
 	var cond_parts: Array = []
 	if condition != "day":
@@ -471,8 +529,8 @@ func _build_countdown() -> void:
 		cond_lbl.anchor_bottom = 0.5
 		cond_lbl.offset_left = -180
 		cond_lbl.offset_right = 180
-		cond_lbl.offset_top = -134
-		cond_lbl.offset_bottom = -96
+		cond_lbl.offset_top = 112
+		cond_lbl.offset_bottom = 150
 		_countdown_layer.add_child(cond_lbl)
 
 	# The dala dala rolls into its starting position while the route is introduced.
@@ -567,11 +625,11 @@ func _build_hud() -> void:
 	top.add_child(pause_btn)
 
 	# Status phrase
-	status_label = UIFactory.make_label("", 22, UIFactory.COL_DANGER)
+	status_label = UIFactory.make_label("", 20, UIFactory.COL_DANGER)
 	status_label.anchor_left = 0.5
 	status_label.anchor_right = 0.5
-	status_label.offset_left = -160
-	status_label.offset_right = 160
+	status_label.offset_left = -176
+	status_label.offset_right = 176
 	status_label.offset_top = 70 + safe_top
 	hud_layer.add_child(status_label)
 
@@ -581,16 +639,32 @@ func _build_hud() -> void:
 	combo_label.anchor_right = 0.5
 	combo_label.offset_left = -120
 	combo_label.offset_right = 120
-	combo_label.offset_top = 100 + safe_top
+	combo_label.offset_top = 132 + safe_top
 	combo_label.visible = false
 	hud_layer.add_child(combo_label)
 
-	# Fuel bar (left edge, vertical)
+	# Route goal remains visible during calm driving, but yields this space to
+	# urgent fuel, tutorial, kituo, and traffic messages.
+	goal_label = UIFactory.make_label("", 15, UIFactory.COL_PRIMARY)
+	goal_label.anchor_left = 0.5
+	goal_label.anchor_right = 0.5
+	goal_label.offset_left = -154
+	goal_label.offset_right = 154
+	goal_label.offset_top = 108 + safe_top
+	goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	goal_label.add_theme_color_override("font_outline_color", Color(0.025, 0.035, 0.05, 0.88))
+	goal_label.add_theme_constant_override("outline_size", 3)
+	hud_layer.add_child(goal_label)
+
+	# Compact vertical fuel meter: readable at a glance without claiming half
+	# of the road edge on smaller portrait phones.
 	fuel_bar = ProgressBar.new()
-	fuel_bar.anchor_top = 0.14
-	fuel_bar.anchor_bottom = 0.74
-	fuel_bar.offset_left = 8
-	fuel_bar.offset_right = 28
+	fuel_bar.anchor_top = 0.0
+	fuel_bar.anchor_bottom = 0.0
+	fuel_bar.offset_left = 10
+	fuel_bar.offset_right = 30
+	fuel_bar.offset_top = 104 + safe_top
+	fuel_bar.offset_bottom = 218 + safe_top
 	fuel_bar.min_value = 0.0
 	fuel_bar.max_value = 1.0
 	fuel_bar.value = 1.0
@@ -599,12 +673,13 @@ func _build_hud() -> void:
 	_style_bar(fuel_bar, Color("#2ecc71"))
 	hud_layer.add_child(fuel_bar)
 
-	var fuel_icon := _make_game_icon(_GameIcon.IconKind.FUEL, Color("#e74c3c"), Vector2(28, 28))
-	fuel_icon.anchor_top = 0.74
-	fuel_icon.offset_left = 4
+	var fuel_icon := _make_game_icon(_GameIcon.IconKind.FUEL, Color("#e74c3c"), Vector2(24, 24))
+	fuel_icon.anchor_top = 0.0
+	fuel_icon.anchor_bottom = 0.0
+	fuel_icon.offset_left = 8
 	fuel_icon.offset_right = 32
-	fuel_icon.offset_top = 3
-	fuel_icon.offset_bottom = 31
+	fuel_icon.offset_top = 224 + safe_top
+	fuel_icon.offset_bottom = 248 + safe_top
 	hud_layer.add_child(fuel_icon)
 
 	# Power-ups sit in the deliberate gap between the bus and control dock.
@@ -645,12 +720,14 @@ func _build_hud() -> void:
 		_lane_warnings.append(w)
 
 	# One stable driving dock keeps controls clear of the bus on portrait phones.
-	var drive_dock := PanelContainer.new()
+	drive_dock = PanelContainer.new()
 	drive_dock.anchor_left = 0.5; drive_dock.anchor_right = 0.5
 	drive_dock.anchor_top = 1.0; drive_dock.anchor_bottom = 1.0
 	drive_dock.offset_left = -204; drive_dock.offset_right = 204
 	drive_dock.offset_top = -130 - safe_bottom; drive_dock.offset_bottom = -18 - safe_bottom
-	drive_dock.mouse_filter = Control.MOUSE_FILTER_PASS
+	# The whole dock is a no-swipe zone. This prevents a thumb starting in the
+	# gap beside a button from being mistaken for a steering gesture.
+	drive_dock.mouse_filter = Control.MOUSE_FILTER_STOP
 	var dock_style := StyleBoxFlat.new()
 	dock_style.bg_color = Color(0.035, 0.055, 0.078, 0.94)
 	dock_style.border_color = Color(0.45, 0.64, 0.76, 0.42)
@@ -666,7 +743,7 @@ func _build_hud() -> void:
 	var drive_row := HBoxContainer.new()
 	drive_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	drive_row.add_theme_constant_override("separation", 12)
-	drive_row.mouse_filter = Control.MOUSE_FILTER_PASS
+	drive_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	drive_dock.add_child(drive_row)
 
 	# ── Lane tap buttons ──────────────────────────────────────────
@@ -761,43 +838,115 @@ func _build_pause_overlay() -> void:
 	pause_overlay = Control.new()
 	pause_overlay.anchor_right = 1.0; pause_overlay.anchor_bottom = 1.0
 	pause_overlay.visible = false
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	hud_layer.add_child(pause_overlay)
 
 	var bg := ColorRect.new()
-	bg.color = Color(0, 0, 0, 0.68)
+	bg.color = Color(0.01, 0.02, 0.035, 0.82)
 	bg.anchor_right = 1.0; bg.anchor_bottom = 1.0
 	pause_overlay.add_child(bg)
 
-	var v := VBoxContainer.new()
-	v.anchor_left = 0.5; v.anchor_top = 0.5
-	v.anchor_right = 0.5; v.anchor_bottom = 0.5
-	v.offset_left = -165; v.offset_right = 165
-	v.offset_top = -145; v.offset_bottom = 145
-	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_theme_constant_override("separation", 18)
-	pause_overlay.add_child(v)
+	var panel := UIFactory.make_panel(Color(0.045, 0.065, 0.09, 0.98))
+	panel.anchor_left = 0.5; panel.anchor_right = 0.5
+	panel.anchor_top = 0.5; panel.anchor_bottom = 0.5
+	panel.offset_left = -184; panel.offset_right = 184
+	panel.offset_top = -220; panel.offset_bottom = 220
+	pause_overlay.add_child(panel)
 
-	v.add_child(UIFactory.make_title(LocaleManager.t("PAUSE"), 38))
+	_pause_menu = VBoxContainer.new()
+	_pause_menu.alignment = BoxContainer.ALIGNMENT_CENTER
+	_pause_menu.add_theme_constant_override("separation", 14)
+	panel.add_child(_pause_menu)
+
+	_pause_menu.add_child(UIFactory.make_title(LocaleManager.t("PAUSE"), 38))
+	var safe_lbl := UIFactory.make_label(LocaleManager.t("PAUSE_SAFE"), 15, UIFactory.COL_MUTED)
+	safe_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_pause_menu.add_child(safe_lbl)
+
+	_pause_route_label = UIFactory.make_label("", 20, UIFactory.COL_PRIMARY)
+	_pause_menu.add_child(_pause_route_label)
+	_pause_stats_label = UIFactory.make_label("", 17, UIFactory.COL_TEXT)
+	_pause_menu.add_child(_pause_stats_label)
 
 	var rs := UIFactory.make_button(LocaleManager.t("RESUME"))
 	rs.pressed.connect(_toggle_pause)
-	v.add_child(rs)
+	_pause_menu.add_child(rs)
 
 	var restart := UIFactory.make_button(LocaleManager.t("RESTART"), false)
-	restart.pressed.connect(func():
-		AudioManager.play_sfx("click")
-		TransitionManager.go_to("res://scenes/game.tscn")
-	)
-	v.add_child(restart)
+	restart.pressed.connect(func(): _request_pause_exit(
+		"res://scenes/game.tscn", "CONFIRM_RESTART"))
+	_pause_menu.add_child(restart)
 
 	var mb := UIFactory.make_button(LocaleManager.t("MAIN_MENU"), false)
-	mb.pressed.connect(func(): TransitionManager.go_to("res://scenes/main_menu.tscn"))
-	v.add_child(mb)
+	mb.pressed.connect(func(): _request_pause_exit(
+		"res://scenes/main_menu.tscn", "CONFIRM_MAIN_MENU"))
+	_pause_menu.add_child(mb)
+
+	_pause_confirm = VBoxContainer.new()
+	_pause_confirm.alignment = BoxContainer.ALIGNMENT_CENTER
+	_pause_confirm.add_theme_constant_override("separation", 18)
+	_pause_confirm.visible = false
+	panel.add_child(_pause_confirm)
+
+	_pause_confirm_title = UIFactory.make_title("", 30)
+	_pause_confirm_title.add_theme_color_override("font_color", UIFactory.COL_DANGER)
+	_pause_confirm.add_child(_pause_confirm_title)
+	_pause_confirm_body = UIFactory.make_label("", 17, UIFactory.COL_TEXT)
+	_pause_confirm_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_pause_confirm.add_child(_pause_confirm_body)
+
+	var confirm_stats := UIFactory.make_label(LocaleManager.t("PAUSE_LOSS_DETAIL"), 15, UIFactory.COL_MUTED)
+	confirm_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_pause_confirm.add_child(confirm_stats)
+
+	var confirm_btn := UIFactory.make_button(LocaleManager.t("CONFIRM_EXIT"), false)
+	confirm_btn.add_theme_color_override("font_color", UIFactory.COL_DANGER.lightened(0.18))
+	confirm_btn.pressed.connect(_confirm_pause_exit)
+	_pause_confirm.add_child(confirm_btn)
+	var cancel_btn := UIFactory.make_button(LocaleManager.t("CANCEL"))
+	cancel_btn.pressed.connect(_cancel_pause_exit)
+	_pause_confirm.add_child(cancel_btn)
+
+func _refresh_pause_status() -> void:
+	if not is_instance_valid(_pause_route_label):
+		return
+	_pause_route_label.text = LocaleManager.t(String(current_route.get("name_key", "ROUTE_KARIAKOO")))
+	_pause_stats_label.text = "%.0f m   •   %d 🪙   •   %d/%d 👤" % [
+		distance, coins, onboard, CAPACITY + OVERLOAD_MAX,
+	]
+
+func _show_pause_menu() -> void:
+	_pause_pending_path = ""
+	_pause_menu.visible = true
+	_pause_confirm.visible = false
+	_refresh_pause_status()
+
+func _request_pause_exit(path: String, title_key: String) -> void:
+	AudioManager.play_sfx("click")
+	_pause_pending_path = path
+	_pause_confirm_title.text = LocaleManager.t(title_key)
+	_pause_confirm_body.text = LocaleManager.t("PAUSE_LOSS_WARNING")
+	_pause_menu.visible = false
+	_pause_confirm.visible = true
+
+func _cancel_pause_exit() -> void:
+	AudioManager.play_sfx("click")
+	_show_pause_menu()
+
+func _confirm_pause_exit() -> void:
+	if _pause_pending_path.is_empty():
+		return
+	AudioManager.play_sfx("click")
+	var path: String = _pause_pending_path
+	_pause_pending_path = ""
+	TransitionManager.go_to(path)
 
 func _toggle_pause() -> void:
 	if game_over or _counting_down: return
 	paused = not paused
 	pause_overlay.visible = paused
+	if paused:
+		_show_pause_menu()
 	AudioManager.play_sfx("click")
 
 func _notification(what: int) -> void:
@@ -807,6 +956,7 @@ func _notification(what: int) -> void:
 		return
 	paused = true
 	pause_overlay.visible = true
+	_show_pause_menu()
 
 # ═════════════════════════ HUD UPDATE ═════════════════════════════
 
@@ -847,12 +997,40 @@ func _update_hud() -> void:
 	_horn_btn.disabled = horn_charges <= 0
 
 	# Dim unavailable lane buttons so touch controls communicate their limits.
-	var can_move_left: bool = player.current_lane > 0
-	var can_move_right: bool = player.current_lane < num_lanes - 1
+	var can_steer: bool = not player.is_lane_switching()
+	var can_move_left: bool = can_steer and player.current_lane > 0
+	var can_move_right: bool = can_steer and player.current_lane < num_lanes - 1
 	btn_left.disabled = not can_move_left
 	btn_right.disabled = not can_move_right
 	btn_left.queue_redraw()
 	btn_right.queue_redraw()
+
+	var route_stats := _current_route_stats()
+	var goal_met: bool = Routes.is_goal_met(current_route, route_stats)
+	var goal_progress: String = Routes.goal_progress(current_route, route_stats)
+	var goal_reward: int = int(current_route.get("goal_reward", 0))
+	goal_label.text = "%s  %s  +%d 🪙" % [
+		("✓ " + LocaleManager.t("ROUTE_GOAL")) if goal_met else LocaleManager.t("ROUTE_GOAL"),
+		goal_progress,
+		goal_reward,
+	]
+	goal_label.add_theme_color_override("font_color", Color("#2ecc71") if goal_met else UIFactory.COL_PRIMARY)
+	goal_label.visible = status_label.text.is_empty()
+	if goal_met and not _route_goal_reached:
+		_route_goal_reached = true
+		_spawn_float_label(LocaleManager.t("GOAL_COMPLETE"),
+			player.position + Vector2(0, -130), Color("#2ecc71"))
+		AudioManager.play_sfx("powerup")
+		FeedbackManager.powerup()
+
+func _current_route_stats() -> Dictionary:
+	return {
+		"score": _current_score(),
+		"coins": coins,
+		"passengers": passengers,
+		"distance": distance,
+		"near_misses": _run_near_misses,
+	}
 
 func _update_status() -> void:
 	var sc: int = _current_score()
@@ -864,6 +1042,12 @@ func _update_status() -> void:
 		status_label.add_theme_color_override("font_color", UIFactory.COL_PRIMARY)
 	elif starter_hint_time > 0.0:
 		status_label.text = LocaleManager.t("START_HINT")
+		status_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
+	elif _starter_shield_hint_time > 0.0:
+		status_label.text = LocaleManager.t("PRACTICE_SHIELD")
+		status_label.add_theme_color_override("font_color", UIFactory.COL_PRIMARY)
+	elif _speed_ramp_hint_time > 0.0:
+		status_label.text = LocaleManager.t("SPEED_RAMP")
 		status_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
 	elif sc > SCORE_JAM:
 		status_label.text = LocaleManager.t("TRAFFIC_JAM")
@@ -891,12 +1075,22 @@ func _process(delta: float) -> void:
 	speed = base_speed * difficulty_mult * (1.0 + 0.15 * ramps)
 	speed_lines.speed_ref = speed
 	AudioManager.set_music_intensity(clampf(elapsed / 160.0, 0.0, 1.0))
+	if ramps > _announced_speed_ramps:
+		_announced_speed_ramps = ramps
+		_speed_ramp_hint_time = 1.8
+		_spawn_float_label(LocaleManager.t("SPEED_RAMP"),
+			player.position + Vector2(0, -150), UIFactory.COL_ACCENT)
+		AudioManager.play_sfx("powerup")
+		FeedbackManager.powerup()
+		_screen_shake(2.0, 0.10)
 
 	if magnet_time > 0: magnet_time = max(0.0, magnet_time - delta)
 	if slow_time  > 0: slow_time   = max(0.0, slow_time  - delta)
 	if boost_time > 0: boost_time  = max(0.0, boost_time - delta)
 	if grace_time > 0: grace_time  = max(0.0, grace_time - delta)
 	if starter_hint_time > 0: starter_hint_time = maxf(0.0, starter_hint_time - delta)
+	if _starter_shield_hint_time > 0: _starter_shield_hint_time = maxf(0.0, _starter_shield_hint_time - delta)
+	if _speed_ramp_hint_time > 0: _speed_ramp_hint_time = maxf(0.0, _speed_ramp_hint_time - delta)
 	if _kituo_hint_time > 0: _kituo_hint_time = maxf(0.0, _kituo_hint_time - delta)
 
 	if combo > 0:
@@ -921,6 +1115,7 @@ func _process(delta: float) -> void:
 	elif fuel >= FUEL_LOW_THRESHOLD:
 		_fuel_warned = false
 	if fuel <= 0.0:
+		_end_reason = "fuel"
 		_spawn_float_label(LocaleManager.t("FUEL_EMPTY"), player.position, Color("#e74c3c"))
 		_end_run()
 		return
@@ -928,7 +1123,9 @@ func _process(delta: float) -> void:
 	var move: float = speed * delta * (0.5 if slow_time > 0.0 else 1.0)
 	if boost_time > 0.0:
 		move *= BOOST_SPEED_MULT
-	distance += move * (1.0 + 0.04 * _upg_engine)
+	# Visual movement uses world pixels; progression and UI use real meter-like
+	# units so route goals and distance achievements require meaningful survival.
+	distance += move * METERS_PER_WORLD_UNIT * (1.0 + 0.04 * _upg_engine)
 
 	road.advance(move)
 	speed_lines.advance(move)
@@ -1113,6 +1310,10 @@ func _check_collisions() -> void:
 func _on_hit(o: Obstacle) -> void:
 	if shield_active:
 		shield_active = false
+		# Let the player recover from the impact before another clustered hazard
+		# can immediately turn a successful shield use into a forced crash.
+		grace_time = maxf(grace_time, SHIELD_RECOVERY_TIME)
+		spawn_timer = maxf(spawn_timer, 0.55)
 		FeedbackManager.powerup()
 		_screen_shake(7.0, 0.25)
 		AudioManager.play_sfx("powerup")
@@ -1120,6 +1321,7 @@ func _on_hit(o: Obstacle) -> void:
 		AchievementManager.try_unlock("shield_use")
 		_despawn_obstacle(o)
 		return
+	_end_reason = o.type_id
 	FeedbackManager.crash()
 	AudioManager.play_sfx("voice_mwisho")
 	_burst(player.position, Color("#e74c3c"), 18)
@@ -1367,16 +1569,28 @@ func _spawn_wave() -> void:
 	var to_block: int = randi_range(1, max_blocked)
 	var blocked_lanes: Array = []
 	var free_lane: int = -1
+	var clear_lanes: Array = _clear_lanes_for_wave()
+	if clear_lanes.is_empty():
+		# Existing traffic already occupies every lane's decision corridor. Skip
+		# this wave instead of creating an impossible last-second road choice.
+		return
 	if to_block == num_lanes - 1:
 		# A touch player should never need to cross two lanes between consecutive
-		# forced-choice waves. Keep the next safe lane current or adjacent.
-		var safe_choices: Array = [_last_safe_lane]
-		if _last_safe_lane > 0:
-			safe_choices.append(_last_safe_lane - 1)
-		if _last_safe_lane < num_lanes - 1:
-			safe_choices.append(_last_safe_lane + 1)
-		safe_choices.shuffle()
-		free_lane = int(safe_choices[0])
+		# forced-choice waves. The free lane must also be clear of earlier traffic.
+		var reachable_choices: Array = []
+		for lane_idx in clear_lanes:
+			if abs(int(lane_idx) - player.current_lane) <= 1 \
+			and abs(int(lane_idx) - _last_safe_lane) <= 1:
+				reachable_choices.append(lane_idx)
+		if reachable_choices.is_empty():
+			for lane_idx in clear_lanes:
+				if abs(int(lane_idx) - player.current_lane) <= 1:
+					reachable_choices.append(lane_idx)
+		if reachable_choices.is_empty():
+			# No clear lane is reachable with one deliberate swipe. Defer danger.
+			return
+		reachable_choices.shuffle()
+		free_lane = int(reachable_choices[0])
 		_last_safe_lane = free_lane
 		for lane_idx in range(num_lanes):
 			if lane_idx != free_lane:
@@ -1397,6 +1611,25 @@ func _spawn_wave() -> void:
 			_spawn_coin_trail(free_lane)
 		else:
 			_spawn_collectible_in_lane(free_lane, _pick_collectible_type(false))
+
+func _clear_lanes_for_wave() -> Array:
+	var clear_lanes: Array = []
+	for lane_idx in range(num_lanes):
+		var blocked: bool = false
+		for candidate in obstacles_active:
+			var obstacle := candidate as Obstacle
+			if _nearest_lane_index(obstacle.position.x) != lane_idx:
+				continue
+			# Only traffic in the next decision corridor matters. Obstacles above
+			# it are still being telegraphed; obstacles below have already passed.
+			var half_height: float = obstacle.size.y * 0.5 + 40.0
+			if obstacle.position.y + half_height >= -140.0 \
+			and obstacle.position.y - half_height <= player.position.y + 120.0:
+				blocked = true
+				break
+		if not blocked:
+			clear_lanes.append(lane_idx)
+	return clear_lanes
 
 func _spawn_coin_trail(lane_idx: int) -> void:
 	if not _pickup_corridor_clear(lane_idx, -500.0, -50.0):
@@ -1557,8 +1790,17 @@ func _spawn_float_label(text: String, world_pos: Vector2, col: Color) -> void:
 	lbl.text = text
 	lbl.add_theme_font_size_override("font_size", 22)
 	lbl.add_theme_color_override("font_color", col)
+	lbl.add_theme_color_override("font_outline_color", Color(0.025, 0.035, 0.05, 0.92))
+	lbl.add_theme_constant_override("outline_size", 4)
+	lbl.reset_size()
 	var screen_pos: Vector2 = get_viewport().get_canvas_transform() * world_pos
-	lbl.position = screen_pos - Vector2(52, 24)
+	var safe_top: float = UIFactory.safe_top_inset(view_size.y)
+	var safe_bottom: float = UIFactory.safe_bottom_inset(view_size.y)
+	var top_limit: float = 108.0 + safe_top
+	var bottom_limit: float = view_size.y - 222.0 - safe_bottom
+	var pos_x: float = clampf(screen_pos.x - lbl.size.x * 0.5, 8.0, view_size.x - lbl.size.x - 8.0)
+	var pos_y: float = clampf(screen_pos.y - 28.0, top_limit, bottom_limit)
+	lbl.position = Vector2(pos_x, pos_y)
 	hud_layer.add_child(lbl)
 	var tw := lbl.create_tween()
 	tw.tween_property(lbl, "position:y", lbl.position.y - 95.0, 0.80)
@@ -1568,6 +1810,18 @@ func _spawn_float_label(text: String, world_pos: Vector2, col: Color) -> void:
 # ═════════════════════════ INPUT ══════════════════════════════════
 
 func _input(event: InputEvent) -> void:
+	# Pause must be handled before the paused guard so the same hardware key can
+	# resume, and so Escape mirrors Android Back inside an exit confirmation.
+	var pause_key_pressed: bool = event is InputEventKey \
+		and event.pressed \
+		and not event.echo \
+		and (event.is_action_pressed("pause_action") \
+			or event.keycode == KEY_ESCAPE \
+			or event.physical_keycode == KEY_ESCAPE)
+	if pause_key_pressed:
+		if not game_over and not _counting_down:
+			_handle_pause_back()
+		return
 	if _counting_down or paused or game_over: return
 	if event is InputEventScreenTouch:
 		if event.pressed:
@@ -1606,13 +1860,11 @@ func _input(event: InputEvent) -> void:
 			_move_left()
 		elif event.is_action_pressed("ui_right"):
 			_move_right()
-		elif event.is_action_pressed("pause_action"):
-			_toggle_pause()
 		elif event.is_action_pressed("horn_action"):
 			_use_horn()
 
 func _is_hud_interaction(screen_position: Vector2) -> bool:
-	for control in [pause_btn, btn_left, btn_right, _horn_btn]:
+	for control in [pause_btn, drive_dock, btn_left, btn_right, _horn_btn]:
 		if is_instance_valid(control) and control.visible and control.get_global_rect().has_point(screen_position):
 			return true
 	return false
@@ -1641,8 +1893,14 @@ func _current_score() -> int:
 ## Android hardware back button → pause (called by TransitionManager).
 func handle_back() -> void:
 	if not paused and not game_over and not _counting_down:
-		_toggle_pause()
+		_handle_pause_back()
 	elif paused:
+		_handle_pause_back()
+
+func _handle_pause_back() -> void:
+	if paused and is_instance_valid(_pause_confirm) and _pause_confirm.visible:
+		_cancel_pause_exit()
+	else:
 		_toggle_pause()
 
 # ═════════════════════════ END RUN ════════════════════════════════
@@ -1684,6 +1942,7 @@ func _end_run() -> void:
 		"fuel_drain_mult": fuel_drain_mult,
 		"condition": condition,
 		"rush_hour": rush_hour,
+		"end_reason": _end_reason,
 	})
 	await get_tree().create_timer(0.55).timeout
 	TransitionManager.go_to("res://scenes/game_over.tscn")

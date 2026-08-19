@@ -26,6 +26,10 @@ var _music_stream: AudioStream
 func _ready() -> void:
 	music_on = SaveSystem.get_value("music_on", true)
 	sfx_on = SaveSystem.get_value("sfx_on", true)
+	# Data-contract tests load the real project autoload graph but do not need to
+	# synthesize several audio buffers just before immediate headless shutdown.
+	if "--logic-contracts" in OS.get_cmdline_user_args():
+		return
 
 	for _i in range(VOICE_POOL):
 		var p := AudioStreamPlayer.new()
