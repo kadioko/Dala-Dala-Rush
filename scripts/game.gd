@@ -125,6 +125,10 @@ const GRACE_TIME := 2.5
 const SHIELD_RECOVERY_TIME := 1.15
 const STARTER_WINDOW := 12.0
 const START_HINT_DURATION := 4.0
+const COUNTDOWN_NUMBER_FONT := 104
+const COUNTDOWN_LAUNCH_FONT := 76
+const COUNTDOWN_SHORT_LAUNCH_FONT := 92
+const COUNTDOWN_PREP_FONT := 30
 const MAX_SPEED_RAMPS := 7
 const MIN_SPAWN_INTERVAL := 0.52
 var _total_boost_uses: int = 0
@@ -381,13 +385,6 @@ func _ready() -> void:
 	_build_pause_overlay()
 	_build_countdown()
 
-	# Tell the player which consumables kicked in
-	for i in range(_used_items.size()):
-		_spawn_float_label(
-			"✓ " + LocaleManager.t(_used_items[i]),
-			player.position + Vector2(0, -60.0 - i * 34.0),
-			UIFactory.COL_PRIMARY)
-
 	speed = base_speed * difficulty_mult
 	set_process(true)
 	set_process_input(true)
@@ -432,6 +429,9 @@ func _build_pools() -> void:
 # ═════════════════════════ COUNTDOWN ══════════════════════════════
 
 func _build_countdown() -> void:
+	# The briefing owns the opening frame. Live controls and duplicate HUD values
+	# appear only when driving actually begins.
+	hud_layer.visible = false
 	_countdown_layer = CanvasLayer.new()
 	add_child(_countdown_layer)
 
@@ -447,25 +447,30 @@ func _build_countdown() -> void:
 	_countdown_label.anchor_top = 0.5
 	_countdown_label.anchor_right = 0.5
 	_countdown_label.anchor_bottom = 0.5
-	_countdown_label.offset_left = -120
-	_countdown_label.offset_right = 120
+	var countdown_half_width := minf(220.0, view_size.x * 0.5 - 16.0)
+	_countdown_label.offset_left = -countdown_half_width
+	_countdown_label.offset_right = countdown_half_width
 	_countdown_label.offset_top = -100
 	_countdown_label.offset_bottom = 100
+	_countdown_label.pivot_offset = Vector2(countdown_half_width, 100.0)
 	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_countdown_label.add_theme_font_size_override("font_size", 110)
+	_countdown_label.add_theme_font_size_override("font_size", COUNTDOWN_NUMBER_FONT)
 	_countdown_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
+	_countdown_label.add_theme_color_override("font_outline_color", Color(0.015, 0.025, 0.04, 0.96))
+	_countdown_label.add_theme_constant_override("outline_size", 10)
 	_countdown_layer.add_child(_countdown_label)
 
 	# Route card: establish where this particular run is happening before launch.
+	var briefing_half_width := minf(210.0, view_size.x * 0.5 - 16.0)
 	var route_title := UIFactory.make_title(
 		LocaleManager.t(String(current_route.get("name_key", "ROUTE_KARIAKOO"))), 30)
 	route_title.anchor_left = 0.5
 	route_title.anchor_right = 0.5
 	route_title.anchor_top = 0.5
 	route_title.anchor_bottom = 0.5
-	route_title.offset_left = -210
-	route_title.offset_right = 210
+	route_title.offset_left = -briefing_half_width
+	route_title.offset_right = briefing_half_width
 	route_title.offset_top = -230
 	route_title.offset_bottom = -185
 	route_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -477,8 +482,8 @@ func _build_countdown() -> void:
 	route_detail.anchor_right = 0.5
 	route_detail.anchor_top = 0.5
 	route_detail.anchor_bottom = 0.5
-	route_detail.offset_left = -210
-	route_detail.offset_right = 210
+	route_detail.offset_left = -briefing_half_width
+	route_detail.offset_right = briefing_half_width
 	route_detail.offset_top = -182
 	route_detail.offset_bottom = -138
 	route_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -487,12 +492,13 @@ func _build_countdown() -> void:
 	# Show the run's concrete purpose before the countdown claims the player's
 	# attention. This makes routes feel distinct from the first second.
 	var goal_panel := PanelContainer.new()
+	var goal_half_width := minf(186.0, view_size.x * 0.5 - 20.0)
 	goal_panel.anchor_left = 0.5
 	goal_panel.anchor_right = 0.5
 	goal_panel.anchor_top = 0.5
 	goal_panel.anchor_bottom = 0.5
-	goal_panel.offset_left = -186
-	goal_panel.offset_right = 186
+	goal_panel.offset_left = -goal_half_width
+	goal_panel.offset_right = goal_half_width
 	goal_panel.offset_top = -136
 	goal_panel.offset_bottom = -102
 	var goal_style := StyleBoxFlat.new()
@@ -512,6 +518,7 @@ func _build_countdown() -> void:
 		"%s: %s   +%d 🪙" % [LocaleManager.t("ROUTE_GOAL"), goal_text, goal_reward],
 		15, UIFactory.COL_ACCENT)
 	goal_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	goal_intro.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	goal_panel.add_child(goal_intro)
 	_countdown_layer.add_child(goal_panel)
 
@@ -522,7 +529,11 @@ func _build_countdown() -> void:
 	if rush_hour:
 		cond_parts.append(LocaleManager.t("COND_RUSH"))
 	if not cond_parts.is_empty():
-		var cond_lbl := UIFactory.make_label(" • ".join(cond_parts), 24, UIFactory.COL_ACCENT)
+		var condition_text := "%s: %s" % [
+			LocaleManager.t("CONDITION_LABEL"),
+			" • ".join(cond_parts),
+		]
+		var cond_lbl := UIFactory.make_label(condition_text, 20, UIFactory.COL_ACCENT)
 		cond_lbl.anchor_left = 0.5
 		cond_lbl.anchor_right = 0.5
 		cond_lbl.anchor_top = 0.5
@@ -542,7 +553,21 @@ func _build_countdown() -> void:
 	bus_intro.tween_property(player, "position:y", launch_y, 0.50).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	bus_intro.tween_property(player, "modulate:a", 1.0, 0.34)
 
-	_show_countdown_num(3)
+	_show_countdown_prep()
+
+func _show_countdown_prep() -> void:
+	_countdown_label.text = LocaleManager.t("PREP").to_upper()
+	_countdown_label.add_theme_font_size_override("font_size", COUNTDOWN_PREP_FONT)
+	_countdown_label.add_theme_color_override("font_color", UIFactory.COL_TEXT)
+	_countdown_label.scale = Vector2(0.94, 0.94)
+	_countdown_label.modulate.a = 0.0
+	var tw := _countdown_label.create_tween()
+	tw.tween_property(_countdown_label, "modulate:a", 1.0, 0.12)
+	tw.parallel().tween_property(_countdown_label, "scale", Vector2.ONE, 0.24) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.34)
+	tw.tween_property(_countdown_label, "modulate:a", 0.0, 0.12)
+	tw.tween_callback(func(): _show_countdown_num(3))
 
 func _show_countdown_num(n: int) -> void:
 	if n <= 0:
@@ -550,30 +575,47 @@ func _show_countdown_num(n: int) -> void:
 		spawn_timer = maxf(spawn_timer, 1.25)
 		passenger_timer = maxf(passenger_timer, 1.0)
 		starter_hint_time = START_HINT_DURATION
-		_countdown_label.text = LocaleManager.t("GO_TEXT")
+		var launch_text := LocaleManager.t("GO_TEXT")
+		_countdown_label.text = launch_text
+		_countdown_label.add_theme_font_size_override(
+			"font_size",
+			COUNTDOWN_LAUNCH_FONT if launch_text.length() > 5 else COUNTDOWN_SHORT_LAUNCH_FONT
+		)
 		AudioManager.play_sfx("voice_twende")
 		_countdown_label.add_theme_color_override("font_color", Color("#2ecc71"))
-		_countdown_label.scale = Vector2(0.4, 0.4)
+		_countdown_label.scale = Vector2(0.84, 0.84)
 		_countdown_label.modulate.a = 1.0
 		var tw := _countdown_label.create_tween()
-		tw.tween_property(_countdown_label, "scale", Vector2(1.3, 1.3), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tw.tween_interval(0.22)
+		tw.tween_property(_countdown_label, "scale", Vector2(1.06, 1.06), 0.24) \
+			.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_interval(0.30)
 		tw.tween_property(_countdown_label, "modulate:a", 0.0, 0.22)
 		tw.tween_callback(func():
+			hud_layer.visible = true
 			_countdown_layer.queue_free()
 			_counting_down = false
+			_announce_used_items()
 		)
 		return
 
 	_countdown_label.text = str(n)
+	_countdown_label.add_theme_font_size_override("font_size", COUNTDOWN_NUMBER_FONT)
 	_countdown_label.add_theme_color_override("font_color", UIFactory.COL_ACCENT)
-	_countdown_label.scale = Vector2(1.8, 1.8)
+	_countdown_label.scale = Vector2(1.22, 1.22)
 	_countdown_label.modulate.a = 1.0
 	var tw := _countdown_label.create_tween()
-	tw.tween_property(_countdown_label, "scale", Vector2(1.0, 1.0), 0.30).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(0.42)
-	tw.tween_property(_countdown_label, "modulate:a", 0.0, 0.20)
+	tw.tween_property(_countdown_label, "scale", Vector2.ONE, 0.24) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(0.38)
+	tw.tween_property(_countdown_label, "modulate:a", 0.0, 0.18)
 	tw.tween_callback(func(): _show_countdown_num(n - 1))
+
+func _announce_used_items() -> void:
+	for i in range(_used_items.size()):
+		_spawn_float_label(
+			"✓ " + LocaleManager.t(_used_items[i]),
+			player.position + Vector2(0, -60.0 - i * 34.0),
+			UIFactory.COL_PRIMARY)
 
 # ═════════════════════════ HUD BUILD ══════════════════════════════
 
@@ -628,9 +670,12 @@ func _build_hud() -> void:
 	status_label = UIFactory.make_label("", 20, UIFactory.COL_DANGER)
 	status_label.anchor_left = 0.5
 	status_label.anchor_right = 0.5
-	status_label.offset_left = -176
-	status_label.offset_right = 176
+	var status_half_width := minf(220.0, view_size.x * 0.5 - 20.0)
+	status_label.offset_left = -status_half_width
+	status_label.offset_right = status_half_width
 	status_label.offset_top = 70 + safe_top
+	status_label.add_theme_color_override("font_outline_color", Color(0.025, 0.035, 0.05, 0.90))
+	status_label.add_theme_constant_override("outline_size", 3)
 	hud_layer.add_child(status_label)
 
 	# Combo label

@@ -4,6 +4,22 @@ Current local closed-testing artifact: version 1.0.5 (code 6). Waves 5-7 are
 included in the signed, locally verified Godot 4.7.1 / API 36 bundle. This is a
 historical implementation log; release readiness is tracked in `ROADMAP.md`.
 
+## Wave 14 - Professional bilingual match start (August 19, 2026)
+
+- Rebuilt the route opening as a focused `JIANDOE / 3 / 2 / 1 / TWENDE`
+  sequence in Swahili and `GET READY / 3 / 2 / 1 / GO` in English.
+- Replaced the clipped 240 px launch label with a portrait-width-aware label,
+  centered pivot, restrained scale animation, responsive route copy, and a
+  strong outline that remains readable over every road condition.
+- Hid the live score HUD, fuel meter, power-up row, and drive controls during
+  the briefing; they now appear only when the player receives control.
+- Delayed one-run consumable notices until driving begins so they are visible
+  rather than expiring behind the countdown overlay.
+- Added context to dusk/night/rain/rush-hour copy with a `HALI / CONDITION`
+  prefix and polished early-run, fuel, horn, lane-warning, and route-goal text.
+- Added launch-copy length contracts and visually verified the opening plus the
+  first steering hint at a 496x883 debug window.
+
 ## Wave 13 - Core logic and data-contract audit (August 19, 2026)
 
 - Made scene transitions single-owner: repeated navigation input is ignored

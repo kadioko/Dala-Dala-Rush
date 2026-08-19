@@ -9,6 +9,9 @@ that has appeared in any Google Play track.
 ## English
 
 - Rebuilt the pause flow with live run stats and confirmation before leaving.
+- Rebuilt the opening route briefing and countdown with centered, responsive
+  `GET READY / GO` and natural Swahili `JIANDOE / TWENDE` cues. The live HUD
+  stays hidden until driving begins.
 - Improved the pre-run route briefing, How to Play guide, HUD controls, and
   contextual crash tips in both Swahili and English.
 - Added fairer late-run traffic waves, clearer speed-ramp feedback, safer
@@ -25,6 +28,8 @@ that has appeared in any Google Play track.
 ## Kiswahili
 
 - Pause sasa inaonyesha hali ya run na inaomba uthibitisho kabla ya kuondoka.
+- Mwanzo wa route na countdown sasa uko katikati na unatumia maneno ya kawaida
+  `JIANDOE / TWENDE`; HUD inaonekana baada ya kuanza kuendesha.
 - Tumeboresha maelezo ya route kabla ya kuanza, Jinsi ya Kucheza, controls za
   HUD, na ushauri wa ajali kwa Kiswahili na English.
 - Traffic ya baadaye sasa ni ya haki zaidi, ongezeko la speed linaonekana wazi,
@@ -42,13 +47,13 @@ that has appeared in any Google Play track.
 English:
 
 ```text
-Improved pause, route briefings, How to Play, HUD controls and crash tips. Traffic waves and shield recovery are fairer, distance goals are better paced, rewarded choices pay once, and save, navigation and ghost-code reliability are stronger.
+Improved the centered bilingual route countdown, pause, How to Play, HUD controls and crash tips. Traffic is fairer, goals are better paced, rewards pay once, and save, navigation and ghost-code reliability are stronger.
 ```
 
 Kiswahili:
 
 ```text
-Tumeboresha pause, maelezo ya route, Jinsi ya Kucheza, HUD controls na ushauri wa ajali. Traffic na shield sasa ni za haki zaidi, distance imepangwa vizuri, rewarded choices hulipa mara moja, na save, navigation pamoja na ghost codes ni salama zaidi.
+Tumeboresha countdown ya route kwa JIANDAE/TWENDE, pause, Jinsi ya Kucheza, HUD controls na ushauri wa ajali. Traffic ni ya haki zaidi, distance imepangwa vizuri, rewards hulipa mara moja, na save pamoja na ghost codes ni salama zaidi.
 ```
 
 ## Final Artifact Details

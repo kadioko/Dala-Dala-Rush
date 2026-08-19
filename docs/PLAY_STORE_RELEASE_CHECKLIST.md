@@ -21,7 +21,7 @@ for store assets, declarations, and rollout checks.
 - Next release AAB path: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
 - Debug APK path: `exports/android/DalaDalaRushTZ-debug.apk`
 - Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
-- Source status: Waves 8-13 are newer than code 6; the next upload requires
+- Source status: Waves 8-14 are newer than code 6; the next upload requires
   version code `7` or higher and a newly exported AAB.
 
 Before a replacement upload, check every Play track first. Google Play rejects
@@ -165,6 +165,8 @@ Detailed copy/paste answers are in
 - Install the debug APK on a real Android phone.
 - Verify launch, main menu, settings, Swahili/English switching, route select,
   garage, gameplay, pause, crash, revive, double coins, and game over.
+- Verify the route briefing/countdown uses natural localized wording, remains
+  centered, and hides the live HUD until control begins.
 - Verify ads use test mode or test devices before public release.
 - Do not click live ads during development.
 - Confirm the release AAB uploads successfully to an internal testing track.

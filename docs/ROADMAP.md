@@ -14,7 +14,7 @@ evidence, not another feature expansion.
 | Social/competitive | **Done (offline)** | Ghost racing w/ shareable codes, local leaderboard, livery + slogan sharing. Online (GPGS) is a later add. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
-| Android readiness | **New source build required** | Code 6 is locally verified but predates Waves 8-13. Godot 4.7.1, API 36, both ARM ABIs, signing, and AdMob configuration are ready; the next upload needs code 7 or higher. |
+| Android readiness | **New source build required** | Code 6 is locally verified but predates Waves 8-14. Godot 4.7.1, API 36, both ARM ABIs, signing, and AdMob configuration are ready; the next upload needs code 7 or higher. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
 | Live ops | **Scaffolded** | Remote config + offline analytics queue. Needs hosting URL + Firebase plugin. |
 | QA/testing | **In progress** | Godot 4.7.1 parses cleanly; headless contracts cover locales, catalogs, save repair, selections, rewarded claims, ghosts, and distance. Controls have been phone-tested. Full device matrix and long-run balancing remain. |
@@ -25,11 +25,13 @@ evidence, not another feature expansion.
 - Completed: set version `1.0.5`, code `6`, and ran Godot 4.7.1 parser validation.
 - Completed: added and passed the repeatable headless logic-contract suite.
 - Required before upload: increment to code `7` or higher and build a fresh AAB;
-  code 6 does not contain Waves 8-13.
+  code 6 does not contain Waves 8-14.
 - Play 20+ runs across all six routes and both languages.
 - Tune: fares (`FARE_*`), overload penalties, kituo cadence, chase
   frequency/fine, condition modifiers, coin economy vs upgrade prices.
 - Verify all screens in both languages at 540x960.
+- Verify the route briefing, goal, countdown, launch cue, and first steering
+  hint in both languages with no HUD overlap or clipping.
 - Verify ad-continue flow (simulated ads in debug builds), ghost code
   export/import round-trip, livery persistence per vehicle.
 - Code-enforced: one rewarded choice per run. Revive and Double Coins are
@@ -57,7 +59,7 @@ evidence, not another feature expansion.
 - Standard launcher icon now uses the prepared store artwork; produce and wire
   a dedicated adaptive foreground/background pair before production.
 - Review the generated 512 icon and feature graphic.
-- Recapture portrait screenshots from the final code 6 build, including current
+- Recapture portrait screenshots from the next release candidate, including current
   gameplay HUD and How to Play visuals.
 - Verify the localized Privacy Policy button opens the active public page from
   Settings on a real phone.

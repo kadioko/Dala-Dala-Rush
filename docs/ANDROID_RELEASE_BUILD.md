@@ -185,6 +185,8 @@ the same split APK delivery users receive.
 On the installed build, verify:
 
 - Splash, main menu, Play transition, gameplay, pause, crash, and results.
+- Route briefing/countdown is centered in both languages and the live HUD
+  appears only after driving begins.
 - Left, horn, and right controls do not overlap or trigger each other.
 - Swahili/English switching and all saved settings survive restart.
 - Rewarded revive restores the complete run state exactly once.

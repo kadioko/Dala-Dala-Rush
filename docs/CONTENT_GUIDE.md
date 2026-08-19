@@ -61,6 +61,9 @@ Add the matching `goal_key` text in both Swahili and English locale dictionaries
   Add early hazards to the starter allow-list only after playtesting.
 - New direct UI copy needs entries in both `"sw"` and `"en"` dictionaries.
   Swahili is the runtime fallback, but both entries are required before release.
+- Keep central launch copy at 10 characters or fewer and preparation copy at
+  16 or fewer. Test both languages before changing `PREP`, `GO_TEXT`, route
+  goals, or early-run status messages.
 - Pickups spawned independently of a wave use a clear lane check. Preserve that
   behavior when adding collectible types or movement patterns.
 - Forced two-lane waves must keep the next safe lane current or adjacent; do

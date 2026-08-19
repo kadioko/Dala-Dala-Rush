@@ -33,7 +33,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - **Living city**: each run rolls day/dusk/night/rain (+25% rush hour) —
   night headlights, slippery rain, denser rush traffic. Per-route parallax
   scenery (Kariakoo stalls, Posta offices, Kigamboni palms, Ubungo overpass).
-- Juice: hit-stop, particles, camera shake, lane-tilt, countdown, music
+- Juice: hit-stop, particles, camera shake, lane-tilt, a centered bilingual
+  route briefing/countdown, and music
   that intensifies with speed.
 
 ### Progression & retention
@@ -89,7 +90,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - Current local closed-testing artifact: version `1.0.5`, code `6`.
   `DalaDalaRushTZ-closed-testing-v6.aab` was built, signature-verified, and
   checked for its AdMob and Advertising ID manifest entries on August 9, 2026.
-  The current source contains Waves 8-13 and is newer than that artifact; the
+  The current source contains Waves 8-14 and is newer than that artifact; the
   next Play upload must use version code `7` or higher.
 - Android export is configured for package `com.kadioko.daladalarush`, minimum
   API 24, target API 36, Gradle custom build, and AAB output.
@@ -97,6 +98,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   placement QA remain release checks.
 - Swahili and English are complete locale sets; English falls back to Swahili
   if a future key is missing.
+- The match start uses natural `JIANDOE / TWENDE` and `GET READY / GO` cues,
+  hides the live HUD until control begins, and scales safely on narrow screens.
 - Store-listing drafts are under `assets/store_listing/`; recapture screenshots
   after the final UI pass before uploading the next release.
 - See `docs/ROADMAP.md` for launch work remaining and `docs/UPGRADES.md` for

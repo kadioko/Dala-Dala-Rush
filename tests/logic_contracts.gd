@@ -28,6 +28,7 @@ var _failures: Array[String] = []
 
 func _ready() -> void:
 	_check_locales()
+	_check_launch_copy()
 	_check_routes()
 	_check_vehicles()
 	_check_missions()
@@ -64,6 +65,21 @@ func _check_locales() -> void:
 	for key_value in en.keys():
 		var key := String(key_value)
 		_check(sw.has(key), "Swahili is missing locale key " + key)
+	locale_node.free()
+
+func _check_launch_copy() -> void:
+	var locale_node: Node = LocaleScript.new()
+	var all_strings: Dictionary = locale_node.get("strings")
+	for locale_id in ["sw", "en"]:
+		var locale_strings: Dictionary = all_strings.get(locale_id, {})
+		var launch_text := String(locale_strings.get("GO_TEXT", "")).strip_edges()
+		var prep_text := String(locale_strings.get("PREP", "")).strip_edges()
+		_check(not launch_text.is_empty() and launch_text.length() <= 10,
+			"%s launch copy must fit the countdown" % locale_id)
+		_check(not prep_text.is_empty() and prep_text.length() <= 16,
+			"%s preparation copy must fit the countdown" % locale_id)
+	_check(String((all_strings.get("sw", {}) as Dictionary).get("GO_TEXT", "")) == "TWENDE!",
+		"Swahili launch cue must use the natural Twende wording")
 	locale_node.free()
 
 func _check_routes() -> void:

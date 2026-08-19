@@ -39,6 +39,9 @@ silent until the recording exists — no placeholder beep):
 | `audio/voice_kituo.ogg` | Bus stop approaching | "Kituo! Shusha!" |
 | `audio/voice_karibu.ogg` | (spare hook — wire where you like) | "Karibu!" |
 
+The on-screen Swahili launch cue is also `TWENDE!`; keep the recording and
+localized text synchronized.
+
 To add more: append the key to `VOICE_KEYS` in `autoload/audio_manager.gd`
 and call `AudioManager.play_sfx("voice_x")` at the trigger.
 

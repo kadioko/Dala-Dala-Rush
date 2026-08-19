@@ -75,6 +75,8 @@ changed.
 Run through this on a real phone before each release:
 
 - [ ] Swipe left/right feels responsive at high speed (adjust `swipe_threshold` in game.gd if not).
+- [ ] Route briefing, goal, `JIANDOE / 3 / 2 / 1 / TWENDE`, and the first
+  steering hint remain centered and unclipped in both languages.
 - [ ] On-screen left / horn / right controls are reachable with a thumb and
   do not move the bus when Horn is tapped. A completed lane move must not be
   cancelled by a second touch while its animation is still playing.
