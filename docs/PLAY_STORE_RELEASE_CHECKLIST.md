@@ -10,23 +10,23 @@ for store assets, declarations, and rollout checks.
 ## Build Status
 
 - Package name: `com.kadioko.daladalarush`
-- Current local closed-testing artifact: `1.0.5`
-- Current local version code: `6`
+- Current local closed-testing artifact: `1.0.7`
+- Current local version code: `8`
 - Artifact status: signed and locally verified; not tracked in Git
-- Local artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`
+- Local artifact: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
 - Min SDK: `24`
 - Target SDK: `36`
 - Export format: Android App Bundle (`.aab`)
 - Gradle/custom build: enabled for AdMob
-- Next release AAB path: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
+- Release AAB path: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
 - Debug APK path: `exports/android/DalaDalaRushTZ-debug.apk`
 - Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
-- Source status: Waves 8-14 are newer than code 6; the next upload requires
-  version code `7` or higher and a newly exported AAB.
+- Source status: Wave 15 referrals and main-menu polish are included in the
+  locally verified code 8 artifact.
 
 Before a replacement upload, check every Play track first. Google Play rejects
 a bundle whose code is not higher than every previously uploaded artifact. If
-code `6` has reached Play, use code `7` or higher for a replacement.
+code `8` has reached Play, use a higher never-used code for a replacement.
 
 Starting August 31, 2026, new mobile apps and updates must target Android 16 /
 API 36 or higher. This project already targets API 36. Recheck the official
@@ -186,6 +186,6 @@ Detailed copy/paste answers are in
 - Confirm `support@kadioko.com` is monitored.
 - Test real AdMob callbacks and consent behavior on a registered test device.
 - Review final Data safety answers against the exact SDK version.
-- Increment to version code `7` or higher, export and verify a fresh signed AAB,
-  then inspect Play Console warnings before rollout.
-- Finalize bilingual notes from `docs/RELEASE_NOTES_NEXT.md`.
+- Upload the verified code 8 AAB from current source, then inspect Play Console
+  warnings before rollout.
+- Use finalized bilingual notes from `docs/RELEASE_NOTES_1.0.7.md`.

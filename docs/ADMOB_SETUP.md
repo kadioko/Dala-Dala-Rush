@@ -83,10 +83,10 @@ This is the most ad-heavy game in the portfolio, but the rules stay fair:
    - The Android build template is installed in `android/build/`.
    - Gradle/custom build is enabled so the plugin can add AARs, dependencies,
      and the AdMob App ID manifest entry.
-   - The latest verified output is the historical code 6 artifact. Current
-     source is newer; the next export should use a unique filename such as
-     `exports/android/DalaDalaRushTZ-closed-testing-v7.aab` after incrementing
-     the preset version code to 7 or higher.
+   - The latest verified output is
+     `exports/android/DalaDalaRushTZ-closed-testing-v8.aab`, version `1.0.7`,
+     code `8`. Use a new filename and a never-used higher code for any
+     replacement after this artifact reaches Play.
 4. Register test devices or use AdMob test mode while developing. Never click
    live ads during development.
 5. On a real Android build, test ad load, close, failure, app resume, and reward

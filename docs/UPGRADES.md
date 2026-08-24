@@ -1,8 +1,33 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-Current local closed-testing artifact: version 1.0.5 (code 6). Waves 5-7 are
+Current local closed-testing artifact: version 1.0.7 (code 8). Waves 5-15 are
 included in the signed, locally verified Godot 4.7.1 / API 36 bundle. This is a
 historical implementation log; release readiness is tracked in `ROADMAP.md`.
+
+## Wave 15 - Offline Invite & Earn (August 24, 2026)
+
+- Added a portrait-first, bilingual Invite & Earn screen reachable from the
+  main menu, with current balance, invite code, claim progress, welcome claim,
+  returned confirmation claim, clear status copy, and Android sharing.
+- Added a fair two-player handshake: the invited player may enter one friend's
+  code for 75 coins, then returns a one-time confirmation so the inviter earns
+  125 coins. Inviter rewards are capped at 10 per local save.
+- Added automatic milestone bonuses of 100, 200, and 500 coins at 3, 5, and 10
+  confirmed friends, with the next target shown directly on the referral hub.
+- Blocked self-referrals, repeated welcome claims, duplicate invitees,
+  confirmations belonging to another inviter, malformed codes, and checksum
+  tampering. Multi-field payouts commit through one save batch.
+- Added schema-3 referral persistence using random game codes only. The feature
+  does not read contacts, phone numbers, names, accounts, or precise location.
+- Added referral normalization, tamper, ownership, reward-amount, and
+  idempotency contracts; Godot 4.7.1 parsing and all logic contracts pass.
+- Visually checked the complete screen at 540x960, including lower actions and
+  Android safe-area clearance. A real two-phone share/return test remains.
+- Android sharing now falls back to copying the full message if the share
+  intent cannot open, so an invite or confirmation is never silently lost.
+- Promoted Invite & Earn on the main menu with a distinct green reward action
+  that shows the current 125-coin inviter reward without adding menu clutter.
+- The signed code 8 AAB now includes this wave.
 
 ## Wave 14 - Professional bilingual match start (August 19, 2026)
 

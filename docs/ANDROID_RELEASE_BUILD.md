@@ -19,9 +19,10 @@ Play closed testing. Store-listing work and Play Console declarations are in
 | Architectures | `armeabi-v7a`, `arm64-v8a` |
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
-| Latest local closed-testing artifact | Version 1.0.5, code 6 |
-| Artifact status | Built and locally verified, but older than current source |
-| Next source build | Version code 7 or higher; proposed version name 1.0.6 |
+| Latest local closed-testing artifact | Version 1.0.7, code 8 |
+| Artifact status | Built and locally verified from the Wave 15 referral release source |
+| Artifact path | `exports/android/DalaDalaRushTZ-closed-testing-v8.aab` |
+| Next source build | Use a never-before-used code higher than 8 (confirm every Play track first) |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
 31, 2026. Recheck the current policy before future releases:
@@ -51,14 +52,14 @@ signing configuration.
 The current verified local artifact was exported from both Android presets with:
 
 ```text
-Version name: 1.0.5
-Version code: 6
+Version name: 1.0.7
+Version code: 8
 ```
 
 The code must be greater than every active artifact in every Play track,
-including internal, closed, open, and production tracks. If code 6 has already
-been uploaded, use code 7 for a replacement build even if code 6 was never
-promoted.
+including internal, closed, open, and production tracks. If code 8 has already
+been uploaded, use a never-before-used code higher than 8 for a replacement
+build even if code 8 was never promoted.
 
 Confirm the local preset without displaying signing values:
 
@@ -116,10 +117,10 @@ Preferred editor path:
 Project > Export > Android AAB Release > Export Project
 ```
 
-The next source build should use a new filename:
+The current verified source build is:
 
 ```text
-exports/android/DalaDalaRushTZ-closed-testing-v7.aab
+exports/android/DalaDalaRushTZ-closed-testing-v8.aab
 ```
 
 Equivalent command-line export:
@@ -201,11 +202,11 @@ Use the complete device matrix in `ANDROID_EXPORT.md`.
 ## 7. Upload Checklist
 
 - [ ] Upload the newly verified versioned AAB to the intended Play track.
-- [ ] Confirm Play Console reads version code 7 or higher and target API 36.
+- [ ] Confirm Play Console reads version code 8 and target API 36.
 - [ ] Confirm the Advertising ID warning is absent for the new artifact.
 - [ ] Review native-code debug-symbol and deobfuscation notices. These are
   warnings unless obfuscation is enabled, but record the decision.
-- [ ] Finalize and add localized notes from `RELEASE_NOTES_NEXT.md`.
+- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.7.md`.
 - [ ] Recheck Ads, Data safety, target audience, content rating, app access,
   financial, health, and government declarations.
 - [ ] Confirm the public privacy URL opens:

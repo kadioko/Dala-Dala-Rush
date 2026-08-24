@@ -62,3 +62,19 @@ Current status: no paid season pass exists.
   intact.
 - Fake coins have no cash value and cannot be withdrawn, traded, wagered, or
   exchanged for prizes.
+
+## Referral Coin Economy
+
+Invite & Earn is a retention feature, not a paid product. The current offline
+handshake pays 75 welcome coins to one invited player and 125 coins to the
+inviter after a returned confirmation, with a maximum of 10 inviter rewards per
+local save. Milestones add 100 coins at 3 friends, 200 at 5, and 500 at 10.
+Sharing alone never pays coins. A player who completes all 10 referrals earns
+2,050 inviter coins in total, enough for meaningful progression without an
+uncapped source.
+
+The local checksum and duplicate guards deter casual repeat claims but are not
+server-grade fraud prevention. Do not raise the cap, attach cash value, or add
+large or paid rewards until installs and payouts are verified by a backend. A
+future implementation should use Play install attribution plus server-side
+idempotency while preserving the current saved invite code where possible.

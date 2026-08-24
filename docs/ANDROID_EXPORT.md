@@ -14,10 +14,10 @@ upload handoff, use `docs/ANDROID_RELEASE_BUILD.md`.
 - Offline-first: no required network access for MVP.
 - Target phones: low to mid-range Android devices common in Tanzania.
 - Package: `com.kadioko.daladalarush`.
-- Current local closed-testing artifact: `1.0.5` / version code `6`.
-- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v6.aab`.
-- Current source is newer than that artifact. The next replacement build must
-  use version code `7` or higher after checking every Play track.
+- Current local closed-testing artifact: `1.0.7` / version code `8`.
+- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v8.aab`.
+- The artifact is locally verified and includes Wave 15 referrals. Check every
+  Play track before using any later, never-before-used higher version code.
 
 API 36 meets Google Play's Android 16 requirement for new apps and app updates
 starting August 31, 2026. Recheck the policy before later releases:
@@ -34,8 +34,8 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 7. Set orientation to portrait.
 8. Keep Gradle/custom build enabled and export **AAB** for Google Play. Use a
    unique output name such as `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`.
-9. The current local presets are version name `1.0.5` and version code `6`.
-   Before making a replacement build, first check Play Console: every upload
+9. The current local release preset uses version name `1.0.7` and version code
+   `8`. Before any replacement export, first check Play Console: every upload
    needs a never-before-used higher version code.
 
 The 4.7.1 Android template is installed and identified by

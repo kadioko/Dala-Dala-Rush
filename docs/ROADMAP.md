@@ -1,9 +1,8 @@
 # Dala Dala Rush TZ - Product Roadmap
 
-Updated August 19, 2026 after the core-logic, scoring, Android playability,
-traffic-fairness, save-integrity, and release-build passes. The signed `1.0.5` / code `6`
-closed-testing AAB is ready locally; the immediate goal is tester rollout and
-evidence, not another feature expansion.
+Updated August 24, 2026 after the referral, UI-polish, and code-8 release pass.
+The signed `1.0.7` / code `8` closed-testing AAB includes current Wave 15 source
+and is ready for Play upload plus delivered-device testing.
 
 ## Status by Area
 
@@ -11,21 +10,21 @@ evidence, not another feature expansion.
 |------|--------|-------|
 | Core driving loop | **Done** | Vituo passenger loop, overload risk/reward, horn, fuel, combos, exact bonus scoring, near-miss, boost, police chases, and beginner-safe living-city conditions. Needs play-balancing only. |
 | Progression | **Done** | Route unlock gates, career ranks, bus upgrades, missions + season, daily challenge, login streak, achievements, consumables. |
-| Social/competitive | **Done (offline)** | Ghost racing w/ shareable codes, local leaderboard, livery + slogan sharing. Online (GPGS) is a later add. |
+| Social/competitive | **Done (offline MVP)** | Ghost racing, livery sharing, and two-sided Invite & Earn codes work without accounts. Verified install attribution and automatic referrer payouts need a backend later. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
-| Android readiness | **New source build required** | Code 6 is locally verified but predates Waves 8-14. Godot 4.7.1, API 36, both ARM ABIs, signing, and AdMob configuration are ready; the next upload needs code 7 or higher. |
+| Android readiness | **Code 8 AAB built, QA pending** | Version 1.0.7 includes Waves 8-15 and is locally verified with Godot 4.7.1, API 36, both ARM ABIs, signing metadata, AdMob metadata, and AD_ID permission. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
 | Live ops | **Scaffolded** | Remote config + offline analytics queue. Needs hosting URL + Firebase plugin. |
-| QA/testing | **In progress** | Godot 4.7.1 parses cleanly; headless contracts cover locales, catalogs, save repair, selections, rewarded claims, ghosts, and distance. Controls have been phone-tested. Full device matrix and long-run balancing remain. |
-| Store launch | **Next tester build pending** | Export and verify current source with code 7 or higher, then upload, process, roll out, and review reports. |
+| QA/testing | **In progress** | Godot 4.7.1 parses cleanly; contracts cover locales, catalogs, saves, selections, ad rewards, ghost codes, referral tampering/idempotency, and distance. Referral UI is portrait-verified; phone handoff testing remains. |
+| Store launch | **Code 8 tester rollout pending** | Upload the verified AAB, process it through Play, roll out to testers, and review reports. |
 
 ## Milestone A — Current Source Release Candidate
 
-- Completed: set version `1.0.5`, code `6`, and ran Godot 4.7.1 parser validation.
+- Completed: set version `1.0.7`, code `8`, and ran Godot 4.7.1 parser validation.
 - Completed: added and passed the repeatable headless logic-contract suite.
-- Required before upload: increment to code `7` or higher and build a fresh AAB;
-  code 6 does not contain Waves 8-14.
+- Completed: exported and independently verified the signed code 8 AAB from
+  Waves 8-15.
 - Play 20+ runs across all six routes and both languages.
 - Tune: fares (`FARE_*`), overload penalties, kituo cadence, chase
   frequency/fine, condition modifiers, coin economy vs upgrade prices.
@@ -40,6 +39,9 @@ evidence, not another feature expansion.
   remains readable at the capped pace.
 - Verify consecutive two-lane waves never require a direct far-left to
   far-right move, especially with swipe controls enabled.
+- On two phones, verify the full referral handoff: share invite, claim 75 once,
+  return confirmation, claim 125 once, then retry both codes and confirm no
+  second payout occurs.
 - Confirm displayed bonus values match score changes and survive one rewarded
   revive without duplication.
 - Complete a reward-heavy run, close the app from the result screen, and verify
@@ -68,11 +70,11 @@ evidence, not another feature expansion.
 ## Milestone D — Closed Testing Upload And Rollout
 
 - Completed locally: export and signature/manifest verification of the signed
-  API 36 AAB with version code 6.
+  API 36 AAB with version code 8.
 - Upload to closed testing, then resolve artifact-specific warnings.
 - Recheck Advertising ID, Data safety, Ads, target audience, content rating,
   and privacy policy declarations.
-- Add the final localized notes from `docs/RELEASE_NOTES_1.0.5.md`.
+- Add finalized localized notes from `docs/RELEASE_NOTES_1.0.7.md`.
 
 ## Milestone E — Production Readiness
 
@@ -86,6 +88,8 @@ evidence, not another feature expansion.
 
 - Online leaderboards via Play Games Services v2; cloud save (one JSON dict — see `docs/LIVE_OPS.md`).
 - SACCO crews (team competitions) — needs a tiny backend.
+- Replace manual referral confirmations with verified install attribution and
+  server-side settlement; keep the current codes as a migration/fallback path.
 - New cities as route packs: Mwanza, Arusha, Zanzibar; Kigamboni ferry segment.
 - Rival daladala racing you to the kituo (chase system can be extended).
 - Replay GIF export for TikTok (ghost timeline is already recorded; needs a GIF encoder plugin).
@@ -101,6 +105,7 @@ evidence, not another feature expansion.
 | Ad SDK fails or policy state differs by region | High | SDK code is isolated; use registered test devices, validate UMP/consent, and inspect every release artifact. |
 | Store media no longer matches current UI | Medium | Recapture screenshots from the next current-source release candidate. |
 | Save schema growth breaks old saves | Medium | Defaults, load-time type/range repair, batched commits, safe .bak restoration, selection validation, and grandfathering migration are shipped and contract-tested. |
+| Offline referral codes are forged or farmed | Medium | One welcome claim, self/duplicate guards, checksum confirmation, and a 10-referral cap limit casual abuse. Valuable or uncapped rewards require server verification. |
 | Scope creep before launch | High | Systems are done — freeze features, ship Milestones A–E. |
 
 ## Shipping Philosophy

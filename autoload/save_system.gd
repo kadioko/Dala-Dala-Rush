@@ -9,7 +9,7 @@ var _batch_depth: int = 0
 var _batch_dirty: bool = false
 
 const DEFAULTS := {
-	"schema_version": 2,
+	"schema_version": 3,
 	"best_score": 0,
 	"total_coins": 0,
 	"selected_vehicle": "classic_blue",
@@ -49,6 +49,13 @@ const DEFAULTS := {
 	"consumables": {},
 	# Top-5 leaderboard: Array of {name, score, route}
 	"leaderboard": [],
+	# Offline referral handshake. Codes are random game identifiers, not PII.
+	"referral_invite_code": "",
+	"referral_welcome_claimed": false,
+	"referral_inviter_code": "",
+	"referral_confirmation_code": "",
+	"referral_claimed_invitees": [],
+	"referral_success_count": 0,
 }
 
 func _ready() -> void:
@@ -94,11 +101,13 @@ func _is_compatible_value(default_value: Variant, loaded_value: Variant) -> bool
 	return expected_type == loaded_type
 
 func _normalize_core_data() -> void:
+	data["schema_version"] = int(DEFAULTS["schema_version"])
 	var non_negative_ints: Array[String] = [
 		"best_score", "total_coins", "total_runs", "total_coins_ever",
 		"total_passengers_ever", "route_goals_completed",
 		"daily_challenges_completed", "ads_runs_since_interstitial",
 		"ads_next_interstitial_at", "streak_count",
+		"referral_success_count",
 		"best_kariakoo", "best_mwenge", "best_mbezi", "best_posta",
 		"best_kigamboni", "best_ubungo",
 	]
@@ -113,6 +122,10 @@ func _normalize_core_data() -> void:
 		data.get("unlocked_routes", []), "kariakoo"
 	)
 	data["achievements"] = _normalized_string_array(data.get("achievements", []))
+	data["referral_claimed_invitees"] = _normalized_string_array(
+		data.get("referral_claimed_invitees", [])
+	)
+	data["referral_success_count"] = (data["referral_claimed_invitees"] as Array).size()
 
 	var locale := String(data.get("locale", "sw"))
 	data["locale"] = locale if locale in ["sw", "en"] else "sw"

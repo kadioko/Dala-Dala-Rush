@@ -10,6 +10,7 @@ const SaveScript := preload("res://autoload/save_system.gd")
 const LocaleScript := preload("res://autoload/locale_manager.gd")
 const AchievementScript := preload("res://autoload/achievement_manager.gd")
 const GameScript := preload("res://scripts/game.gd")
+const ReferralsData := preload("res://data/referrals.gd")
 
 const OBSTACLE_IDS := [
 	"bodaboda", "bajaji", "car", "pothole", "cone", "police",
@@ -34,6 +35,8 @@ func _ready() -> void:
 	_check_missions()
 	_check_achievements()
 	_check_ghost_validation()
+	_check_referrals()
+	_check_referral_reward_idempotency()
 	_check_distance_scale()
 	_check_save_normalization()
 	_check_selection_guards()
@@ -181,6 +184,92 @@ func _check_ghost_validation() -> void:
 		"Trivial ghost duration was accepted")
 	_check(GhostDataLib.decode("not-a-ghost").is_empty(), "Invalid ghost prefix was accepted")
 
+func _check_referrals() -> void:
+	var inviter := "DDR-ABC234"
+	var invitee := "DDR-DEF567"
+	_check(ReferralsData.normalize_invite_code(" ddr abc-234 ") == inviter,
+		"Referral invite normalization failed")
+	_check(ReferralsData.normalize_invite_code("DDR-000000").is_empty(),
+		"Referral code accepted confusing or unsupported characters")
+	_check(not bool(ReferralsData.validate_invite_claim(inviter, inviter, false).get("ok", true)),
+		"Self-referral was accepted")
+	_check(not bool(ReferralsData.validate_invite_claim(inviter, invitee, true).get("ok", true)),
+		"A second welcome referral was accepted")
+	var confirmation := ReferralsData.build_confirmation_code(inviter, invitee)
+	var parsed := ReferralsData.inspect_confirmation_code(confirmation)
+	_check(bool(parsed.get("ok", false)), "Valid referral confirmation was rejected")
+	_check(String(parsed.get("inviter", "")) == inviter,
+		"Referral confirmation lost the inviter code")
+	_check(String(parsed.get("invitee", "")) == invitee,
+		"Referral confirmation lost the invitee code")
+	var tampered := confirmation.substr(0, confirmation.length() - 1) + "0"
+	_check(not bool(ReferralsData.inspect_confirmation_code(tampered).get("ok", true)),
+		"Tampered referral confirmation was accepted")
+	_check(ReferralsData.WELCOME_REWARD > 0 and ReferralsData.REFERRER_REWARD > 0,
+		"Referral rewards must be positive")
+	_check(ReferralsData.MAX_REFERRAL_REWARDS > 0 \
+		and ReferralsData.MAX_REFERRAL_REWARDS <= 20,
+		"Offline referral reward limit is outside the safe economy range")
+	_check(ReferralsData.milestone_reward_for(3) == 100,
+		"Three-friend referral milestone has the wrong reward")
+	_check(ReferralsData.milestone_reward_for(4) == 0,
+		"Non-milestone referral count paid a bonus")
+	var next_milestone := ReferralsData.next_milestone_after(3)
+	_check(int(next_milestone.get("count", 0)) == 5,
+		"Referral milestone progression did not advance to five friends")
+
+func _check_referral_reward_idempotency() -> void:
+	var save_data_before := SaveSystem.data.duplicate(true)
+	var batch_depth_before := SaveSystem._batch_depth
+	var batch_dirty_before := SaveSystem._batch_dirty
+	var inviter := "DDR-ABC234"
+	var invitee := "DDR-DEF567"
+
+	# Keep referral reward tests in memory so developer saves are never rewritten.
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem.data["referral_invite_code"] = invitee
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	var welcome_claim := ReferralsData.claim_invite_code(inviter)
+	var repeated_welcome := ReferralsData.claim_invite_code(inviter)
+	_check(bool(welcome_claim.get("ok", false)), "Valid welcome referral did not pay")
+	_check(not bool(repeated_welcome.get("ok", true)), "Welcome referral paid twice")
+	_check(int(SaveSystem.data.total_coins) == ReferralsData.WELCOME_REWARD,
+		"Welcome referral paid an incorrect amount")
+
+	var confirmation := String(welcome_claim.get("confirmation", ""))
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem.data["referral_invite_code"] = inviter
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	var referrer_claim := ReferralsData.claim_confirmation_code(confirmation)
+	var repeated_referrer_claim := ReferralsData.claim_confirmation_code(confirmation)
+	_check(bool(referrer_claim.get("ok", false)), "Valid referrer confirmation did not pay")
+	_check(not bool(repeated_referrer_claim.get("ok", true)),
+		"Referrer confirmation paid twice")
+	_check(int(SaveSystem.data.total_coins) == ReferralsData.REFERRER_REWARD,
+		"Referrer confirmation paid an incorrect amount")
+	_check((SaveSystem.data.referral_claimed_invitees as Array).size() == 1,
+		"Referrer claim did not record exactly one invitee")
+
+	var second_confirmation := ReferralsData.build_confirmation_code(inviter, "DDR-GHJ678")
+	var third_confirmation := ReferralsData.build_confirmation_code(inviter, "DDR-KLM789")
+	var second_claim := ReferralsData.claim_confirmation_code(second_confirmation)
+	var third_claim := ReferralsData.claim_confirmation_code(third_confirmation)
+	var repeated_milestone_claim := ReferralsData.claim_confirmation_code(third_confirmation)
+	_check(bool(second_claim.get("ok", false)) and bool(third_claim.get("ok", false)),
+		"Valid milestone referrals were rejected")
+	_check(int(third_claim.get("milestone_bonus", 0)) == 100,
+		"Third referral did not pay its milestone bonus")
+	_check(not bool(repeated_milestone_claim.get("ok", true)),
+		"Third-referral milestone paid twice")
+	_check(int(SaveSystem.data.total_coins) == ReferralsData.REFERRER_REWARD * 3 + 100,
+		"Three-referral total did not include the exact milestone payout")
+
+	SaveSystem.data = save_data_before
+	SaveSystem._batch_depth = batch_depth_before
+	SaveSystem._batch_dirty = batch_dirty_before
+
 func _check_distance_scale() -> void:
 	var base_meters_per_second := 340.0 * float(GameScript.METERS_PER_WORLD_UNIT)
 	_check(base_meters_per_second >= 40.0 and base_meters_per_second <= 70.0,
@@ -192,6 +281,7 @@ func _check_distance_scale() -> void:
 func _check_save_normalization() -> void:
 	var save_node := SaveScript.new()
 	save_node.data = SaveScript.DEFAULTS.duplicate(true)
+	save_node.data["schema_version"] = 2
 	save_node.data["total_coins"] = -100
 	save_node.data["total_distance_ever"] = -25.0
 	save_node.data["locale"] = "invalid"
@@ -204,7 +294,10 @@ func _check_save_normalization() -> void:
 		{"name": [], "score": {}, "route": []},
 		"invalid",
 	]
+	save_node.data["referral_claimed_invitees"] = ["DDR-ABC234", "DDR-ABC234", 42]
+	save_node.data["referral_success_count"] = 99
 	save_node.call("_normalize_core_data")
+	_check(int(save_node.data.schema_version) == 3, "Old save schema was not migrated")
 	_check(int(save_node.data.total_coins) == 0, "Negative saved coins were not clamped")
 	_check(float(save_node.data.total_distance_ever) == 0.0,
 		"Negative lifetime distance was not clamped")
@@ -217,6 +310,10 @@ func _check_save_normalization() -> void:
 		"Malformed consumable counts were not removed")
 	_check((save_node.data.leaderboard as Array).size() == 1,
 		"Malformed leaderboard rows were not removed")
+	_check((save_node.data.referral_claimed_invitees as Array).size() == 1,
+		"Malformed or duplicate referral invitees were not removed")
+	_check(int(save_node.data.referral_success_count) == 1,
+		"Referral success count did not reconcile with claimed invitees")
 	save_node.free()
 
 func _check_selection_guards() -> void:

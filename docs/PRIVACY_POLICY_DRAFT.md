@@ -1,11 +1,12 @@
 # Privacy Policy Source
 
-Source verified: August 19, 2026. The public URL returned HTTP 200.
+Source updated: August 24, 2026. Publish the matching HTML before the referral
+build is submitted to Google Play.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: August 9, 2026
+Effective date: August 24, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -23,12 +24,18 @@ The game stores gameplay progress locally on your device, including:
 - Haptics, reduced-effects, and language settings
 - Routes, missions, achievements, career upgrades, and daily/streak progress
 - Optional local ghost-race, livery, and leaderboard data
+- Random referral invite codes, one-time confirmation codes, and local claim
+  history used to prevent duplicate in-game coin rewards
 - Local ad pacing and offline analytics-event logs
 
 This local gameplay data is used only to make the game work and remember your
 progress. The current analytics bridge does not upload its local event log. This
 local data is not sold by us and can be removed by clearing app storage or
 uninstalling the game.
+
+The referral feature does not read or upload your contacts, phone number, name,
+account, or precise location. Sharing opens the Android share sheet, and you
+choose the app and recipient yourself.
 
 ## Ads
 

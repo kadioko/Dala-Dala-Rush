@@ -34,6 +34,26 @@ static func make_button(text: String, primary: bool = true) -> Button:
 	b.add_theme_font_size_override("font_size", 22)
 	return b
 
+## Applies a focused color treatment while preserving the shared button shape.
+static func tint_button(button: Button, color: Color) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = color
+	normal.corner_radius_top_left = 12
+	normal.corner_radius_top_right = 12
+	normal.corner_radius_bottom_left = 12
+	normal.corner_radius_bottom_right = 12
+	normal.content_margin_left = 16
+	normal.content_margin_right = 16
+	normal.content_margin_top = 12
+	normal.content_margin_bottom = 12
+	button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate()
+	hover.bg_color = color.lightened(0.1)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := normal.duplicate()
+	pressed.bg_color = color.darkened(0.15)
+	button.add_theme_stylebox_override("pressed", pressed)
+
 static func make_title(text: String, font_size: int = 42) -> Label:
 	var l := Label.new()
 	l.text = text

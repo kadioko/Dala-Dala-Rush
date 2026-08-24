@@ -152,6 +152,13 @@ ad content rating, identifiers, privacy policy wording, and Families policy.
 
 ## Data Safety
 
+Wave 15 referral identifiers and claim history are generated and stored only on
+the device. The game does not collect them on a developer server, does not read
+contacts, and only hands share text to another app after the player presses
+Share and chooses a recipient. They do not add a developer-collected data type
+to the current declaration. Reassess before adding a referral backend or
+automatic install attribution.
+
 ### Data Collection
 
 Answer: **Yes, the app collects or shares user data.**

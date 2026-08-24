@@ -49,6 +49,10 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - **Daily challenge** + **login streak** with a 7-day reward calendar.
 - **Ghost racing**: race your best run's ghost; share/import **ghost codes**
   via clipboard/WhatsApp — competitive play with zero servers.
+- **Invite & Earn**: offline referral codes reward the invited player with 75
+  coins and the inviter with 125 after a one-time confirmation. Self-referrals,
+  duplicate confirmations, and repeated welcome claims are blocked locally;
+  confirmed-friend milestones add 100, 200, and 500 coins at 3, 5, and 10.
 - 14 achievements with toasts, local top-5 leaderboard, lifetime stats.
 - One-run **consumables** in the shop (head-start shield, extra horn,
   reserve fuel).
@@ -86,12 +90,11 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - The project is validated with Godot 4.7.1 in headless scene startup checks.
 - A headless logic-contract suite now verifies localization parity, catalog
   integrity, save repair, selection guards, rewarded-claim idempotency, ghost
-  validation, and the gameplay distance scale.
-- Current local closed-testing artifact: version `1.0.5`, code `6`.
-  `DalaDalaRushTZ-closed-testing-v6.aab` was built, signature-verified, and
-  checked for its AdMob and Advertising ID manifest entries on August 9, 2026.
-  The current source contains Waves 8-14 and is newer than that artifact; the
-  next Play upload must use version code `7` or higher.
+  validation, referral reward integrity, and the gameplay distance scale.
+- Current local closed-testing artifact: version `1.0.7`, code `8`.
+  `DalaDalaRushTZ-closed-testing-v8.aab` includes the Wave 15 referral and
+  menu-polish pass. Package/version name, AdMob App ID, Advertising ID entry,
+  release certificate, and SHA-256 were verified on August 24, 2026.
 - Android export is configured for package `com.kadioko.daladalarush`, minimum
   API 24, target API 36, Gradle custom build, and AAB output.
 - AdMob is wired with production unit IDs; real-device loading, consent, and
@@ -130,6 +133,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   ├── missions.gd        #   mission templates + season track
 │   ├── career.gd          #   ranks + bus upgrades
 │   ├── ghost_data.gd      #   bounded validation + sharing codec
+│   ├── referrals.gd       #   offline invite + confirmation reward rules
 │   ├── daily_challenges.gd
 │   └── login_streak.gd
 ├── scripts/
@@ -164,7 +168,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Current closed-testing artifact, store assets, and upload checklist |
 | `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Current Play policy-form answers |
 | `docs/PRIVACY_POLICY_DRAFT.md` | Source copy for the public privacy page |
-| `docs/RELEASE_NOTES_NEXT.md` | Draft bilingual notes for the next source build |
+| `docs/RELEASE_NOTES_1.0.6.md` | Final bilingual notes and verification record for code 7 |
+| `docs/RELEASE_NOTES_1.0.7.md` | Final bilingual notes and verification record for code 8 |
 | `docs/RELEASE_NOTES_1.0.5.md` | Historical bilingual notes for the code 6 artifact |
 | `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Suggested Play Console declarations |
 
@@ -209,7 +214,8 @@ broken, making it suitable for a future CI check.
 `user://save.json` with batched multi-reward commits, automatic `.bak` rotation,
 type/range normalization, and corruption recovery. Loading the backup repairs
 the primary immediately without rotating the corrupt primary over the known-good
-backup.
+backup. Schema 3 adds random local referral identifiers and one-time claim
+history; these contain no name, phone number, contact list, or account data.
 On Windows during development:
 `%APPDATA%\Godot\app_userdata\Dala Dala Rush TZ\save.json`.
 

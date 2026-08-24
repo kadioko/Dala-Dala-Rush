@@ -36,10 +36,14 @@ Analytics plugin for Godot 4 and forward in `_send_to_sdk()`. Crashlytics
 comes with the same plugin family.
 
 Current status: `_send_to_sdk()` is a no-op. The capped event queue remains on
-the device and is not uploaded by this project.
+the device and is not uploaded by this project. Referral funnel events record
+only the action, reward amount, count, and broad runtime platform; invite and
+confirmation codes are never added to analytics parameters.
 
-Events worth adding as you tune: `route_unlocked`, `upgrade_bought`,
-`mission_complete`, `ad_continue_used`, `iap_purchase`.
+Instrumented referral events: `referral_invite_shared`,
+`referral_welcome_claimed`, `referral_confirmation_shared`, and
+`referral_reward_claimed`. Events worth adding as you tune: `route_unlocked`,
+`upgrade_bought`, `mission_complete`, `ad_continue_used`, `iap_purchase`.
 
 ## Release Guardrails
 

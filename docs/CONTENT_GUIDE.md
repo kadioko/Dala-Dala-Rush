@@ -206,6 +206,22 @@ Treat imported ghost codes as untrusted input. Encode and decode only through
 fields must retain duration, count, lane-range, numeric, and ordering limits,
 and must be covered by `tests/logic_contracts.gd`.
 
+## Referral Rewards
+
+Referral rules live in `data/referrals.gd`; the screen only presents results.
+Keep welcome and inviter rewards positive, keep `MAX_REFERRAL_REWARDS` at 20 or
+below for an offline build, and update both locale dictionaries when changing
+the explanation. Never pay for tapping Share alone.
+
+Treat invite and confirmation codes as untrusted text. Always normalize and
+validate through `Referrals`, preserve self/duplicate/owner checks, and wrap
+multi-field rewards in a save batch. Add matching cases to
+`tests/logic_contracts.gd` whenever the code format or payout rules change.
+
+For uncapped campaigns, valuable rewards, or automatic install attribution,
+replace local confirmation with server verification. Do not collect contacts or
+phone numbers merely to simplify referrals.
+
 ## Content Tone
 
 - Keep names local and playful.

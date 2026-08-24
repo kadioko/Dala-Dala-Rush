@@ -1,7 +1,7 @@
 # Dala Dala Rush TZ 1.0.5 Release Notes
 
 Status: historical code 6 artifact record. Current source contains later Waves
-8-14; use `RELEASE_NOTES_NEXT.md` for the next upload.
+8-15; use `RELEASE_NOTES_1.0.7.md` for the current upload.
 
 Release artifact: version `1.0.5`, version code `6`, target API `36`.
 The signed AAB was built and locally verified on August 9, 2026. Use the

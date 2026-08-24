@@ -1,10 +1,9 @@
-# Dala Dala Rush TZ - Next Release Notes (Draft)
+# Dala Dala Rush TZ 1.0.6 Release Notes
 
-Prepared August 19, 2026 for the next build from current source.
+Prepared August 19, 2026 for the historical Waves 8-14 artifact. Current source
+is newer; Wave 15 referrals are not included in this build.
 
-Proposed release: version `1.0.6`, version code `7` or higher, target API `36`.
-Confirm the final version and artifact details after export; never reuse a code
-that has appeared in any Google Play track.
+Release: version `1.0.6`, version code `7`, target API `36`.
 
 ## English
 
@@ -58,12 +57,12 @@ Tumeboresha countdown ya route kwa JIANDAE/TWENDE, pause, Jinsi ya Kucheza, HUD 
 
 ## Final Artifact Details
 
-- Version name: confirm before export
-- Version code: `7` or higher
+- Version name: `1.0.6`
+- Version code: `7`
 - Target SDK: Android 16 / API 36
-- Artifact: use a unique versioned `.aab` filename
-- Size: record after export
-- SHA-256: record after export
-- Signature: verify with `jarsigner`
-- Manifest: verify AdMob App ID and
-  `com.google.android.gms.permission.AD_ID`
+- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
+- Size: `61,392,692` bytes
+- SHA-256: `03C120276DD479500DC8BA3A3171195B68B97FBABFF6AAA71CC507A24DD78D6C`
+- Signature: verified locally with `jarsigner`
+- Manifest: package/version, AdMob App ID, and
+  `com.google.android.gms.permission.AD_ID` verified

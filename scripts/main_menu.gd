@@ -7,6 +7,7 @@ const Vehicles   := preload("res://data/vehicles.gd")
 const Routes     := preload("res://data/routes.gd")
 const DailyChallengesData := preload("res://data/daily_challenges.gd")
 const LoginStreakData := preload("res://data/login_streak.gd")
+const ReferralsData := preload("res://data/referrals.gd")
 
 var _title: Label
 var _subtitle: Label
@@ -26,6 +27,7 @@ var _btn_how: Button
 var _btn_stats: Button
 var _btn_leaderboard: Button
 var _btn_missions: Button
+var _btn_referrals: Button
 
 # Animated background
 var _scroll_t: float = 0.0
@@ -189,6 +191,14 @@ func _ready() -> void:
 			"res://scenes/shop.tscn":     _btn_shop     = btn
 			_:                            _btn_settings = btn
 
+	_btn_referrals = UIFactory.make_button("", false)
+	_btn_referrals.custom_minimum_size = Vector2(0, 54)
+	_btn_referrals.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_referrals.add_theme_font_size_override("font_size", 18)
+	UIFactory.tint_button(_btn_referrals, Color("#0f8a59"))
+	_btn_referrals.pressed.connect(func(): _go("res://scenes/referrals.tscn"))
+	v.add_child(_btn_referrals)
+
 	_btn_how = UIFactory.make_button("", false)
 	_btn_how.custom_minimum_size = Vector2(0, 52)
 	_btn_how.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -257,6 +267,8 @@ func _refresh_text(_l := "") -> void:
 	_btn_garage.text       = LocaleManager.t("GARAGE")
 	_btn_shop.text         = LocaleManager.t("SHOP")
 	_btn_settings.text     = LocaleManager.t("SETTINGS")
+	_btn_referrals.text    = LocaleManager.t("REFERRAL_MENU_PROMO") \
+		.replace("{n}", str(ReferralsData.REFERRER_REWARD))
 	_btn_how.text          = LocaleManager.t("HOW_TO_PLAY")
 
 func _on_play() -> void:
