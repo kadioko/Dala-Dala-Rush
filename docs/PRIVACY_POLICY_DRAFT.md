@@ -1,12 +1,12 @@
 # Privacy Policy Source
 
-Source updated: August 24, 2026. Publish the matching HTML before the referral
-build is submitted to Google Play.
+Source updated: September 30, 2026. The matching HTML is published; review the
+Play Data Safety declaration against the currently enabled Railway features.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: August 24, 2026
+Effective date: September 30, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -29,9 +29,51 @@ The game stores gameplay progress locally on your device, including:
 - Local ad pacing and offline analytics-event logs
 
 This local gameplay data is used only to make the game work and remember your
-progress. The current analytics bridge does not upload its local event log. This
-local data is not sold by us and can be removed by clearing app storage or
-uninstalling the game.
+progress. Gameplay Insights only sends information after you choose to turn it
+on in Settings. This local data is not sold by us and can be removed by
+clearing app storage or uninstalling the game.
+
+## Optional Cloud Backup And Leaderboard Pilot
+
+Cloud Backup is optional. The game first shows an in-app consent screen and
+only uploads a gameplay-progress backup after you choose to turn it on. The
+Railway service stores an anonymous installation identifier, a
+protected device sync credential, gameplay progress, and anonymous referral
+records created through the pilot. It does not receive your email address,
+contacts, precise location, advertising ID, local analytics log, or referral
+codes.
+
+Online Leaderboards are separate from Cloud Backup and optional. Before
+joining, you will be asked to choose a
+short driver display name. That name and the route score you choose to submit
+will be visible to other players on the friends or world leaderboard. Rankings
+have no prizes and scores are labelled unverified. You can avoid this sharing
+by not joining online leaderboards; the personal leaderboard remains on-device.
+Players can also leave public competition from the leaderboard, which removes
+their public profile, submitted scores, friend links, and active friend codes.
+
+When the game connects to online services, the backend temporarily processes
+the connection IP address in memory to enforce request limits and reduce abuse.
+The game backend does not write this address to the game database or use it to
+infer location. The hosting/network provider may process connection metadata
+under its own privacy practices.
+
+## Optional Gameplay Insights
+
+Gameplay Insights have their own in-app opt-in separate from Cloud Backup and
+Online Leaderboards. After you opt in, the game sends only a small allowlist of
+sanitized,
+aggregate product events: tutorial completion, run end reason, fuel failures,
+leaderboard request success/failure, and day-1/day-7 return markers. The
+service rejects names, friend codes, tokens, advertising IDs, contact details,
+and free-form nested data. You can turn this option off in Settings at any
+time; this stops future uploads.
+
+You can turn Cloud Backup off at any time. The in-game **Delete Cloud Data**
+control permanently deletes the anonymous installation's cloud backup, online
+scores, referral records, and temporary transfer codes. It does not delete the
+game progress stored on your phone. We will keep this policy and the Google
+Play Data Safety form updated if this service's data handling changes.
 
 The referral feature does not read or upload your contacts, phone number, name,
 account, or precise location. Sharing opens the Android share sheet, and you
