@@ -17,8 +17,14 @@ func tap() -> void:
 func collect() -> void:
 	_vibrate(28)
 
+func near_miss() -> void:
+	_vibrate(22)
+
 func powerup() -> void:
 	_vibrate(45)
+
+func horn() -> void:
+	_vibrate(54)
 
 func crash() -> void:
 	_vibrate(110)

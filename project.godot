@@ -32,6 +32,7 @@ FeedbackManager="*res://autoload/feedback_manager.gd"
 AdService="*res://autoload/ad_service.gd"
 AnalyticsService="*res://autoload/analytics_service.gd"
 RemoteConfig="*res://autoload/remote_config.gd"
+OnlineService="*res://autoload/online_service.gd"
 IapService="*res://autoload/iap_service.gd"
 
 [display]

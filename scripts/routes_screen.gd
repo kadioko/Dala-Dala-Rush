@@ -2,6 +2,7 @@ extends Control
 
 const UIFactory := preload("res://ui/ui_factory.gd")
 const Routes := preload("res://data/routes.gd")
+const RouteContractsData := preload("res://data/route_contracts.gd")
 
 var _title: Label
 var _back_btn: Button
@@ -9,6 +10,7 @@ var _list_box: VBoxContainer
 var _row_buttons: Array = []
 var _msg: Label
 var _coin_label: Label
+var _mastery_hint: Label
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -29,6 +31,9 @@ func _ready() -> void:
 
 	_coin_label = UIFactory.make_label("", 17, UIFactory.COL_ACCENT)
 	root.add_child(_coin_label)
+	_mastery_hint = UIFactory.make_label("", 13, UIFactory.COL_MUTED)
+	_mastery_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	root.add_child(_mastery_hint)
 
 	_msg = UIFactory.make_label("", 15, UIFactory.COL_DANGER)
 	root.add_child(_msg)
@@ -57,7 +62,7 @@ func _build_rows() -> void:
 	_row_buttons.clear()
 	for r in Routes.LIST:
 		var btn := UIFactory.make_button("", r.id == GameState.selected_route_id)
-		btn.custom_minimum_size = Vector2(0, 118)
+		btn.custom_minimum_size = Vector2(0, 184)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.add_theme_font_size_override("font_size", 15)
 		var route_id: String = r.id
@@ -68,11 +73,14 @@ func _build_rows() -> void:
 func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SELECT_ROUTE")
 	_back_btn.text = LocaleManager.t("BACK")
-	_coin_label.text = "🪙 %d   |   %s: %d" % [
+	_coin_label.text = "🪙 %d   |   %s: %d   |   %s: %d/18" % [
 		int(SaveSystem.get_value("total_coins", 0)),
 		LocaleManager.t("GOALS_DONE"),
 		int(SaveSystem.get_value("route_goals_completed", 0)),
+		LocaleManager.t("ROUTE_MASTERY"),
+		_total_mastery_stars(),
 	]
+	_mastery_hint.text = LocaleManager.t("MASTERY_RULES")
 	for entry in _row_buttons:
 		var r: Dictionary = entry.route
 		var label := LocaleManager.t(r.name_key)
@@ -87,18 +95,32 @@ func _refresh(_l := "") -> void:
 		if r.id == GameState.selected_route_id:
 			label += "  [%s]" % LocaleManager.t("SELECTED")
 		var best := SaveSystem.get_route_best(r.id)
+		var mastery := _mastery_marks(SaveSystem.get_route_mastery(String(r.id)))
 		var flavor := LocaleManager.t(r.get("flavor_key", ""))
 		var goal := _goal_text(r)
+		var signature := LocaleManager.t(String(r.get("signature_key", "ROUTE_MOMENT_GENERIC")))
 		var difficulty := _difficulty_marks(float(r.difficulty))
-		entry.btn.text = "%s\n%s\n%s: %s\n%s: %s   %s: %d" % [
+		var focus: Dictionary = Routes.next_mastery_target(r, SaveSystem.get_route_mastery(String(r.id)))
+		var next_target: String = _mastery_target_text(focus)
+		var contract_text: String = ""
+		if RouteContractsData.is_available(String(r.id)):
+			var contract: Dictionary = RouteContractsData.current(String(r.id))
+			var contract_state: String = LocaleManager.t("CONTRACT_COMPLETE") if RouteContractsData.is_completed_today(String(r.id)) else "+%d 🪙" % int(contract.get("reward", 0))
+			contract_text = "%s: %s  %s" % [LocaleManager.t("ROUTE_CONTRACT"), RouteContractsData.describe(contract), contract_state]
+		entry.btn.text = "%s\n%s\n%s: %s\n%s: %s\n%s: %s   %s: %d\n%s: %s%s" % [
 			label,
 			flavor,
 			LocaleManager.t("ROUTE_GOAL"),
 			goal,
+			LocaleManager.t("ROUTE_SIGNATURE"),
+			signature,
 			LocaleManager.t("DIFFICULTY"),
 			difficulty,
 			LocaleManager.t("BEST"),
 			best,
+			LocaleManager.t("ROUTE_MASTERY"),
+			mastery + "  |  " + next_target,
+			("\n" + contract_text) if not contract_text.is_empty() else "",
 		]
 
 func _difficulty_marks(value: float) -> String:
@@ -115,6 +137,26 @@ func _goal_text(route: Dictionary) -> String:
 		"{n}",
 		str(int(route.get("goal_target", 0)))
 	)
+
+func _mastery_marks(stars: int) -> String:
+	var marks := ""
+	for index in range(3):
+		marks += "★" if index < clampi(stars, 0, 3) else "☆"
+	return marks
+
+func _total_mastery_stars() -> int:
+	var total: int = 0
+	for route_value in Routes.LIST:
+		var route: Dictionary = route_value
+		total += SaveSystem.get_route_mastery(String(route.id))
+	return total
+
+func _mastery_target_text(focus: Dictionary) -> String:
+	if bool(focus.get("complete", false)):
+		return LocaleManager.t("MASTERY_COMPLETE")
+	var level: int = clampi(int(focus.get("level", 1)), 1, 3)
+	return LocaleManager.t("MASTERY_NEXT_%d" % level).replace(
+		"{score}", str(int(focus.get("score", 0))))
 
 func _select(id: String) -> void:
 	AudioManager.play_sfx("click")

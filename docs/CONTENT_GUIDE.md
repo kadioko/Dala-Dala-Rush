@@ -28,6 +28,11 @@ Example:
 	"goal_type": "score",
 	"goal_target": 900,
 	"goal_reward": 60,
+	"mastery_scores": [500, 1000, 1800],
+	"mastery_rewards": [15, 25, 45],
+	"signature_id": "fare_rush",
+	"signature_key": "ROUTE_MOMENT_FARE_RUSH",
+	"signature_title_key": "MOMENT_FARE_RUSH",
 	"obstacle_weights": {
 		"bodaboda": 12, "bajaji": 12, "car": 14, "pothole": 12, "cone": 8,
 		"police": 6, "barrier": 8, "truck": 10, "pedestrian": 8, "tire": 10,
@@ -43,6 +48,20 @@ Example:
 For example, if `truck` is twice as high as `car`, trucks are roughly twice as likely as cars.
 Use `spawn_interval_mult` above `1.0` for calmer routes and below `1.0` for busier routes.
 
+### Route Job Profile
+
+Every route must also include a small job profile so its personality changes
+the run, not just the card copy. `passenger_interval_mult` controls how often
+passenger opportunities return (lower is more frequent), `kituo_gap_mult`
+controls the spacing of stops (lower is closer), and `fuel_drain_route_mult`
+controls route-level fuel pressure (lower is more efficient). Keep each value
+between `0.70` and `1.35`; the game clamps the live values to that fair range.
+
+`rush_hour_chance` is a `0.0` to `1.0` chance applied after the early lessons.
+`condition_weights` must contain positive relative weights for `day`, `dusk`,
+`night`, and `rain`. Early guided runs always stay clear daytime, and saved
+continues preserve their original weather and traffic state.
+
 Route goals support these `goal_type` values:
 
 - `score`
@@ -52,6 +71,53 @@ Route goals support these `goal_type` values:
 - `passengers`
 
 Add the matching `goal_key` text in both Swahili and English locale dictionaries.
+
+Each route must also declare one supported `signature_id` plus localized
+`signature_key`, `signature_title_key`, and `signature_action_key`. The shipped
+IDs are `fare_rush`, `boda_watch`, `truck_line`, `checkpoint_clear`,
+`fuel_scout`, and `jam_breaker`. Signature moments should create a readable,
+guaranteed opportunity or relief, never an unavoidable hazard. Add the gameplay
+handling in `scripts/game.gd` → `_start_route_moment()` and add a logic contract
+when introducing a new ID.
+
+Each route also needs three increasing `mastery_scores` and three matching
+`mastery_rewards`. The core rule is fixed: first star meets its score,
+second meets its score and the route goal, third additionally earns an A
+Driver Reputation. Rewards are paid only for newly saved stars, so repeat runs
+cannot farm them.
+
+`Routes.next_mastery_target()` derives the exact next requirement from that
+data. It is used by route cards, the pre-run briefing, and results; do not
+duplicate or hand-write a separate mastery requirement in UI code.
+
+## Driver Reputation
+
+Driver Reputation is a 0-100 feedback score, not a currency. Every run starts
+at 50. Passenger drop-offs, passengers, near misses, a route goal, clean
+checkpoints, and signature moments add points; missed stops, police fines,
+an ordinary crash, and an empty-fuel finish subtract points. The result screen shows the localized
+point ledger from `GameState.calculate_reputation()` so any formula change must
+keep `base`, `positive_total`, `negative_total`, and their item values aligned.
+The grade bands are A (85+), B (70+), C (50+), and D (below 50).
+
+## Progressive Discovery
+
+`GameState._queue_progress_discovery()` introduces one durable system at a time
+on the result screen: full traffic, Mwenge, Route Mastery, changing conditions,
+ghost races, and police chases. Discovery keys are allow-listed in
+`SaveSystem.DISCOVERY_KEYS` and saved in `seen_discoveries`, so use a new key in
+both language dictionaries before adding another milestone. A later milestone
+must remain eligible on subsequent runs; do not make a one-time trigger that
+can be hidden by a higher-priority discovery.
+
+## Driving Flow
+
+Driving Flow is the short `x1`-`x8` chain shown during a run. Coin pickups,
+safe near-misses, and successful fare stops extend it; a fare stop counts as
+two actions because it is the central service decision. Only coin pickup value
+scales from the flow, so it must not be applied to fares, route rewards,
+missions, ads, or permanent progression. `Game.next_combo()` owns the hard
+`x8` cap, and the peak is preserved through a rewarded continue for results.
 
 ## Fairness And Localization Rules
 
@@ -90,6 +156,19 @@ Open `data/daily_challenges.gd` and append to `LIST`:
 Supported `type` values are the same as route goals: `score`, `coins`, `distance`, `near_misses`, and `passengers`.
 Add the `key` text in both locale dictionaries.
 
+## Route Contracts
+
+`data/route_contracts.gd` defines a rotating daily contract per route. They
+unlock only after the first three completed runs, pay once per route per local
+day, and are deliberately shown on route selection/results rather than the
+driving HUD. Use existing stats (`fares`, `passengers`, `near_misses`,
+`horn_uses`, `distance`, `score`, `clean_checkpoints`, `route_moments`,
+`coins`, or `boosts`), then add both-language copy for its `key`.
+
+Do not make contracts use a new currency, a countdown, or an unavoidable
+traffic requirement. The permanent route goal remains the primary in-run goal;
+contracts are a small replay reason once players understand the basics.
+
 ## Add a Vehicle
 
 1. Add a vehicle entry in `data/vehicles.gd`.
@@ -118,6 +197,11 @@ Vehicle perk fields:
 - `fuel_drain_mult`: lower means better fuel economy.
 - `coin_mult`: higher means more coins per coin pickup.
 - `horn_charges`: starting and maximum horn uses.
+
+The Garage surfaces the strongest positive stat immediately after a purchase.
+Keep at least one positive stat on every paid vehicle so that unlock message is
+useful; add any new `VEHICLE_PERK_*` copy in Swahili and English only when a
+new stat category is introduced.
 
 ## Add an Obstacle
 

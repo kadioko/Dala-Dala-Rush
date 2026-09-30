@@ -39,7 +39,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 
 ### Progression & retention
 - **6 routes** with unique traffic, goals, and unlock gates (goal progress
-  or coin purchase).
+  or coin purchase), each with a favorable signature moment: fare rush,
+  boda watch, truck line, clean checkpoint, fuel scout, or jam breaker.
 - **8 vehicles** with perks + permanent **bus upgrades** (engine / brakes /
   sound system, 3 levels each).
 - **Livery editor**: body/accent colors, patterns (stripe/flames/checker),
@@ -49,6 +50,14 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - **Daily challenge** + **login streak** with a 7-day reward calendar.
 - **Ghost racing**: race your best run's ghost; share/import **ghost codes**
   via clipboard/WhatsApp — competitive play with zero servers.
+- **Leaderboards**: set a real driver name once, view route-specific personal
+  bests offline, then optionally join Friends and World boards. Friend codes
+  last 24 hours; online scores are never reward-bearing and remain labelled
+  unverified until server-side run validation exists. Route-best uploads retry
+  safely, standings are cached, and public competition can be left and deleted
+  without affecting offline progress.
+- **Daily Run**: a same-rules daily route with a shared traffic seed, starter
+  dala, and no-revive policy makes local score comparisons more meaningful.
 - **Invite & Earn**: offline referral codes reward the invited player with 75
   coins and the inviter with 125 after a one-time confirmation. Self-referrals,
   duplicate confirmations, and repeated welcome claims are blocked locally;
@@ -59,6 +68,16 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - Full **Swahili (default) + English** localization, switchable live.
 - Compact settings with a saved **Reduced Effects** mode for motion comfort,
   battery life, and lower-end Android phones.
+- Three persistent, non-modal first-session lessons: steering and coins, then
+  passengers and a stop, then horn and slow motion. Existing player saves skip
+  them automatically.
+- **Driver Reputation** turns passenger service, close calls, clean checkpoints,
+  route moments, missed stops, and fines into a simple A-D end-of-run rating.
+- **Route Mastery** gives every route three permanent performance stars and a
+  one-time coin reward per star: score, score plus route goal, then score plus
+  route goal with an A Driver Reputation.
+- The next Route Mastery target stays visible on the route card, in the pre-run
+  briefing, and on results so the player always knows what the next run is for.
 
 ### Monetization and live ops
 - AdMob is integrated for rewarded revive, rewarded double coins,
@@ -66,8 +85,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   Editor debug builds simulate ads; Android builds use the installed SDK.
 - Deferred IAP catalog + Play Billing seam, including **TZ carrier billing**
   notes. No real-money purchases are enabled — `docs/MONETIZATION.md`.
-- Remote config (hosted JSON, cached) + offline analytics event queue —
-  `docs/LIVE_OPS.md`.
+- Remote config (hosted JSON, cached) + privacy-filtered offline analytics
+  journal — `docs/LIVE_OPS.md`.
 
 ---
 
@@ -90,11 +109,14 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - The project is validated with Godot 4.7.1 in headless scene startup checks.
 - A headless logic-contract suite now verifies localization parity, catalog
   integrity, save repair, selection guards, rewarded-claim idempotency, ghost
-  validation, referral reward integrity, and the gameplay distance scale.
-- Current local closed-testing artifact: version `1.0.7`, code `8`.
-  `DalaDalaRushTZ-closed-testing-v8.aab` includes the Wave 15 referral and
-  menu-polish pass. Package/version name, AdMob App ID, Advertising ID entry,
-  release certificate, and SHA-256 were verified on August 24, 2026.
+  validation, referral reward integrity, tutorial progression, remote-tuning
+  safeguards, and the gameplay distance scale.
+- Google Play production is active. The current signed production-track update
+  is version `1.0.13`, code `14`. The next release candidate is `1.0.14`, code
+  `15`, with the signed bundle at `exports/android/DalaDalaRushTZ-production-v14.aab`. It adds reliable
+  leaderboard upload states, request/score safeguards, daily-run and route
+  progression polish, and the remote-config URL fix. Play processing and phone
+  checks remain release gates for this candidate.
 - Android export is configured for package `com.kadioko.daladalarush`, minimum
   API 24, target API 36, Gradle custom build, and AAB output.
 - AdMob is wired with production unit IDs; real-device loading, consent, and
@@ -103,6 +125,16 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   if a future key is missing.
 - The match start uses natural `JIANDOE / TWENDE` and `GET READY / GO` cues,
   hides the live HUD until control begins, and scales safely on narrow screens.
+- Route Contracts, seasonal events, and daily equal-rules runs are included in
+  this build. The optional online services are enabled for phone validation,
+  but remain opt-in and must complete the two-phone checklist before broad
+  rollout.
+- Wave 27 adds deployed Railway cloud backup with explicit consent, restore,
+  deletion, and phone transfer. It never uploads a save until the player turns
+  on Cloud Backup in Settings.
+- Wave 28 adds Personal, Friends, and World leaderboard support with a separate
+  competition consent and public driver name. Rankings are unverified and have
+  no prizes; players can leave competition and delete their public profile.
 - Store-listing drafts are under `assets/store_listing/`; recapture screenshots
   after the final UI pass before uploading the next release.
 - See `docs/ROADMAP.md` for launch work remaining and `docs/UPGRADES.md` for
@@ -126,6 +158,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   ├── iap_service.gd     #   Play Billing seam
 │   ├── analytics_service.gd    # offline event queue → SDK seam
 │   └── remote_config.gd   #   hosted-JSON tuning w/ local cache
+│   └── online_service.gd  #   consent-gated Railway cloud/referral/leaderboard seam
 ├── data/                  # Pure data catalogs
 │   ├── routes.gd          #   6 routes: weights, goals, unlock gates
 │   ├── vehicles.gd        #   8 vehicles with perks
@@ -163,9 +196,12 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/ADMOB_SETUP.md` | Installed AdMob integration and release QA |
 | `docs/MONETIZATION.md` | IAP, carrier billing (TZ), season pass plan |
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |
+| `docs/RAILWAY_BACKEND.md` | Railway/PostgreSQL deployment and safety runbook |
+| `docs/RELEASE_NOTES_1.0.14.md` | Bilingual release notes for code 15 |
+| `docs/RELEASE_NOTES_1.0.13.md` | Historical production notes for code 14 |
 | `docs/SPRITES.md` | Sprite filenames/sizes for the art pass |
 | `docs/AUDIO_ASSETS.md` | Audio filenames/specs incl. Swahili voice lines |
-| `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Current closed-testing artifact, store assets, and upload checklist |
+| `docs/PLAY_STORE_RELEASE_CHECKLIST.md` | Production-track artifact, store assets, and upload checklist |
 | `docs/PLAY_CONSOLE_APP_CONTENT_ANSWERS.md` | Current Play policy-form answers |
 | `docs/PRIVACY_POLICY_DRAFT.md` | Source copy for the public privacy page |
 | `docs/RELEASE_NOTES_1.0.6.md` | Final bilingual notes and verification record for code 7 |
@@ -214,8 +250,12 @@ broken, making it suitable for a future CI check.
 `user://save.json` with batched multi-reward commits, automatic `.bak` rotation,
 type/range normalization, and corruption recovery. Loading the backup repairs
 the primary immediately without rotating the corrupt primary over the known-good
-backup. Schema 3 adds random local referral identifiers and one-time claim
-history; these contain no name, phone number, contact list, or account data.
+backup. Schema 9 includes first-session lessons, Driver Reputation, route
+contracts, and aggregate local analytics lifecycle markers. It also reserves a
+filtered, disabled-by-default Railway cloud-sync identity; no cloud transfer
+occurs until a future explicit opt-in. Local referral identifiers and one-time
+claim history contain no name, phone number, contact list, advertising
+identifier, or account data.
 On Windows during development:
 `%APPDATA%\Godot\app_userdata\Dala Dala Rush TZ\save.json`.
 

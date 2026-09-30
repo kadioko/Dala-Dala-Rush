@@ -49,7 +49,10 @@ static func current() -> Dictionary:
 	var day_seed := 0
 	for part in parts:
 		day_seed += int(part)
-	return LIST[day_seed % LIST.size()]
+	var challenge: Dictionary = (LIST[day_seed % LIST.size()] as Dictionary).duplicate(true)
+	var multiplier: float = RemoteConfig.get_float("daily_reward_mult", 1.0, 1.0, 2.0)
+	challenge["reward"] = maxi(1, roundi(int(challenge.get("reward", 0)) * multiplier))
+	return challenge
 
 static func is_completed_today() -> bool:
 	return SaveSystem.get_value("daily_challenge_claimed_date", "") == today_key()

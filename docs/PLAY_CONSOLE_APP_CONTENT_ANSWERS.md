@@ -152,12 +152,11 @@ ad content rating, identifiers, privacy policy wording, and Families policy.
 
 ## Data Safety
 
-Wave 15 referral identifiers and claim history are generated and stored only on
-the device. The game does not collect them on a developer server, does not read
-contacts, and only hands share text to another app after the player presses
-Share and chooses a recipient. They do not add a developer-collected data type
-to the current declaration. Reassess before adding a referral backend or
-automatic install attribution.
+Offline referral identifiers and claim history remain on-device only. The
+enabled Railway features add optional developer-collected data only after the
+player accepts the corresponding in-app consent. Do not submit an
+online-enabled production update until this section has been reviewed against
+the exact shipped client and backend behavior.
 
 ### Data Collection
 
@@ -200,7 +199,62 @@ exact Play Console questions before saving the form:
    - Shared: Yes
    - Required or optional: follow the current SDK disclosure and consent setup
 
+### Additional Data For The Consented Railway Features
+
+For code 12 and later while `RELEASE_CLOUD_SYNC_ENABLED` is enabled, add the
+following conservative declarations in addition to the Google Mobile Ads SDK
+entries above. Railway is operated for this app, so these data types are
+**collected**, not shared with an unrelated third party. They are optional:
+players can use the full offline game without enabling Cloud Backup, joining
+online competition, or turning on Gameplay Insights.
+
+1. **Personal info - Name**
+   - Data: the 2-16 character driver display name chosen for online rankings.
+   - Purpose: App functionality.
+   - Collected: Yes, optional.
+   - Shared: No, unless the developer's final service arrangement changes.
+   - Deletion: leaving online competition removes the public profile, scores,
+     friend links, and friend codes.
+
+2. **Device or other IDs**
+   - Data: a random app-installation identifier and protected sync credential.
+   - Purpose: App functionality for cloud backup, restore, online competition,
+     and deletion; Analytics only when Gameplay Insights is separately enabled.
+   - Collected: Yes, optional.
+   - Shared: No, unless the developer's final service arrangement changes.
+   - Do not describe this as an advertising ID. AdMob's advertising-ID behavior
+     remains covered by its separate declaration above.
+
+3. **App activity - Other actions**
+   - Data: the gameplay progress chosen for Cloud Backup and route scores
+     voluntarily submitted to the unverified leaderboard.
+   - Purpose: App functionality.
+   - Collected: Yes, optional.
+   - Shared: No, unless the developer's final service arrangement changes.
+
+4. **App activity - App interactions and Other actions**
+   - Data: the small Gameplay Insights allowlist: tutorial completion, run end
+     reason, fuel failures, leaderboard request success/failure, and D1/D7
+     return markers. The service rejects names, codes, tokens, advertising IDs,
+     contact details, and free-form nested data.
+   - Purpose: Analytics.
+   - Collected: Yes, optional, only after the separate Gameplay Insights opt-in.
+   - Shared: No, unless the developer's final service arrangement changes.
+
+Before saving, compare the exact choices to Google Play's current Data Safety
+guidance and any embedded SDK disclosures. The developer remains responsible
+for complete and accurate answers:
+https://support.google.com/googleplay/android-developer/answer/10787469
+
 ### Security Practices
+
+Data-handling note for the current Railway protections: the service reads the
+request IP address and retains it only in an in-memory rate-limit bucket (up to
+one hour for registration requests). It is not written to the game database or
+used to infer location by the game. Include this behavior when reviewing the
+current Play Data Safety form's treatment of transient network data; reassess
+if IP-based location, persistent logging, or a different retention period is
+introduced.
 
 Is all user data encrypted in transit?
 
@@ -210,18 +264,20 @@ Yes
 
 Can users request data deletion?
 
-Recommended answer for MVP:
+Recommended answer while the consented Railway features are enabled:
 
 ```text
-No
+Yes
 ```
 
 Reason:
 
 ```text
-The game does not create user accounts or maintain a developer-hosted user
-profile database. Gameplay progress is stored locally on the device. AdMob data
-is handled by Google under Google's privacy controls.
+The game has no email/password account. Players can delete the anonymous cloud
+record, backup, online scores, friend links, referral records, and transfer
+codes with Settings > Delete Cloud Data; leaving online competition separately
+removes the public leaderboard profile. Local phone progress remains local and
+can be removed by clearing app storage or uninstalling the app.
 ```
 
 If Play Console expects a deletion URL, create a support/privacy page explaining
@@ -270,7 +326,7 @@ diagnostic, treatment, medication, mental health, or health research features.
 - Store icon, feature graphic, and four portrait screenshots exist in
   `assets/store_listing/`; review and recapture them after the final UI pass.
 - The standard launcher icon is wired; add a dedicated adaptive icon pair
-  before production if the current fallback crops poorly on device launchers.
+  before the next visual refresh if the current fallback crops poorly on device launchers.
 - Verify the localized in-app Privacy Policy link in Settings.
 - Confirmation that the target audience should be 13+ and not under 13.
 - Complete real-device AdMob/consent testing before finalizing Data safety.

@@ -1,9 +1,9 @@
 # Android Release Build Runbook
 
-Last verified: August 19, 2026.
+Last updated: September 30, 2026.
 
 Use this document to create and validate a signed Android App Bundle for Google
-Play closed testing. Store-listing work and Play Console declarations are in
+Play production-track updates. Store-listing work and Play Console declarations are in
 `PLAY_STORE_RELEASE_CHECKLIST.md`.
 
 ## Current Configuration
@@ -19,10 +19,11 @@ Play closed testing. Store-listing work and Play Console declarations are in
 | Architectures | `armeabi-v7a`, `arm64-v8a` |
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
-| Latest local closed-testing artifact | Version 1.0.7, code 8 |
-| Artifact status | Built and locally verified from the Wave 15 referral release source |
-| Artifact path | `exports/android/DalaDalaRushTZ-closed-testing-v8.aab` |
-| Next source build | Use a never-before-used code higher than 8 (confirm every Play track first) |
+| Current production release | Version 1.0.13, code 14 |
+| Release candidate | Version 1.0.14, code 15 |
+| Artifact status | Signed AAB exported and locally verified; Play processing and device checks remain required before rollout |
+| Artifact path | `exports/android/DalaDalaRushTZ-production-v14.aab` |
+| Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
 31, 2026. Recheck the current policy before future releases:
@@ -36,6 +37,11 @@ Complete these before rolling the verified bundle out to testers:
 - [ ] Settings includes an in-app Privacy Policy link.
 - [ ] Final launcher and adaptive icons replace the generic `icon.svg`.
 - [ ] Swahili and English menus have been checked at 540x960 and on a phone.
+- [ ] Railway hardening is deployed separately, migration 005 completed, and
+  the live leaderboard write/read behavior has been smoke-tested.
+- [ ] Complete the small-phone and two-phone competition checks in
+  `DEVICE_QA.md`; update the privacy policy and review Play Data Safety before
+  rollout.
 - [ ] Rewarded, interstitial, banner, and consent behavior have been tested on
   a registered AdMob test device.
 - [ ] The support email is monitored.
@@ -49,11 +55,11 @@ signing configuration.
 
 ## 1. Confirm The Version
 
-The current verified local artifact was exported from both Android presets with:
+The release candidate is exported from the Android AAB preset with:
 
 ```text
-Version name: 1.0.7
-Version code: 8
+Version name: 1.0.14
+Version code: 15
 ```
 
 The code must be greater than every active artifact in every Play track,
@@ -120,7 +126,7 @@ Project > Export > Android AAB Release > Export Project
 The current verified source build is:
 
 ```text
-exports/android/DalaDalaRushTZ-closed-testing-v8.aab
+exports/android/DalaDalaRushTZ-production-v14.aab
 ```
 
 Equivalent command-line export:
@@ -129,7 +135,7 @@ Equivalent command-line export:
 $godot = 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe'
 & $godot --headless --path '.' `
   --export-release 'Android AAB Release' `
-  'exports/android/DalaDalaRushTZ-closed-testing-v7.aab'
+  'exports/android/DalaDalaRushTZ-production-v14.aab'
 ```
 
 Do not interrupt the process. A successful command must return exit code 0 and
@@ -140,7 +146,7 @@ the requested AAB must have a new modification time.
 Set the artifact path once:
 
 ```powershell
-$aab = 'exports/android/DalaDalaRushTZ-closed-testing-v7.aab'
+$aab = 'exports/android/DalaDalaRushTZ-production-v14.aab'
 ```
 
 Confirm it exists, record its size, and create a checksum:
@@ -177,11 +183,33 @@ Optional, when Google's `bundletool` is installed:
 java -jar bundletool-all.jar validate --bundle $aab
 ```
 
+### Previous Code 14 Verification Record
+
+- Artifact: `exports/android/DalaDalaRushTZ-production-v13.aab`
+- Size: `61,525,651` bytes
+- SHA-256: `7170353AF393A549BB334A62531DEF90883F35EFEA0C78FDA9D58993FD97813E`
+- Bundle structure contains the base manifest/resources and release signature
+  entries. Google Play processing remains the authoritative AAB validation.
+
+### Code 15 Verification Record
+
+- Artifact: `exports/android/DalaDalaRushTZ-production-v14.aab`
+- Size: `61,541,199` bytes
+- SHA-256: `A6D497DCBB6C2EE4DDBD5FC673C341D70C55C01128EA08348B228C54F4A6CC7B`
+- `jarsigner` reports `jar verified`.
+- The release manifest reports version `1.0.14`, code `15`, target API `36`,
+  the AdMob application ID metadata, and `com.google.android.gms.permission.AD_ID`.
+- Godot 4.7.1 printed export completion and produced the verified artifact; its
+  headless process did not exit normally and was stopped after artifact checks.
+
+These checks verify bundle structure and signing only. They do not replace the
+physical-device, consent, or Play pre-launch checks below.
+
 ## 6. Install Through Play Testing
 
-An AAB is not installed directly like an APK. Upload it to the closed-testing
-track, wait for processing, then install from the tester opt-in link. This tests
-the same split APK delivery users receive.
+An AAB is not installed directly like an APK. Upload it to the intended Play
+track, wait for processing, then install through Play delivery. This tests the
+same split APK delivery users receive.
 
 On the installed build, verify:
 
@@ -195,6 +223,16 @@ On the installed build, verify:
 - Interstitial cadence survives restart and remains every 2-3 completed runs.
 - Banners appear only on menu/results.
 - Save data survives a force-close after a reward-heavy result.
+- World standings clearly show loading, empty, cached, offline, and retry
+  states in Swahili and English. Friend standings remain consent-gated.
+- A pending score survives offline/relaunch, Retry visibly uploads it after
+  connectivity returns, and successful or already-surpassed responses clear
+  the queue while the local confirmation survives restart.
+- The name field remains visible above the keyboard on 360px and 393px phones;
+  long names do not collide with rank or score.
+- With two phones, an opted-in test score appears on the public World board,
+  while the second phone can view without joining. Friend features require both
+  profiles to opt in.
 - Performance and thermals remain acceptable for at least 10 minutes.
 
 Use the complete device matrix in `ANDROID_EXPORT.md`.
@@ -202,11 +240,11 @@ Use the complete device matrix in `ANDROID_EXPORT.md`.
 ## 7. Upload Checklist
 
 - [ ] Upload the newly verified versioned AAB to the intended Play track.
-- [ ] Confirm Play Console reads version code 8 and target API 36.
+- [ ] Confirm Play Console reads version code 15 and target API 36.
 - [ ] Confirm the Advertising ID warning is absent for the new artifact.
 - [ ] Review native-code debug-symbol and deobfuscation notices. These are
   warnings unless obfuscation is enabled, but record the decision.
-- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.7.md`.
+- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.14.md`.
 - [ ] Recheck Ads, Data safety, target audience, content rating, app access,
   financial, health, and government declarations.
 - [ ] Confirm the public privacy URL opens:
@@ -254,6 +292,5 @@ for the previous accepted Play artifact first.
 ## Definition Of Done
 
 The Android release build is complete only when the signed AAB passes local
-signature/manifest checks, uploads as a new Play artifact, installs through the
-closed-testing link, completes the device/ad/save test pass, and has no blocking
-Play Console errors.
+checks, uploads as a new Play artifact, installs through Play delivery,
+completes the device/ad/save test pass, and has no blocking Play Console errors.

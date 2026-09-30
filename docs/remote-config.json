@@ -1,0 +1,20 @@
+{
+  "event_banner": "",
+	"event_banner_sw": "",
+	"event_banner_en": "",
+  "spawn_interval_global": 1.0,
+  "fuel_drain_global": 0.9,
+  "coin_reward_global": 1.0,
+  "speed_ramp_global": 0.95,
+  "daily_reward_mult": 1.0,
+  "kituo_min_gap": 18.0,
+  "kituo_max_gap": 28.0,
+  "route_tuning": {
+    "kariakoo": {"spawn": 1.03, "passengers": 0.96, "kituo_gap": 0.96},
+    "mwenge": {"spawn": 1.02, "rush": 0.98},
+    "mbezi": {"fuel": 0.96, "kituo_gap": 1.03},
+    "posta": {"spawn": 1.03},
+    "kigamboni": {"fuel": 0.95, "passengers": 1.03},
+    "ubungo": {"spawn": 1.04, "rush": 0.95}
+  }
+}

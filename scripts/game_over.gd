@@ -2,6 +2,8 @@ extends Control
 ## Game Over: star rating, animated count-up, route record, optional leaderboard entry.
 
 const UIFactory := preload("res://ui/ui_factory.gd")
+const RouteContracts := preload("res://data/route_contracts.gd")
+const Vehicles := preload("res://data/vehicles.gd")
 
 var _title_lbl: Label
 var _record_lbl: Label
@@ -14,9 +16,17 @@ var _pass_lbl: Label
 var _best_lbl: Label
 var _goal_lbl: Label
 var _daily_lbl: Label
+var _contract_lbl: Label
 var _tagline_lbl: Label
+var _mastery_lbl: Label
+var _flow_lbl: Label
 var _coach_title_lbl: Label
 var _coach_body_lbl: Label
+var _next_step_lbl: Label
+var _reputation_title_lbl: Label
+var _reputation_body_lbl: Label
+var _discovery_lbl: Label
+var _progression_lbl: Label
 var _play_btn: Button
 var _menu_btn: Button
 var _lb_btn: Button
@@ -137,6 +147,28 @@ func _ready() -> void:
 	_coach_body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	coach_content.add_child(_coach_body_lbl)
 
+	_next_step_lbl = UIFactory.make_label("", 16, UIFactory.COL_PRIMARY)
+	_next_step_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_next_step_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(_next_step_lbl)
+
+	# One compact service-quality panel makes a failed run feel useful without
+	# adding another currency or turning the results screen into a dashboard.
+	var reputation_panel := UIFactory.make_panel()
+	reputation_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(reputation_panel)
+	var reputation_box := VBoxContainer.new()
+	reputation_box.add_theme_constant_override("separation", 4)
+	reputation_panel.add_child(reputation_box)
+	_reputation_title_lbl = UIFactory.make_label("", 16, UIFactory.COL_PRIMARY)
+	reputation_box.add_child(_reputation_title_lbl)
+	_reputation_body_lbl = UIFactory.make_label("", 15, UIFactory.COL_TEXT)
+	_reputation_body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	reputation_box.add_child(_reputation_body_lbl)
+	_discovery_lbl = UIFactory.make_label("", 15, UIFactory.COL_ACCENT)
+	_discovery_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_discovery_lbl)
+
 	# ── Stats panel ──
 	var panel := UIFactory.make_panel()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -149,8 +181,15 @@ func _ready() -> void:
 	_coins_lbl = _stat_label(stats, UIFactory.COL_ACCENT)
 	_pass_lbl  = _stat_label(stats)
 	_goal_lbl  = _stat_label(stats, UIFactory.COL_PRIMARY, 18)
+	_contract_lbl = _stat_label(stats, Color("#2ecc71"), 18)
 	_daily_lbl = _stat_label(stats, UIFactory.COL_ACCENT, 18)
+	_mastery_lbl = _stat_label(stats, UIFactory.COL_PRIMARY, 18)
+	_flow_lbl = _stat_label(stats, UIFactory.COL_ACCENT, 18)
 	_best_lbl  = _stat_label(stats, UIFactory.COL_MUTED, 16)
+
+	_progression_lbl = UIFactory.make_label("", 16, UIFactory.COL_PRIMARY)
+	_progression_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_progression_lbl)
 
 	# Completed missions banner
 	for t in GameState.last_missions_completed:
@@ -160,8 +199,9 @@ func _ready() -> void:
 			int(t.reward),
 		]
 
-	# ── Leaderboard name entry (when score qualifies) ──
-	if SaveSystem.qualifies_for_leaderboard(GameState.last_score):
+	# The local Top-5 and online route personal bests have separate rules.
+	# A route PB can be queued for upload even if it does not enter Top-5.
+	if SaveSystem.qualifies_for_leaderboard(GameState.last_score) or GameState.last_is_route_record:
 		var lb_panel := UIFactory.make_panel()
 		lb_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		v.add_child(lb_panel)
@@ -177,9 +217,10 @@ func _ready() -> void:
 		lb_vb.add_child(hb)
 
 		_name_edit = LineEdit.new()
-		_name_edit.max_length = 3
-		_name_edit.placeholder_text = "AAA"
-		_name_edit.custom_minimum_size = Vector2(80, 44)
+		_name_edit.max_length = 16
+		_name_edit.placeholder_text = LocaleManager.t("LEADERBOARD_NAME_HINT")
+		_name_edit.text = SaveSystem.get_leaderboard_display_name()
+		_name_edit.custom_minimum_size = Vector2(150, 44)
 		_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		hb.add_child(_name_edit)
 
@@ -274,13 +315,20 @@ func _update_stats_labels() -> void:
 	_coins_lbl.text = "%s: %d"    % [LocaleManager.t("COINS"),      int(_anim_coins)]
 	if GameState.last_bonus_coins > 0:
 		_coins_lbl.text += " (+%d)" % GameState.last_bonus_coins
+	if GameState.last_mastery_bonus_coins > 0:
+		_coins_lbl.text += " (+%d)" % GameState.last_mastery_bonus_coins
 	_pass_lbl.text  = "%s: %d   |   %s: %d (+%d 🪙)" % [
 		LocaleManager.t("PASSENGERS"), int(_anim_pass),
 		LocaleManager.t("DROPOFFS"), GameState.last_dropoffs, GameState.last_fares,
 	]
 	var goal_status := LocaleManager.t("GOAL_COMPLETE") if GameState.last_route_goal_met else LocaleManager.t("GOAL_FAILED")
 	_goal_lbl.text  = "%s: %s  %s" % [LocaleManager.t("ROUTE_GOAL"), goal_status, GameState.last_route_goal_progress]
+	_contract_lbl.text = _contract_result_text()
+	_contract_lbl.visible = not _contract_lbl.text.is_empty()
 	_daily_lbl.text = _daily_result_text()
+	_mastery_lbl.text = _mastery_result_text()
+	_flow_lbl.text = LocaleManager.t("FLOW_RESULT").replace("{n}", str(GameState.last_combo_peak))
+	_flow_lbl.visible = GameState.last_combo_peak >= 2
 	_best_lbl.text  = "%s: %d"    % [LocaleManager.t("BEST"),       int(SaveSystem.get_value("best_score", 0))]
 
 func _refresh(_l := "") -> void:
@@ -292,6 +340,17 @@ func _refresh(_l := "") -> void:
 	_coach_title_lbl.text = LocaleManager.t("RUN_COACH_TITLE")
 	var tip_key: String = String(END_TIP_KEYS.get(GameState.last_end_reason, "RUN_TIP_GENERAL"))
 	_coach_body_lbl.text = LocaleManager.t(tip_key)
+	_next_step_lbl.text = _next_step_text()
+	_reputation_title_lbl.text = "%s: %s  %d/100" % [
+		LocaleManager.t("HUDUMA_RATING"), GameState.last_reputation_grade, GameState.last_reputation,
+	]
+	_reputation_title_lbl.add_theme_color_override("font_color", _reputation_color())
+	_reputation_body_lbl.text = _reputation_summary_text()
+	_progression_lbl.text = _progression_text()
+	_discovery_lbl.visible = not GameState.last_discovery_key.is_empty()
+	_discovery_lbl.text = "%s\n%s" % [
+		LocaleManager.t("DISCOVERY_TITLE"), LocaleManager.t(GameState.last_discovery_key),
+	]
 	_play_btn.text  = LocaleManager.t("PLAY_AGAIN")
 	_menu_btn.text  = LocaleManager.t("MAIN_MENU")
 	_lb_btn.text    = LocaleManager.t("LEADERBOARD")
@@ -303,6 +362,99 @@ func _refresh(_l := "") -> void:
 	if _submit_btn and not _score_submitted:
 		_submit_btn.text = LocaleManager.t("SUBMIT")
 	_update_stats_labels()
+
+func _next_step_text() -> String:
+	# A fuel failure needs an immediate, actionable recovery hint before progression.
+	if GameState.last_end_reason == "fuel":
+		return "%s: %s" % [LocaleManager.t("NEXT_STEP"), LocaleManager.t("NEXT_STEP_FUEL")]
+	var route: Dictionary = Routes.get_by_id(GameState.selected_route_id)
+	var focus: Dictionary = Routes.next_mastery_target(route, GameState.last_mastery_stars)
+	if GameState.last_mastery_gained > 0 or not bool(focus.get("complete", false)):
+		return "%s: %s" % [LocaleManager.t("NEXT_STEP"), _mastery_target_text(focus)]
+	if GameState.last_route_goal_met:
+		return "%s: %s" % [LocaleManager.t("NEXT_STEP"), LocaleManager.t("NEXT_STEP_ROUTE")]
+	return "%s: %s" % [LocaleManager.t("NEXT_STEP"), LocaleManager.t("NEXT_STEP_RETRY")]
+
+func _progression_text() -> String:
+	var coins: int = int(SaveSystem.get_value("total_coins", 0))
+	for value in Vehicles.LIST:
+		var vehicle: Dictionary = value
+		var id: String = String(vehicle.get("id", ""))
+		if SaveSystem.is_vehicle_unlocked(id):
+			continue
+		var price: int = int(vehicle.get("price", 0))
+		var left: int = maxi(0, price - coins)
+		return LocaleManager.t("NEXT_VEHICLE_PROGRESS") \
+			.replace("{name}", LocaleManager.t(String(vehicle.get("name_key", "")))) \
+			.replace("{perk}", _vehicle_primary_perk(vehicle)) \
+			.replace("{coins}", str(left))
+	return LocaleManager.t("NEXT_VEHICLE_ALL_OWNED")
+
+func _vehicle_primary_perk(vehicle: Dictionary) -> String:
+	var coin_bonus: int = int(round((float(vehicle.get("coin_mult", 1.0)) - 1.0) * 100.0))
+	if coin_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_COINS").replace("{n}", str(coin_bonus))
+	var fuel_bonus: int = int(round((1.0 / float(vehicle.get("fuel_drain_mult", 1.0)) - 1.0) * 100.0))
+	if fuel_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_FUEL").replace("{n}", str(fuel_bonus))
+	var handling_bonus: int = int(round((0.14 / float(vehicle.get("lane_time", 0.14)) - 1.0) * 100.0))
+	if handling_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_HANDLING").replace("{n}", str(handling_bonus))
+	return LocaleManager.t("VEHICLE_PERK_HORN").replace("{n}", str(int(vehicle.get("horn_charges", 3))))
+
+func _mastery_target_text(focus: Dictionary) -> String:
+	if bool(focus.get("complete", false)):
+		return LocaleManager.t("MASTERY_COMPLETE")
+	var level: int = clampi(int(focus.get("level", 1)), 1, 3)
+	return LocaleManager.t("MASTERY_NEXT_%d" % level).replace(
+		"{score}", str(int(focus.get("score", 0))))
+
+func _reputation_summary_text() -> String:
+	var breakdown: Dictionary = GameState.last_reputation_breakdown
+	var lines: Array[String] = [
+		LocaleManager.t("REPUTATION_BASE").replace("{n}", str(int(breakdown.get("base", 50))))
+	]
+	var gains: String = _reputation_items(breakdown, [
+		{"field": "dropoffs", "key": "REPUTATION_DROPOFFS"},
+		{"field": "passengers", "key": "REPUTATION_PASSENGERS"},
+		{"field": "near_misses", "key": "REPUTATION_NEAR_MISSES"},
+		{"field": "goal", "key": "REPUTATION_GOAL"},
+		{"field": "checkpoints", "key": "REPUTATION_CHECKPOINTS"},
+		{"field": "moments", "key": "REPUTATION_MOMENTS"},
+	])
+	var costs: String = _reputation_items(breakdown, [
+		{"field": "missed", "key": "REPUTATION_MISSED_STOPS"},
+		{"field": "fines", "key": "REPUTATION_FINES"},
+		{"field": "fuel", "key": "REPUTATION_FUEL"},
+		{"field": "crash", "key": "REPUTATION_CRASH"},
+	])
+	var gained: int = int(breakdown.get("positive_total", 0))
+	var lost: int = int(breakdown.get("negative_total", 0))
+	if gained > 0:
+		lines.append(LocaleManager.t("REPUTATION_GAINED") \
+			.replace("{n}", str(gained)).replace("{items}", gains))
+	if lost > 0:
+		lines.append(LocaleManager.t("REPUTATION_COST") \
+			.replace("{n}", str(lost)).replace("{items}", costs))
+	if GameState.last_best_score_delta > 0:
+		lines.append(LocaleManager.t("HIGHLIGHT_BEST_DELTA").replace("{n}", str(GameState.last_best_score_delta)))
+	return "\n".join(lines)
+
+func _reputation_items(breakdown: Dictionary, definitions: Array) -> String:
+	var parts: Array[String] = []
+	for definition_value in definitions:
+		var definition: Dictionary = definition_value
+		var points: int = int(breakdown.get(String(definition.field), 0))
+		if points > 0:
+			parts.append(LocaleManager.t(String(definition.key)).replace("{n}", str(points)))
+	return ", ".join(parts)
+
+func _reputation_color() -> Color:
+	match GameState.last_reputation_grade:
+		"A": return Color("#2ecc71")
+		"B": return UIFactory.COL_PRIMARY
+		"C": return UIFactory.COL_ACCENT
+		_: return UIFactory.COL_DANGER
 
 func _refresh_reward_actions() -> void:
 	var reward_available: bool = AdService.is_rewarded_available()
@@ -333,6 +485,32 @@ func _daily_result_text() -> String:
 		GameState.last_daily_challenge_progress,
 	]
 
+func _contract_result_text() -> String:
+	if GameState.last_route_contract.is_empty():
+		return ""
+	var description: String = RouteContracts.describe(GameState.last_route_contract)
+	if GameState.last_route_contract_rewarded:
+		return "%s: %s  +%d 🪙" % [
+			LocaleManager.t("ROUTE_CONTRACT"), description, GameState.last_route_contract_bonus_coins,
+		]
+	var status: String = LocaleManager.t("CONTRACT_COMPLETE") if GameState.last_route_contract_met \
+		else GameState.last_route_contract_progress
+	return "%s: %s  %s" % [LocaleManager.t("ROUTE_CONTRACT"), description, status]
+
+func _mastery_result_text() -> String:
+	var marks: String = _mastery_marks(GameState.last_mastery_stars)
+	var text: String = "%s: %s" % [LocaleManager.t("ROUTE_MASTERY"), marks]
+	if GameState.last_mastery_gained > 0:
+		text += "  " + LocaleManager.t("MASTERY_EARNED").replace(
+			"{n}", str(GameState.last_mastery_bonus_coins))
+	return text
+
+func _mastery_marks(stars: int) -> String:
+	var marks := ""
+	for index in range(3):
+		marks += "★" if index < clampi(stars, 0, 3) else "☆"
+	return marks
+
 func _pulse_label(lbl: Label) -> void:
 	if not is_instance_valid(lbl):
 		return
@@ -347,10 +525,13 @@ func _pulse_label(lbl: Label) -> void:
 func _on_submit_score() -> void:
 	if _score_submitted or _name_edit == null:
 		return
-	var nm: String = _name_edit.text.strip_edges().to_upper()
-	if nm.length() == 0:
-		nm = "AAA"
-	SaveSystem.add_to_leaderboard(nm, GameState.last_score, GameState.selected_route_id)
+	var nm: String = SaveSystem.set_leaderboard_display_name(_name_edit.text)
+	if SaveSystem.qualifies_for_leaderboard(GameState.last_score):
+		SaveSystem.add_to_leaderboard(nm, GameState.last_score, GameState.selected_route_id)
+	if OnlineService.is_enabled() and SaveSystem.is_online_leaderboard_opted_in() \
+		and OnlineService.has_identity() and GameState.last_is_route_record:
+		OnlineService.update_leaderboard_profile(nm)
+		OnlineService.queue_leaderboard_submission(GameState.selected_route_id, GameState.last_score)
 	_score_submitted = true
 	if _submit_btn:
 		_submit_btn.text = "✓"

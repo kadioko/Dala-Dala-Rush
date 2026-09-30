@@ -18,7 +18,9 @@ static func _day_number(date_str: String) -> int:
 	return int(unix / 86400)
 
 static func reward_for(streak: int) -> int:
-	return min(MAX_REWARD, BASE_REWARD + (streak - 1) * PER_DAY_BONUS)
+	var base_reward: int = min(MAX_REWARD, BASE_REWARD + (streak - 1) * PER_DAY_BONUS)
+	var multiplier: float = RemoteConfig.get_float("daily_reward_mult", 1.0, 1.0, 2.0)
+	return maxi(1, roundi(base_reward * multiplier))
 
 static func claim_today() -> Dictionary:
 	var today := today_key()

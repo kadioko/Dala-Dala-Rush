@@ -81,8 +81,15 @@ func _build_route_bests_panel() -> void:
 	vb.add_child(hdr)
 	for r in Routes.LIST:
 		var best := SaveSystem.get_route_best(r.id)
+		var stars: int = SaveSystem.get_route_mastery(String(r.id))
 		var col: Color = UIFactory.COL_TEXT if best > 0 else UIFactory.COL_MUTED
-		_add_row(vb, LocaleManager.t(r.name_key), str(best), col)
+		_add_row(vb, LocaleManager.t(r.name_key), "%d  %s" % [best, _mastery_marks(stars)], col)
+
+func _mastery_marks(stars: int) -> String:
+	var marks := ""
+	for index in range(3):
+		marks += "★" if index < clampi(stars, 0, 3) else "☆"
+	return marks
 
 # ─── Achievements ─────────────────────────────────────────────────
 

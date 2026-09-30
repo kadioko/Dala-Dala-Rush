@@ -128,9 +128,12 @@ invalidating the old phone's server access.
 
 ## Remaining Production Checks
 
-- Deploy this backend revision to Railway so migration `005` and the request
-  limits take effect. Confirm `/health`, then verify a test device can submit
-  one best per route and that a lower duplicate is not promoted.
+- Migration `005` and request limits were deployed to Railway on September 30,
+  2026. The API health check and one-best-per-route index were verified.
+  Confirm on a test device that a lower duplicate is not promoted.
+- Configure Railway's production pre-deploy command as `npm run migrate`
+  before the next schema migration; migration `005` was applied manually for
+  this rollout.
 - The request limits are process-local abuse friction, not durable anti-cheat;
   they reset on restart and multiply with multiple replicas. Scores remain
   forgeable and must stay labelled unverified and reward-free.

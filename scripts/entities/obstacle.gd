@@ -29,7 +29,9 @@ var walk_dir: int = 1
 var warning_announced: bool = false
 var visual_variant: int = 0
 
-func setup(t: String, lane_x: float, top_y: float) -> void:
+func setup(t: String, lane_x: float, top_y: float,
+		movement_rng: RandomNumberGenerator = null,
+		visual_rng: RandomNumberGenerator = null) -> void:
 	scale = Vector2.ONE
 	rotation = 0.0
 	modulate = Color.WHITE
@@ -37,7 +39,7 @@ func setup(t: String, lane_x: float, top_y: float) -> void:
 	type_id = t
 	var def: Dictionary = TYPES.get(t, TYPES["car"])
 	color = def.color
-	visual_variant = randi() % 4
+	visual_variant = visual_rng.randi_range(0, 3) if visual_rng != null else randi() % 4
 	if t == "car":
 		var car_colors: Array[Color] = [Color("#9b59b6"), Color("#e85d75"), Color("#2d98da"), Color("#f0b429")]
 		color = car_colors[visual_variant]
@@ -47,8 +49,8 @@ func setup(t: String, lane_x: float, top_y: float) -> void:
 	size = def.size
 	position = Vector2(lane_x, top_y)
 	base_x = lane_x
-	drift_phase = randf() * TAU
-	walk_dir = 1 if randf() < 0.5 else -1
+	drift_phase = (movement_rng.randf() if movement_rng != null else randf()) * TAU
+	walk_dir = 1 if (movement_rng.randf() if movement_rng != null else randf()) < 0.5 else -1
 	warning_announced = false
 	_tex = SpriteLib.get_tex("obstacle", t)
 	active = true

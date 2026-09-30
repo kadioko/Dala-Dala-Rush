@@ -1,6 +1,7 @@
 # Android Export Guide
 
-Last verified: August 19, 2026 with Godot 4.7.1.
+Last updated: September 18, 2026 with Godot 4.7.1. Google Play production is
+active. Version 1.0.13 / code 14 is the current signed production-track update.
 
 For the exact signed AAB procedure, artifact verification commands, and Play
 upload handoff, use `docs/ANDROID_RELEASE_BUILD.md`.
@@ -14,10 +15,11 @@ upload handoff, use `docs/ANDROID_RELEASE_BUILD.md`.
 - Offline-first: no required network access for MVP.
 - Target phones: low to mid-range Android devices common in Tanzania.
 - Package: `com.kadioko.daladalarush`.
-- Current local closed-testing artifact: `1.0.7` / version code `8`.
-- Artifact: `exports/android/DalaDalaRushTZ-closed-testing-v8.aab`.
-- The artifact is locally verified and includes Wave 15 referrals. Check every
-  Play track before using any later, never-before-used higher version code.
+- Current production-track update: `1.0.13` / version code `14`.
+- Built artifact: `exports/android/DalaDalaRushTZ-production-v13.aab`.
+- Artifact SHA-256: `7170353AF393A549BB334A62531DEF90883F35EFEA0C78FDA9D58993FD97813E`.
+- Check every Play track before upload; code 14 must be higher than every
+  existing artifact, and a replacement must use another never-before-used code.
 
 API 36 meets Google Play's Android 16 requirement for new apps and app updates
 starting August 31, 2026. Recheck the policy before later releases:
@@ -33,9 +35,9 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 6. Confirm package name: `com.kadioko.daladalarush`.
 7. Set orientation to portrait.
 8. Keep Gradle/custom build enabled and export **AAB** for Google Play. Use a
-   unique output name such as `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`.
-9. The current local release preset uses version name `1.0.7` and version code
-   `8`. Before any replacement export, first check Play Console: every upload
+   unique output name such as `exports/android/DalaDalaRushTZ-production-v13.aab`.
+9. The current local release preset uses version name `1.0.13` and version code
+   `14`. Before any replacement export, first check Play Console: every upload
    needs a never-before-used higher version code.
 
 The 4.7.1 Android template is installed and identified by
@@ -53,7 +55,7 @@ Project > Export > Android > Export Project
 From CLI if Godot is on PATH:
 
 ```bash
-godot --export-release "Android AAB Release" exports/android/DalaDalaRushTZ-closed-testing-v7.aab
+godot --export-release "Android AAB Release" exports/android/DalaDalaRushTZ-production-v13.aab
 ```
 
 The editor export is preferred when signing settings or plugin state have
@@ -68,7 +70,9 @@ changed.
   and hit-stop without changing scoring or collision timing.
 - Test with sound and vibration enabled.
 - Test with Swahili and English text.
-- Check 540x960 and 720x1280 portrait layouts.
+- Check 360x640, 393x873, 412x915, 540x960, and 720x1600 portrait layouts.
+  The main menu intentionally stacks compact navigation below 500px and utility
+  actions below 380px instead of allowing horizontal overflow.
 
 ## On-Device Test Checklist
 
@@ -110,11 +114,13 @@ See `docs/ADMOB_SETUP.md`. `autoload/ad_service.gd` is the single integration
 point. The plugin bridge is wired; editor builds can simulate the flow while
 Android builds use the installed SDK.
 
-## Online Leaderboard (later)
+## Online Competition (Consent-Gated)
 
-The local top-5 leaderboard lives in `save_system.gd`. To go online, the recommended path is **Google Play Games Services v2** via a Godot plugin:
-
-1. Create the game in Google Play Console > Play Games Services.
-2. Add a leaderboard, note its ID.
-3. Install a GPGS plugin for Godot 4 and submit scores where `SaveSystem.add_to_leaderboard()` is called (game_over.gd `_on_submit_score`).
-4. Keep the local leaderboard as offline fallback.
+The project already contains an optional Railway-backed Friends/World board.
+It queues route personal bests independently of the local Top-5, retries after
+an interrupted request, caches standings, and requires explicit player consent
+before a driver name or score leaves the device. See `docs/RAILWAY_BACKEND.md`
+and `docs/DEVICE_QA.md`. The release switch is enabled for phone validation,
+but every player must still explicitly join before a name or score leaves the
+device. Complete the two-phone competition checks and update Play Data Safety
+before promoting this online-enabled build broadly.

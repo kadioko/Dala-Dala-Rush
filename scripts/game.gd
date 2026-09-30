@@ -50,6 +50,8 @@ var difficulty_mult: float = 1.0
 var current_route: Dictionary = {}
 var current_vehicle: Dictionary = {}
 var spawn_interval_mult: float = 1.0
+var passenger_interval_mult: float = 1.0
+var kituo_gap_mult: float = 1.0
 var fuel_drain_mult: float = 1.0
 var coin_mult: float = 1.0
 var paused: bool = false
@@ -57,6 +59,30 @@ var game_over: bool = false
 var near_miss_done: Dictionary = {}
 var reduced_effects: bool = false
 var _end_reason: String = "unknown"
+var _rng := RandomNumberGenerator.new()
+var _fx_rng := RandomNumberGenerator.new()
+var _completed_runs: int = 0
+var _missed_stops: int = 0
+var _fines: int = 0
+var _clean_checkpoints: int = 0
+
+# ── Route signature moments ───────────────────────────────────────
+# Each route gets one favorable, readable event instead of more random danger.
+var _route_moment_timer: float = 30.0
+var _route_moment_time: float = 0.0
+var _route_moment_id: String = ""
+var _route_moment_successes: int = 0
+var _route_moment_target_type: String = ""
+var _route_moment_target_spawned: bool = false
+
+# ── First-session coaching ────────────────────────────────────────
+# The first three fresh runs teach a single habit each. They are not a modal
+# tutorial: driving remains responsive, and the regular game begins naturally.
+var tutorial_stage: int = 0
+var _tutorial_step: int = 0
+var _tutorial_timer: float = 0.0
+var _tutorial_prompt_key: String = ""
+var _tutorial_spawned: bool = false
 
 # ── Career upgrades (permanent, read at run start) ───────────────
 var _upg_engine: int = 0     # +4% score per level
@@ -146,7 +172,9 @@ const FUEL_LOW_THRESHOLD := 0.28
 # ── Combo ─────────────────────────────────────────────────────────
 var combo: int = 0
 var combo_timer: float = 0.0
-const COMBO_WINDOW := 2.8
+var combo_peak: int = 0
+const COMBO_WINDOW := 3.2
+const COMBO_MAX := 8
 
 # ── Horn ──────────────────────────────────────────────────────────
 var horn_charges: int = 3
@@ -184,6 +212,7 @@ var coins_label: Label
 var pass_label: Label
 var status_label: Label
 var goal_label: Label
+var route_moment_label: Label
 var combo_label: Label
 var pause_btn: Button
 var btn_left: Button
@@ -216,35 +245,47 @@ const SCORE_JAM  := 1500
 # ═════════════════════════ READY ══════════════════════════════════
 
 func _ready() -> void:
+	_fx_rng.randomize()
+	if GameState.is_daily_route_challenge_active():
+		_rng.seed = int(GameState.daily_route_challenge.get("traffic_seed", 1))
+	else:
+		_rng.randomize()
 	view_size = get_viewport_rect().size
 	_compute_lanes()
 
 	current_route = Routes.get_by_id(GameState.selected_route_id)
 	difficulty_mult = float(current_route.difficulty)
 	spawn_interval_mult = float(current_route.get("spawn_interval_mult", 1.0))
+	passenger_interval_mult = clampf(float(current_route.get("passenger_interval_mult", 1.0)) \
+		* RemoteConfig.get_route_float(String(current_route.id), "passengers", 1.0, 0.80, 1.20), 0.70, 1.35)
+	kituo_gap_mult = clampf(float(current_route.get("kituo_gap_mult", 1.0)) \
+		* RemoteConfig.get_route_float(String(current_route.id), "kituo_gap", 1.0, 0.85, 1.15), 0.70, 1.35)
 	reduced_effects = bool(SaveSystem.get_value("reduced_effects", false))
 	var resume_state: Dictionary = {}
 	if GameState.continue_pending:
 		resume_state = GameState.continue_state.duplicate(true)
 	var is_continuing: bool = GameState.continue_pending and not resume_state.is_empty()
+	tutorial_stage = GameState.tutorial_stage_for_run(is_continuing)
+	spawn_interval_mult *= RemoteConfig.get_float("spawn_interval_global", 1.0, 0.75, 1.50)
+	spawn_interval_mult *= RemoteConfig.get_route_float(String(current_route.id), "spawn", 1.0, 0.75, 1.50)
 
 	# Give new drivers two clear runs before introducing weather and rush hour.
 	var completed_runs: int = int(SaveSystem.get_value("total_runs", 0))
+	_completed_runs = completed_runs
 	if is_continuing:
 		condition = String(resume_state.get("condition", "day"))
 		rush_hour = bool(resume_state.get("rush_hour", false))
-	elif completed_runs < 2:
+	elif GameState.is_daily_route_challenge_active() or tutorial_stage > 0 or completed_runs < 4:
 		condition = "day"
 		rush_hour = false
 	else:
-		var roll: float = randf()
-		if roll < 0.40:   condition = "day"
-		elif roll < 0.60: condition = "dusk"
-		elif roll < 0.80: condition = "night"
-		else:             condition = "rain"
-		rush_hour = randf() < 0.25
+		condition = Routes.pick_condition(current_route)
+		var rush_chance: float = float(current_route.get("rush_hour_chance", 0.25)) \
+			* RemoteConfig.get_route_float(String(current_route.id), "rush", 1.0, 0.50, 1.50)
+		rush_hour = _rng.randf() < clampf(rush_chance, 0.0, 0.80)
 	if rush_hour:
 		spawn_interval_mult *= 0.85
+		_route_moment_timer = _rng.randf_range(28.0, 38.0)
 
 	camera = Camera2D.new()
 	camera.position = view_size * 0.5
@@ -284,8 +325,13 @@ func _ready() -> void:
 	slow_max = SLOW_MAX + float(_upg_brakes)
 
 	current_vehicle = Vehicles.get_by_id(GameState.selected_vehicle_id)
-	fuel_drain_mult = float(current_vehicle.get("fuel_drain_mult", 1.0))
-	coin_mult = float(current_vehicle.get("coin_mult", 1.0))
+	fuel_drain_mult = float(current_vehicle.get("fuel_drain_mult", 1.0)) \
+		* clampf(float(current_route.get("fuel_drain_route_mult", 1.0)), 0.70, 1.35) \
+		* RemoteConfig.get_float("fuel_drain_global", 1.0, 0.60, 1.40) \
+		* RemoteConfig.get_route_float(String(current_route.id), "fuel", 1.0, 0.60, 1.40)
+	coin_mult = float(current_vehicle.get("coin_mult", 1.0)) \
+		* RemoteConfig.get_float("coin_reward_global", 1.0, 0.60, 1.60) \
+		* RemoteConfig.get_route_float(String(current_route.id), "coins", 1.0, 0.60, 1.60)
 	max_horn_charges = int(current_vehicle.get("horn_charges", 3))
 	horn_charges = max_horn_charges
 
@@ -330,8 +376,8 @@ func _ready() -> void:
 	kituo.visible = false
 	entity_layer.add_child(kituo)
 
-	# Ghost setup: race the imported rival ghost if present, else own best.
-	if bool(SaveSystem.get_value("ghost_on", true)):
+	# Ghost racing is revealed after the first few independent runs.
+	if completed_runs >= 5 and bool(SaveSystem.get_value("ghost_on", true)):
 		var rival: Variant = SaveSystem.get_value("ghost_rival", null)
 		var own: Variant = SaveSystem.get_value("ghost_best", null)
 		var g: Dictionary = GhostDataLib.sanitize(rival)
@@ -355,6 +401,7 @@ func _ready() -> void:
 		_run_near_misses = int(resume_state.get("near_misses", 0))
 		dropoffs         = int(resume_state.get("dropoffs", 0))
 		fares_earned     = int(resume_state.get("fares", 0))
+		combo_peak       = clampi(int(resume_state.get("combo_peak", 0)), 0, COMBO_MAX)
 		elapsed          = maxf(0.0, float(resume_state.get("elapsed", 0.0)))
 		fuel             = clampf(maxf(float(resume_state.get("fuel", 0.0)), 0.6), 0.0, 1.0)
 		_total_horn_uses = int(resume_state.get("horn_uses", 0))
@@ -363,6 +410,10 @@ func _ready() -> void:
 		horn_charges     = clampi(int(resume_state.get("horn_charges", 0)), 0, max_horn_charges)
 		horn_regen_timer = clampf(float(resume_state.get("horn_regen_timer", HORN_REGEN_TIME)), 0.0, HORN_REGEN_TIME)
 		fuel_drain_mult  = maxf(0.1, float(resume_state.get("fuel_drain_mult", fuel_drain_mult)))
+		_missed_stops = maxi(0, int(resume_state.get("missed_stops", 0)))
+		_fines = maxi(0, int(resume_state.get("fines", 0)))
+		_clean_checkpoints = maxi(0, int(resume_state.get("clean_checkpoints", 0)))
+		_route_moment_successes = maxi(0, int(resume_state.get("route_moments", 0)))
 		_update_handling()
 		grace_time      = GRACE_TIME
 		_was_continued  = true
@@ -370,12 +421,13 @@ func _ready() -> void:
 		GameState.continue_state = {}
 	else:
 		GameState.begin_run()
-		_apply_consumables()
+		if not GameState.is_daily_route_challenge_active():
+			_apply_consumables()
 		# A first run should teach the road, not punish one inevitable early bump.
 		# It is intentionally a one-time local onboarding assist, not an ad reward.
-		if completed_runs == 0:
+		if tutorial_stage > 0:
 			shield_active = true
-			_starter_shield_hint_time = 7.0
+			_starter_shield_hint_time = 5.0
 
 	if is_continuing:
 		_announced_speed_ramps = mini(int(elapsed / 20.0), MAX_SPEED_RAMPS)
@@ -386,6 +438,13 @@ func _ready() -> void:
 	_build_countdown()
 
 	speed = base_speed * difficulty_mult
+	AnalyticsService.log_event("run_start", {
+		"route": String(current_route.id),
+		"vehicle": String(current_vehicle.id),
+		"tutorial_stage": tutorial_stage,
+		"condition": condition,
+		"rush_hour": rush_hour,
+	})
 	set_process(true)
 	set_process_input(true)
 
@@ -476,8 +535,10 @@ func _build_countdown() -> void:
 	route_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_countdown_layer.add_child(route_title)
 
-	var route_detail := UIFactory.make_label(
-		LocaleManager.t(String(current_route.get("flavor_key", "ROUTE_KARIAKOO_D"))), 16, UIFactory.COL_TEXT)
+	var briefing_detail_key: String = String(current_route.get("flavor_key", "ROUTE_KARIAKOO_D"))
+	if tutorial_stage > 0:
+		briefing_detail_key = "TUTORIAL_BRIEF_%d" % tutorial_stage
+	var route_detail := UIFactory.make_label(LocaleManager.t(briefing_detail_key), 16, UIFactory.COL_TEXT)
 	route_detail.anchor_left = 0.5
 	route_detail.anchor_right = 0.5
 	route_detail.anchor_top = 0.5
@@ -499,8 +560,8 @@ func _build_countdown() -> void:
 	goal_panel.anchor_bottom = 0.5
 	goal_panel.offset_left = -goal_half_width
 	goal_panel.offset_right = goal_half_width
-	goal_panel.offset_top = -136
-	goal_panel.offset_bottom = -102
+	goal_panel.offset_top = -146
+	goal_panel.offset_bottom = -92
 	var goal_style := StyleBoxFlat.new()
 	goal_style.bg_color = Color(0.04, 0.10, 0.16, 0.94)
 	goal_style.border_color = UIFactory.COL_PRIMARY.darkened(0.15)
@@ -514,12 +575,25 @@ func _build_countdown() -> void:
 	var goal_target: int = int(current_route.get("goal_target", 0))
 	var goal_reward: int = int(current_route.get("goal_reward", 0))
 	var goal_text: String = LocaleManager.t(goal_key).replace("{n}", str(goal_target))
+	if tutorial_stage > 0:
+		goal_text = LocaleManager.t("TUTORIAL_LESSON_%d" % tutorial_stage)
+		goal_reward = 0
+	var goal_box := VBoxContainer.new()
+	goal_box.add_theme_constant_override("separation", 2)
+	goal_panel.add_child(goal_box)
 	var goal_intro := UIFactory.make_label(
-		"%s: %s   +%d 🪙" % [LocaleManager.t("ROUTE_GOAL"), goal_text, goal_reward],
+		"%s: %s%s" % [LocaleManager.t("ROUTE_GOAL"), goal_text,
+			("   +%d 🪙" % goal_reward) if goal_reward > 0 else ""],
 		15, UIFactory.COL_ACCENT)
 	goal_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	goal_intro.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	goal_panel.add_child(goal_intro)
+	goal_box.add_child(goal_intro)
+	if tutorial_stage <= 0:
+		var focus: Dictionary = Routes.next_mastery_target(
+			current_route, SaveSystem.get_route_mastery(String(current_route.id)))
+		var mastery_intro := UIFactory.make_label(_mastery_target_text(focus), 13, UIFactory.COL_PRIMARY)
+		mastery_intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		goal_box.add_child(mastery_intro)
 	_countdown_layer.add_child(goal_panel)
 
 	# Condition banner ("Usiku" / "Mvua" / "Rush Hour"...)
@@ -595,6 +669,7 @@ func _show_countdown_num(n: int) -> void:
 			_countdown_layer.queue_free()
 			_counting_down = false
 			_announce_used_items()
+			_start_tutorial()
 		)
 		return
 
@@ -700,6 +775,20 @@ func _build_hud() -> void:
 	goal_label.add_theme_color_override("font_outline_color", Color(0.025, 0.035, 0.05, 0.88))
 	goal_label.add_theme_constant_override("outline_size", 3)
 	hud_layer.add_child(goal_label)
+
+	# A small route-moment chip makes the current opportunity readable without
+	# occupying the urgent-status area or the player's thumb space.
+	route_moment_label = UIFactory.make_label("", 14, UIFactory.COL_ACCENT)
+	route_moment_label.anchor_left = 0.5
+	route_moment_label.anchor_right = 0.5
+	route_moment_label.offset_left = -154
+	route_moment_label.offset_right = 154
+	route_moment_label.offset_top = 168 + safe_top
+	route_moment_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	route_moment_label.add_theme_color_override("font_outline_color", Color(0.025, 0.035, 0.05, 0.88))
+	route_moment_label.add_theme_constant_override("outline_size", 3)
+	route_moment_label.visible = false
+	hud_layer.add_child(route_moment_label)
 
 	# Compact vertical fuel meter: readable at a glance without claiming half
 	# of the road edge on smaller portrait phones.
@@ -1031,7 +1120,7 @@ func _update_hud() -> void:
 	boost_bar.value  = boost_time  / BOOST_MAX
 
 	if combo >= 2:
-		combo_label.text = "x%d!" % combo
+		combo_label.text = LocaleManager.t("COMBO_LABEL").replace("{n}", str(combo))
 		combo_label.visible = true
 	else:
 		combo_label.visible = false
@@ -1061,6 +1150,7 @@ func _update_hud() -> void:
 	]
 	goal_label.add_theme_color_override("font_color", Color("#2ecc71") if goal_met else UIFactory.COL_PRIMARY)
 	goal_label.visible = status_label.text.is_empty()
+	_update_route_moment_hud()
 	if goal_met and not _route_goal_reached:
 		_route_goal_reached = true
 		_spawn_float_label(LocaleManager.t("GOAL_COMPLETE"),
@@ -1077,11 +1167,38 @@ func _current_route_stats() -> Dictionary:
 		"near_misses": _run_near_misses,
 	}
 
+func _mastery_target_text(focus: Dictionary) -> String:
+	if bool(focus.get("complete", false)):
+		return LocaleManager.t("MASTERY_COMPLETE")
+	var level: int = clampi(int(focus.get("level", 1)), 1, 3)
+	return LocaleManager.t("MASTERY_NEXT_%d" % level).replace(
+		"{score}", str(int(focus.get("score", 0))))
+
+func _update_route_moment_hud() -> void:
+	if route_moment_label == null:
+		return
+	var is_active: bool = not _route_moment_id.is_empty() and _route_moment_time > 0.0
+	route_moment_label.visible = is_active and status_label.text.is_empty()
+	if not is_active:
+		return
+	var title_key: String = String(current_route.get("signature_title_key", "ROUTE_MOMENT_GENERIC"))
+	var action_key: String = String(current_route.get("signature_action_key", ""))
+	var heading: String = LocaleManager.t("ROUTE_MOMENT_ACTIVE") \
+		.replace("{name}", LocaleManager.t(title_key)) \
+		.replace("{seconds}", str(maxi(1, ceili(_route_moment_time))))
+	route_moment_label.text = heading
+	if not action_key.is_empty():
+		route_moment_label.text += "\n" + LocaleManager.t("ROUTE_MOMENT_ACTION") \
+			.replace("{action}", LocaleManager.t(action_key))
+
 func _update_status() -> void:
 	var sc: int = _current_score()
 	if fuel < FUEL_LOW_THRESHOLD * 0.5:
 		status_label.text = LocaleManager.t("FUEL_LOW")
 		status_label.add_theme_color_override("font_color", Color("#e74c3c"))
+	elif not _tutorial_prompt_key.is_empty():
+		status_label.text = LocaleManager.t(_tutorial_prompt_key)
+		status_label.add_theme_color_override("font_color", UIFactory.COL_PRIMARY)
 	elif _kituo_hint_time > 0.0:
 		status_label.text = LocaleManager.t(_kituo_hint_key)
 		status_label.add_theme_color_override("font_color", UIFactory.COL_PRIMARY)
@@ -1103,6 +1220,90 @@ func _update_status() -> void:
 	else:
 		status_label.text = ""
 
+# ══════════════════════ FIRST-SESSION FLOW ══════════════════════
+
+func _start_tutorial() -> void:
+	if tutorial_stage <= 0:
+		return
+	_tutorial_step = 0
+	_tutorial_timer = 0.0
+	_tutorial_spawned = false
+	_set_tutorial_prompt("TUTORIAL_%d_STEP_0" % tutorial_stage)
+	AnalyticsService.log_event("tutorial_stage_started", {"stage": tutorial_stage})
+
+func _set_tutorial_prompt(key: String) -> void:
+	_tutorial_prompt_key = key
+	_spawn_float_label(LocaleManager.t(key), player.position + Vector2(0, -128), UIFactory.COL_PRIMARY)
+
+func _advance_tutorial_step(next_step: int) -> void:
+	if tutorial_stage <= 0 or next_step <= _tutorial_step:
+		return
+	_tutorial_step = next_step
+	_tutorial_spawned = false
+	AnalyticsService.log_event("tutorial_step_completed", {
+		"stage": tutorial_stage,
+		"step": next_step - 1,
+	})
+	if next_step >= 2:
+		_tutorial_prompt_key = ""
+		_spawn_float_label(LocaleManager.t("TUTORIAL_STEP_DONE"),
+			player.position + Vector2(0, -128), Color("#2ecc71"))
+		FeedbackManager.powerup()
+		return
+	_set_tutorial_prompt("TUTORIAL_%d_STEP_%d" % [tutorial_stage, next_step])
+
+func _update_tutorial(delta: float) -> void:
+	if tutorial_stage <= 0 or _tutorial_step >= 2:
+		return
+	_tutorial_timer += delta
+	# Let the player learn one interaction before normal traffic begins. The
+	# shield still protects a mistaken touch without changing the core controls.
+	if tutorial_stage == 1:
+		if _tutorial_step == 1 and not _tutorial_spawned:
+			_tutorial_spawned = true
+			_spawn_tutorial_collectible("coin", player.current_lane)
+	elif tutorial_stage == 2:
+		if _tutorial_step == 0 and _tutorial_timer >= 1.8 and not _tutorial_spawned:
+			_tutorial_spawned = true
+			_spawn_tutorial_collectible("passenger", player.current_lane)
+		elif _tutorial_step == 1 and not _tutorial_spawned:
+			_tutorial_spawned = true
+			_spawn_tutorial_kituo()
+	elif tutorial_stage == 3:
+		if _tutorial_step == 0 and _tutorial_timer >= 1.9 and not _tutorial_spawned:
+			_tutorial_spawned = true
+			_spawn_tutorial_obstacle("cone", player.current_lane)
+		elif _tutorial_step == 1 and not _tutorial_spawned:
+			_tutorial_spawned = true
+			_spawn_tutorial_collectible("slow", player.current_lane)
+
+func _spawn_tutorial_collectible(type_id: String, lane_idx: int) -> void:
+	if collectibles_free.is_empty():
+		return
+	var safe_lane: int = clampi(lane_idx, 0, num_lanes - 1)
+	var c: Collectible = collectibles_free.pop_back()
+	c.setup(type_id, lanes[safe_lane], -160.0)
+	collectibles_active.append(c)
+
+func _spawn_tutorial_obstacle(type_id: String, lane_idx: int) -> void:
+	if obstacles_free.is_empty():
+		return
+	var safe_lane: int = clampi(lane_idx, 0, num_lanes - 1)
+	var o: Obstacle = obstacles_free.pop_back()
+	o.setup(type_id, lanes[safe_lane], -360.0, _rng, _fx_rng)
+	obstacles_active.append(o)
+
+func _spawn_tutorial_kituo() -> void:
+	if kituo.active:
+		return
+	var side: int = -1 if player.current_lane <= 1 else 1
+	var lane_idx: int = 0 if side < 0 else num_lanes - 1
+	var road_w: float = view_size.x * 0.8
+	var lane_w: float = road_w / num_lanes
+	var shoulder_x: float = lanes[lane_idx] + side * lane_w * 0.72
+	kituo.setup(lane_idx, side, shoulder_x, -220.0, 3)
+	_kituo_warned = false
+
 # ═════════════════════════ MAIN LOOP ══════════════════════════════
 
 func _process(delta: float) -> void:
@@ -1115,9 +1316,11 @@ func _process(delta: float) -> void:
 		return
 
 	elapsed += delta
+	_update_tutorial(delta)
 	# Escalate every 20 seconds, then hold a demanding but readable end-game pace.
 	var ramps: int = mini(int(elapsed / 20.0), MAX_SPEED_RAMPS)
-	speed = base_speed * difficulty_mult * (1.0 + 0.15 * ramps)
+	var speed_ramp: float = 0.15 * RemoteConfig.get_float("speed_ramp_global", 1.0, 0.60, 1.40)
+	speed = base_speed * difficulty_mult * (1.0 + speed_ramp * ramps)
 	speed_lines.speed_ref = speed
 	AudioManager.set_music_intensity(clampf(elapsed / 160.0, 0.0, 1.0))
 	if ramps > _announced_speed_ramps:
@@ -1137,6 +1340,7 @@ func _process(delta: float) -> void:
 	if _starter_shield_hint_time > 0: _starter_shield_hint_time = maxf(0.0, _starter_shield_hint_time - delta)
 	if _speed_ramp_hint_time > 0: _speed_ramp_hint_time = maxf(0.0, _speed_ramp_hint_time - delta)
 	if _kituo_hint_time > 0: _kituo_hint_time = maxf(0.0, _kituo_hint_time - delta)
+	_update_route_moment(delta)
 
 	if combo > 0:
 		combo_timer -= delta
@@ -1204,12 +1408,14 @@ func _process(delta: float) -> void:
 		var scaled_interval: float = (1.75 - elapsed * 0.014) * spawn_interval_mult / difficulty_mult
 		var interval: float = maxf(MIN_SPAWN_INTERVAL, scaled_interval)
 		spawn_timer = interval
-		_spawn_wave()
+		if tutorial_stage <= 0 or elapsed >= 7.0:
+			_spawn_wave()
 
 	passenger_timer -= delta
 	if passenger_timer <= 0.0:
-		passenger_timer = randf_range(4.2, 7.2)
-		_spawn_collectible(_pick_collectible_type(true))
+		passenger_timer = _rng.randf_range(4.2, 7.2) * passenger_interval_mult
+		if tutorial_stage <= 0 or elapsed >= 7.0:
+			_spawn_collectible(_pick_collectible_type(true))
 
 	# ── Ghost playback ────────────────────────────────────────────
 	if _ghost_node != null and not _ghost_data.is_empty():
@@ -1231,14 +1437,14 @@ func _process(delta: float) -> void:
 				_ghost_node.position.x = lerpf(_ghost_node.position.x, lanes[lane_i], 10.0 * delta)
 
 	# ── Police chase event ────────────────────────────────────────
-	if not chase_active:
+	if chase_active:
+		_update_chase(delta)
+	elif _completed_runs >= 6 and (tutorial_stage <= 0 or elapsed >= 24.0):
 		chase_check_timer -= delta
 		if chase_check_timer <= 0.0:
-			chase_check_timer = randf_range(35.0, 55.0)
-			if randf() < 0.5:
+			chase_check_timer = _rng.randf_range(35.0, 55.0)
+			if _rng.randf() < 0.5:
 				_start_chase()
-	else:
-		_update_chase(delta)
 
 	# ── Kituo (bus stop) cycle ────────────────────────────────────
 	if not kituo.active:
@@ -1267,11 +1473,12 @@ func _process(delta: float) -> void:
 			kituo.missed = true
 			_kituo_hint_time = 0.0
 			if onboard > 0:
+				_missed_stops += 1
 				_spawn_float_label(LocaleManager.t("KITUO_MISSED"),
 					player.position + Vector2(0, -50), UIFactory.COL_MUTED)
 		if kituo.position.y > view_size.y + 170.0:
 			kituo.deactivate()
-			kituo_timer = randf_range(20.0, 32.0)
+			kituo_timer = _next_kituo_gap()
 			_kituo_warned = false
 
 # ═════════════════════════ ENTITIES ═══════════════════════════════
@@ -1323,6 +1530,7 @@ func _check_collisions() -> void:
 				# Passing a police checkpoint while overloaded = fine!
 				if o.type_id == "police" and _overload_excess() > 0:
 					var fine: int = _overload_excess() * POLICE_FINE_PER_EXCESS
+					_fines += 1
 					coins = max(0, coins - fine)
 					_spawn_float_label("%s -%d 🪙" % [LocaleManager.t("FINE"), fine],
 						player.position + Vector2(0, -50), UIFactory.COL_DANGER)
@@ -1331,7 +1539,11 @@ func _check_collisions() -> void:
 					FeedbackManager.crash()
 				else:
 					bonus_score += 80
-					_on_near_miss(o.position)
+					if o.type_id == "police":
+						_clean_checkpoints += 1
+						if _route_moment_id == "checkpoint_clear":
+							_complete_route_moment()
+					_on_near_miss(o.position, o.type_id)
 		if prect.intersects(orect):
 			if grace_time > 0.0:
 				continue
@@ -1381,8 +1593,7 @@ func _on_collect(c: Collectible) -> void:
 	var label_col: Color = UIFactory.COL_ACCENT
 	match c.type_id:
 		"coin":
-			combo += 1
-			combo_timer = COMBO_WINDOW
+			_advance_combo()
 			var base_value: int = 1 + int(max(0, combo - 1) * 0.5)
 			var value: int = max(1, int(ceil(float(base_value) * coin_mult)))
 			coins += value
@@ -1391,10 +1602,9 @@ func _on_collect(c: Collectible) -> void:
 			AudioManager.play_sfx("coin")
 			FeedbackManager.collect()
 			_burst(c.position, UIFactory.COL_ACCENT, 6)
-			if combo >= 2:
-				_punch_combo_label()
 			if coins >= 50: AchievementManager.try_unlock("coins_50")
-			if combo >= 5:  AchievementManager.try_unlock("combo_5")
+			if tutorial_stage == 1 and _tutorial_step == 1:
+				_advance_tutorial_step(2)
 		"passenger":
 			if onboard < CAPACITY + OVERLOAD_MAX:
 				onboard += 1
@@ -1415,6 +1625,8 @@ func _on_collect(c: Collectible) -> void:
 			AudioManager.play_sfx("passenger")
 			FeedbackManager.collect()
 			if passengers >= 10: AchievementManager.try_unlock("pass_10")
+			if tutorial_stage == 2 and _tutorial_step == 0:
+				_advance_tutorial_step(1)
 		"fuel":
 			fuel = min(1.0, fuel + FUEL_RESTORE)
 			bonus_score += 300
@@ -1422,6 +1634,8 @@ func _on_collect(c: Collectible) -> void:
 			label_col = Color("#e74c3c")
 			AudioManager.play_sfx("powerup")
 			FeedbackManager.powerup()
+			if _route_moment_id == "fuel_scout":
+				_complete_route_moment()
 		"shield":
 			shield_active = true
 			bonus_text = LocaleManager.t("SHIELD_ON")
@@ -1450,19 +1664,31 @@ func _on_collect(c: Collectible) -> void:
 			label_col = Color("#74b9ff")
 			AudioManager.play_sfx("powerup")
 			FeedbackManager.powerup()
+			if tutorial_stage == 3 and _tutorial_step == 1:
+				_advance_tutorial_step(2)
 	if bonus_text != "":
 		_spawn_float_label(bonus_text, c.position, label_col)
 	_despawn_collectible(c)
 
-func _on_near_miss(world_pos: Vector2) -> void:
+func _on_near_miss(world_pos: Vector2, obstacle_type: String = "") -> void:
 	_run_near_misses += 1
+	_advance_combo()
 	_spawn_float_label(LocaleManager.t("NEAR_MISS"), world_pos, Color("#f1c40f"))
 	if near_miss_flash:
 		near_miss_flash.color = Color(1.0, 0.9, 0.1, 0.16 if reduced_effects else 0.38)
 		var tw := near_miss_flash.create_tween()
 		tw.tween_property(near_miss_flash, "color:a", 0.0, 0.18 if reduced_effects else 0.30)
+	FeedbackManager.near_miss()
+	_screen_shake(1.4, 0.09)
 	if _run_near_misses >= 5:
 		AchievementManager.try_unlock("near_miss_5")
+	if _route_moment_id == "boda_watch" and obstacle_type == "bodaboda":
+		_complete_route_moment()
+	elif _route_moment_id == "truck_line" and obstacle_type == "truck":
+		_complete_route_moment()
+	elif _route_moment_id == "checkpoint_clear" and obstacle_type == "police" \
+	and _overload_excess() == 0:
+		_complete_route_moment()
 
 # ─── Horn ────────────────────────────────────────────────────────
 
@@ -1475,10 +1701,14 @@ func _use_horn() -> void:
 	horn_charges -= 1
 	horn_regen_timer = HORN_REGEN_TIME
 	_total_horn_uses += 1
-	AudioManager.play_sfx("horn")
-	FeedbackManager.powerup()
+	AudioManager.play_route_horn(String(current_route.id))
+	FeedbackManager.horn()
+	if tutorial_stage == 3 and _tutorial_step == 0:
+		_advance_tutorial_step(1)
 	if _total_horn_uses >= 3:
 		AchievementManager.try_unlock("horn_3")
+	if _route_moment_id == "jam_breaker":
+		_complete_route_moment()
 	# Clear nearest obstacle in current lane ahead of player
 	var lane_x: float = lanes[player.current_lane]
 	var nearest: Obstacle = null
@@ -1509,7 +1739,7 @@ func _start_chase() -> void:
 	chase_time = 0.0
 	chase_danger = 0.0
 	_chase_cop = _ChaseCop.new()
-	_chase_cop.position = Vector2(lanes[randi() % num_lanes], view_size.y + 80)
+	_chase_cop.position = Vector2(lanes[_rng.randi() % num_lanes], view_size.y + 80)
 	entity_layer.add_child(_chase_cop)
 	_spawn_float_label("🚨 " + LocaleManager.t("CHASE_START"),
 		player.position + Vector2(0, -70), UIFactory.COL_DANGER)
@@ -1546,6 +1776,7 @@ func _end_chase(escaped: bool) -> void:
 		AchievementManager.try_unlock("chase_escape")
 	else:
 		var fine: int = CHASE_FINE + _overload_excess() * POLICE_FINE_PER_EXCESS
+		_fines += 1
 		coins = max(0, coins - fine)
 		_spawn_float_label("%s -%d 🪙" % [LocaleManager.t("FINE"), fine],
 			player.position + Vector2(0, -60), UIFactory.COL_DANGER)
@@ -1563,13 +1794,113 @@ func _end_chase(escaped: bool) -> void:
 # ─── Vituo (bus stops) ───────────────────────────────────────────
 
 func _spawn_kituo() -> void:
-	var side: int = -1 if randf() < 0.5 else 1
+	var side: int = -1 if _rng.randf() < 0.5 else 1
 	var lane_idx: int = 0 if side < 0 else num_lanes - 1
 	var road_w: float = view_size.x * 0.8
 	var lane_w: float = road_w / num_lanes
 	var shoulder_x: float = lanes[lane_idx] + side * lane_w * 0.72
-	kituo.setup(lane_idx, side, shoulder_x, -140.0, randi_range(2, 5))
+	kituo.setup(lane_idx, side, shoulder_x, -140.0, _rng.randi_range(2, 5))
 	_kituo_warned = false
+
+func _next_kituo_gap() -> float:
+	var minimum: float = RemoteConfig.get_float("kituo_min_gap", 20.0, 12.0, 45.0)
+	var maximum: float = RemoteConfig.get_float("kituo_max_gap", 32.0, minimum, 60.0)
+	minimum = RemoteConfig.get_route_float(String(current_route.id), "kituo_min", minimum, 12.0, 45.0)
+	maximum = RemoteConfig.get_route_float(String(current_route.id), "kituo_max", maximum, minimum, 60.0)
+	return clampf(_rng.randf_range(minimum, maximum) * kituo_gap_mult, 12.0, 60.0)
+
+func _update_route_moment(delta: float) -> void:
+	if tutorial_stage > 0:
+		return
+	if _route_moment_id.is_empty():
+		_route_moment_timer -= delta
+		if _route_moment_timer > 0.0:
+			return
+		_start_route_moment()
+		return
+	if not _route_moment_target_type.is_empty() and not _route_moment_target_spawned \
+	and _route_moment_time > 3.0:
+		_route_moment_target_spawned = _spawn_moment_obstacle(_route_moment_target_type)
+	_route_moment_time -= delta
+	if _route_moment_time <= 0.0:
+		AnalyticsService.log_event("route_moment_timeout", {
+			"route": String(current_route.id),
+			"moment": _route_moment_id,
+			"target_spawned": _route_moment_target_spawned,
+		})
+		_route_moment_id = ""
+		_route_moment_time = 0.0
+		_route_moment_target_type = ""
+		_route_moment_target_spawned = false
+		_route_moment_timer = _rng.randf_range(38.0, 54.0)
+
+func _start_route_moment() -> void:
+	_route_moment_id = String(current_route.get("signature_id", ""))
+	if _route_moment_id.is_empty():
+		_route_moment_timer = _rng.randf_range(38.0, 54.0)
+		return
+	# Fare Rush only appears after the driver has passengers to serve.
+	if _route_moment_id == "fare_rush" and onboard <= 0:
+		_defer_route_moment(9.0)
+		return
+	# A clean checkpoint is only offered when it is actually completable.
+	if _route_moment_id == "checkpoint_clear" and _overload_excess() > 0:
+		_defer_route_moment(10.0)
+		return
+	_route_moment_time = 11.0
+	_route_moment_target_type = ""
+	_route_moment_target_spawned = false
+	var label_key: String = String(current_route.get("signature_key", "ROUTE_MOMENT_GENERIC"))
+	_spawn_float_label(LocaleManager.t(label_key), player.position + Vector2(0, -118), UIFactory.COL_PRIMARY)
+	AudioManager.play_sfx("powerup")
+	FeedbackManager.powerup()
+	AnalyticsService.log_event("route_moment_start", {
+		"route": String(current_route.id),
+		"moment": _route_moment_id,
+	})
+	match _route_moment_id:
+		"fare_rush":
+			if kituo == null or not kituo.active or not kituo.visible \
+			or kituo.served or kituo.missed:
+				kituo_timer = minf(kituo_timer, 1.2)
+		"boda_watch":
+			_route_moment_target_type = "bodaboda"
+		"truck_line":
+			_route_moment_target_type = "truck"
+		"checkpoint_clear":
+			_route_moment_target_type = "police"
+		"fuel_scout":
+			_spawn_collectible("fuel")
+		"jam_breaker":
+			slow_time = maxf(slow_time, slow_max)
+			horn_charges = maxi(horn_charges, 1)
+	if not _route_moment_target_type.is_empty():
+		_route_moment_target_spawned = _spawn_moment_obstacle(_route_moment_target_type)
+
+func _defer_route_moment(delay: float) -> void:
+	_route_moment_id = ""
+	_route_moment_time = 0.0
+	_route_moment_target_type = ""
+	_route_moment_target_spawned = false
+	_route_moment_timer = maxf(1.0, delay)
+
+func _complete_route_moment() -> void:
+	if _route_moment_id.is_empty():
+		return
+	_route_moment_successes += 1
+	bonus_score += 60
+	AnalyticsService.log_event("route_moment_complete", {
+		"route": String(current_route.id),
+		"moment": _route_moment_id,
+	})
+	_spawn_float_label(LocaleManager.t("ROUTE_MOMENT_COMPLETE") + " +60",
+		player.position + Vector2(0, -82), UIFactory.COL_ACCENT)
+	AudioManager.play_sfx("coin")
+	_route_moment_id = ""
+	_route_moment_time = 0.0
+	_route_moment_target_type = ""
+	_route_moment_target_spawned = false
+	_route_moment_timer = _rng.randf_range(38.0, 54.0)
 
 func _serve_kituo() -> void:
 	kituo.served = true
@@ -1578,10 +1909,15 @@ func _serve_kituo() -> void:
 	var normal: int = onboard - excess
 	var fare: int = normal * FARE_NORMAL + excess * FARE_OVERLOAD + 2 * _upg_sound
 	if onboard > 0:
+		if _route_moment_id == "fare_rush":
+			fare = int(ceil(float(fare) * 1.5))
+			_complete_route_moment()
 		coins += fare
 		fares_earned += fare
 		dropoffs += onboard
 		bonus_score += onboard * 60
+		# A successful fare stop is a larger driving-flow action than one coin.
+		_advance_combo(2)
 		_spawn_float_label("%s +%d 🪙" % [LocaleManager.t("FARE"), fare],
 			player.position + Vector2(0, -56), UIFactory.COL_ACCENT)
 		_burst(kituo.position, UIFactory.COL_ACCENT, 8)
@@ -1595,6 +1931,8 @@ func _serve_kituo() -> void:
 			kituo.position + Vector2(0, -40), Color("#fab1a0"))
 	AudioManager.play_sfx("passenger")
 	FeedbackManager.collect()
+	if tutorial_stage == 2 and _tutorial_step == 1:
+		_advance_tutorial_step(2)
 	_update_handling()
 	if dropoffs >= 20:
 		AchievementManager.try_unlock("dropoff_20")
@@ -1607,11 +1945,26 @@ func _update_handling() -> void:
 func _overload_excess() -> int:
 	return max(0, onboard - CAPACITY)
 
+## Keeps the reward loop readable and caps coin scaling on long pickup trails.
+static func next_combo(current: int, amount: int = 1) -> int:
+	return clampi(maxi(0, current) + maxi(1, amount), 0, COMBO_MAX)
+
+func _advance_combo(amount: int = 1) -> void:
+	combo = next_combo(combo, amount)
+	combo_peak = maxi(combo_peak, combo)
+	combo_timer = COMBO_WINDOW
+	if combo >= 2:
+		_punch_combo_label()
+	if combo >= 5:
+		AchievementManager.try_unlock("combo_5")
+
 # ═════════════════════════ SPAWN ══════════════════════════════════
 
 func _spawn_wave() -> void:
 	var max_blocked: int = clamp(int(1 + elapsed / 30.0), 1, num_lanes - 1)
-	var to_block: int = randi_range(1, max_blocked)
+	if tutorial_stage > 0 and elapsed < 16.0:
+		max_blocked = 1
+	var to_block: int = _rng.randi_range(1, max_blocked)
 	var blocked_lanes: Array = []
 	var free_lane: int = -1
 	var clear_lanes: Array = _clear_lanes_for_wave()
@@ -1634,25 +1987,24 @@ func _spawn_wave() -> void:
 		if reachable_choices.is_empty():
 			# No clear lane is reachable with one deliberate swipe. Defer danger.
 			return
-		reachable_choices.shuffle()
+		reachable_choices = shuffle_with_rng(reachable_choices, _rng)
 		free_lane = int(reachable_choices[0])
 		_last_safe_lane = free_lane
 		for lane_idx in range(num_lanes):
 			if lane_idx != free_lane:
 				blocked_lanes.append(lane_idx)
-		blocked_lanes.shuffle()
+		blocked_lanes = shuffle_with_rng(blocked_lanes, _rng)
 	else:
-		var indices: Array = range(num_lanes)
-		indices.shuffle()
+		var indices: Array = shuffle_with_rng(range(num_lanes), _rng)
 		for i in range(to_block):
 			blocked_lanes.append(indices[i])
 		free_lane = int(indices[to_block])
 
 	for lane_idx in blocked_lanes:
 		_spawn_obstacle_in_lane(int(lane_idx))
-	if free_lane >= 0 and randf() < 0.65:
+	if free_lane >= 0 and _rng.randf() < 0.65:
 		# 35% of pickups become a satisfying coin trail down the lane
-		if randf() < 0.35:
+		if _rng.randf() < 0.35:
 			_spawn_coin_trail(free_lane)
 		else:
 			_spawn_collectible_in_lane(free_lane, _pick_collectible_type(false))
@@ -1676,10 +2028,19 @@ func _clear_lanes_for_wave() -> Array:
 			clear_lanes.append(lane_idx)
 	return clear_lanes
 
+static func shuffle_with_rng(values: Array, rng: RandomNumberGenerator) -> Array:
+	var shuffled: Array = values.duplicate()
+	for index in range(shuffled.size() - 1, 0, -1):
+		var swap_index: int = rng.randi_range(0, index)
+		var value: Variant = shuffled[index]
+		shuffled[index] = shuffled[swap_index]
+		shuffled[swap_index] = value
+	return shuffled
+
 func _spawn_coin_trail(lane_idx: int) -> void:
 	if not _pickup_corridor_clear(lane_idx, -500.0, -50.0):
 		return
-	var count: int = randi_range(4, 6)
+	var count: int = _rng.randi_range(4, 6)
 	for i in range(count):
 		if collectibles_free.is_empty():
 			return
@@ -1687,12 +2048,19 @@ func _spawn_coin_trail(lane_idx: int) -> void:
 		c.setup("coin", lanes[lane_idx], -90.0 - i * 78.0)
 		collectibles_active.append(c)
 
-func _spawn_obstacle_in_lane(lane_idx: int) -> void:
-	if obstacles_free.is_empty(): return
+func _spawn_moment_obstacle(obstacle_type: String) -> bool:
+	if obstacle_type.is_empty() or player.current_lane not in _clear_lanes_for_wave():
+		return false
+	return _spawn_obstacle_in_lane(player.current_lane, obstacle_type)
+
+func _spawn_obstacle_in_lane(lane_idx: int, forced_type: String = "") -> bool:
+	if lane_idx < 0 or lane_idx >= num_lanes or obstacles_free.is_empty():
+		return false
 	var o: Obstacle = obstacles_free.pop_back()
-	var t: String = _pick_obstacle_type()
-	o.setup(t, lanes[lane_idx], -130.0)
+	var t: String = forced_type if forced_type in OBSTACLE_TYPES else _pick_obstacle_type()
+	o.setup(t, lanes[lane_idx], -130.0, _rng, _fx_rng)
 	obstacles_active.append(o)
+	return true
 
 func _nearest_lane_index(world_x: float) -> int:
 	var closest_index: int = 0
@@ -1725,7 +2093,7 @@ func _pick_collectible_lane() -> int:
 			clear_lanes.append(lane_idx)
 	if clear_lanes.is_empty():
 		return -1
-	return int(clear_lanes[randi() % clear_lanes.size()])
+	return int(clear_lanes[_rng.randi() % clear_lanes.size()])
 
 func _spawn_collectible_in_lane(lane_idx: int, t: String) -> void:
 	if lane_idx < 0 or lane_idx >= num_lanes or collectibles_free.is_empty():
@@ -1752,14 +2120,16 @@ func _pick_collectible_type(passenger_allowed: bool) -> String:
 	if passenger_allowed:
 		allowed.append("passenger")
 	var weights: Dictionary = current_route.get("collectible_weights", {})
-	return Routes.weighted_pick(weights, allowed, "coin")
+	return Routes.weighted_pick(weights, allowed, "coin", _rng)
 
 func _pick_obstacle_type() -> String:
 	var weights: Dictionary = current_route.get("obstacle_weights", {})
 	if elapsed < STARTER_WINDOW:
 		var starter_types: Array = ["bodaboda", "bajaji", "car", "pothole", "cone", "tire"]
-		return Routes.weighted_pick(weights, starter_types, "car")
-	return Routes.weighted_pick(weights, OBSTACLE_TYPES, "car")
+		return Routes.weighted_pick(weights, starter_types, "car", _rng)
+	if _route_moment_id == "truck_line" and _rng.randf() < 0.60:
+		return "truck"
+	return Routes.weighted_pick(weights, OBSTACLE_TYPES, "car", _rng)
 
 func _despawn_obstacle(o: Obstacle) -> void:
 	o.deactivate()
@@ -1785,7 +2155,7 @@ func _screen_shake(strength: float, duration: float) -> void:
 	_shake_tween = create_tween()
 	var steps: int = int(duration / 0.038)
 	for _i in range(steps):
-		var off := Vector2(randf_range(-strength, strength), randf_range(-strength, strength))
+		var off := Vector2(_fx_rng.randf_range(-strength, strength), _fx_rng.randf_range(-strength, strength))
 		_shake_tween.tween_property(camera, "offset", off, 0.038)
 	_shake_tween.tween_property(camera, "offset", Vector2.ZERO, 0.06)
 
@@ -1922,6 +2292,8 @@ func _move_left() -> void:
 	_ghost_events.append([elapsed, player.current_lane])
 	AudioManager.play_sfx("click")
 	FeedbackManager.tap()
+	if tutorial_stage == 1 and _tutorial_step == 0:
+		_advance_tutorial_step(1)
 
 func _move_right() -> void:
 	var previous_lane: int = player.current_lane
@@ -1931,6 +2303,8 @@ func _move_right() -> void:
 	_ghost_events.append([elapsed, player.current_lane])
 	AudioManager.play_sfx("click")
 	FeedbackManager.tap()
+	if tutorial_stage == 1 and _tutorial_step == 0:
+		_advance_tutorial_step(1)
 
 func _current_score() -> int:
 	return int(distance * 0.1) + bonus_score
@@ -1954,13 +2328,22 @@ func _end_run() -> void:
 	if game_over: return
 	game_over = true
 	AchievementManager.try_unlock("first_run")
+	var run_stats: Dictionary = _current_route_stats()
+	var route_goal_met: bool = Routes.is_goal_met(current_route, run_stats)
 	AnalyticsService.log_event("run_end", {
 		"score": _current_score(),
 		"coins": coins,
+		"distance": int(distance),
+		"passengers": passengers,
 		"dropoffs": dropoffs,
+		"near_misses": _run_near_misses,
 		"route": String(current_route.id),
 		"condition": condition,
 		"continued": _was_continued,
+		"end_reason": _end_reason,
+		"goal_met": route_goal_met,
+		"tutorial_stage": tutorial_stage,
+		"daily_route": GameState.is_daily_route_challenge_active(),
 	})
 	# Save ghost of best fresh (non-continued) run
 	if not _was_continued:
@@ -1976,6 +2359,7 @@ func _end_run() -> void:
 	GameState.record_run(_current_score(), coins, passengers, distance, _run_near_misses, {
 		"dropoffs": dropoffs,
 		"fares": fares_earned,
+		"combo_peak": combo_peak,
 		"onboard": onboard,
 		"fuel": fuel,
 		"elapsed": elapsed,
@@ -1985,10 +2369,22 @@ func _end_run() -> void:
 		"max_horn_charges": max_horn_charges,
 		"horn_regen_timer": horn_regen_timer,
 		"fuel_drain_mult": fuel_drain_mult,
+		"missed_stops": _missed_stops,
+		"fines": _fines,
+		"clean_checkpoints": _clean_checkpoints,
+		"route_moments": _route_moment_successes,
 		"condition": condition,
 		"rush_hour": rush_hour,
 		"end_reason": _end_reason,
+		"tutorial_stage": tutorial_stage,
 	})
+	if tutorial_stage > 0 and not _was_continued:
+		GameState.complete_tutorial_stage(tutorial_stage)
+		AnalyticsService.log_event("tutorial_stage_finished", {
+			"stage": tutorial_stage,
+			"step_reached": _tutorial_step,
+		})
+	OnlineService.flush_telemetry()
 	await get_tree().create_timer(0.55).timeout
 	TransitionManager.go_to("res://scenes/game_over.tscn")
 

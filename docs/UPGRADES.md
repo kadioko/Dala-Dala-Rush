@@ -1,8 +1,238 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-Current local closed-testing artifact: version 1.0.7 (code 8). Waves 5-15 are
-included in the signed, locally verified Godot 4.7.1 / API 36 bundle. This is a
-historical implementation log; release readiness is tracked in `ROADMAP.md`.
+Google Play production is active. The current signed production-track update is
+version 1.0.13 (code 14), built with Godot 4.7.1 / API 36 and including Waves
+16-29, the A21s main-menu fit pass, a responsive narrow-width fallback, and consent-gated Railway phone validation.
+Cloud sync, online leaderboards, and Gameplay Insights are enabled only after
+their separate in-app consents; complete phone QA and Play declarations before
+broad rollout. This is a historical implementation log; release readiness is
+tracked in `ROADMAP.md`.
+
+## Unreleased - Online State And Daily Run Reliability (September 28, 2026)
+
+- Normalized new and previously queued Gameplay Insights timestamps to whole
+  seconds, and skipped events outside Railway's 14-day acceptance window.
+- Kept Daily Run lane order, collectible types, and obstacle motion on the
+  seeded gameplay generator. Screen shake and obstacle colors use a separate
+  visual generator, so Reduced Effects does not alter traffic choices.
+- Made each route's saved personal best visible even when it falls outside the
+  overall local Top-5.
+- Reset leaderboard and insights consent, pending score uploads, cached boards,
+  and the cloud identity after confirmed online-account deletion. Local game
+  progress remains on the phone.
+- Shared one registration request across simultaneous cloud and insights
+  opt-ins; a switch turned off during a pending request stays off.
+- Added Godot contracts and a Railway telemetry endpoint test. These source
+  changes are not in the existing 1.0.13 / code 14 AAB.
+
+## Wave 29 - Competition Reliability And Fair Daily Runs (September 8, 2026)
+
+- Separated local Top-5 display rules from online submission rules: every
+  route personal best can be saved as a pending upload, retried after restart,
+  and backfilled once the player explicitly joins online competition.
+- Added route/tab request correlation, a 12-second request timeout, manual
+  refresh, cached standings with an age label, and stale-response rejection.
+- Added friend-list management, two-way remove controls, a compact target to
+  beat the next friend, and a clear Leave Online action that deletes the public
+  profile, scores, friend links, and friend codes without touching phone saves.
+- Added the daily equal-rules run: deterministic route/traffic seed, Classic
+  Blue starter dala, no consumables, and no rewarded revive.
+- Results now name the next locked dala, its primary perk, and the remaining
+  coin cost. Leaderboard rows use stable 52px mobile touch-friendly spacing,
+  clipped long-name presentation, and full-name tooltips.
+- Added a separate Gameplay Insights opt-in and a Railway event endpoint which
+  accepts only sanitized tutorial/run/retention/leaderboard-friction events.
+  It remains independently opt-in with the rest of Railway online features.
+
+## Wave 28 - Social Leaderboards (September 4, 2026)
+
+- Replaced the static local top-five view with route-aware Personal, Friends,
+  and World leaderboard tabs, a persistent driver name, and clear offline
+  fallback behavior.
+- Added opt-in-only profile/score requests, short-lived friend codes, and
+  server ranking queries that use each driver's single best score per route.
+- Added schema 11 save repair, backend migration `003_social_leaderboards.sql`,
+  bilingual copy, and privacy documentation. The Railway migration and
+  disposable two-account server smoke test passed. The release guard remains
+  off: physical two-phone QA and Play declarations are required before public use.
+
+## Wave 27 - Railway Cloud Pilot (September 2, 2026)
+
+- Deployed the Railway/PostgreSQL API, completed private-network migrations,
+  assigned and verified its public health endpoint, and smoke-tested anonymous
+  registration, cloud backup, phone transfer, and cascading account deletion.
+- Added bilingual Settings consent, one-off backup/restore, delete-cloud-data,
+  and short-lived phone-move controls. The Settings layout now scrolls within
+  Android safe areas rather than clipping on shorter screens.
+- Bumped save repair to schema 10. Release cloud sync is deliberately disabled:
+  debug builds can exercise the pilot; this code-10 build keeps it off until
+  two physical-phone results and final Play declarations are complete.
+
+## Wave 26 - Railway Online Services Foundation (September 2, 2026)
+
+- Replaced the Firebase-as-database direction with a source-ready Railway +
+  PostgreSQL service for optional cloud saves, server-side referral gates, and
+  an explicitly unverified leaderboard.
+- Added a disabled-by-default Godot `OnlineService` seam, filtered cloud-save
+  snapshots, anonymous server-issued device credentials, and schema 9 repair.
+  Nothing uploads until a reviewed HTTPS Railway URL and explicit future opt-in
+  UI are deliberately added to a later build.
+- Added backend validation tests, idempotent SQL migration, deployment runbook,
+  and safeguards against uploading referral codes, names, analytics history,
+  sync secrets, or advertising identifiers.
+
+## Wave 24 - Release Evidence And Live Balance (September 2, 2026)
+
+- Added a GitHub Pages remote-config source with strict allow-listed values,
+  conservative route corrections, offline cache fallback, and new controls for
+  passenger cadence, stop spacing, and rush-hour likelihood.
+- Fixed the offline analytics journal to persist each event instead of waiting
+  for its 500-event cap, protecting phone-QA evidence during short test runs.
+- Added a two-device QA worksheet and a Firebase production handoff that keeps
+  the app honest about the current offline-only telemetry state.
+- Created and verified the signed `1.0.8` / code `9` AAB: JAR signature passes
+  and its generated release manifest includes the AdMob App ID and Android
+  Advertising ID permission. Physical-device QA remains required before upload.
+
+## Wave 25 - Route Contracts And Seasonal Events (September 2, 2026)
+
+- Source-only after the code-9 AAB: added compact rotating daily Route Contracts to every route. They unlock only
+  after onboarding, have route-appropriate skill goals, reward once per route
+  per local day, and appear on route selection/results instead of distracting
+  the driving HUD.
+- Turned seasonal-event scaffolding into working product behavior: main-menu
+  event copy is bilingual and the remote daily multiplier now affects daily
+  challenge and streak rewards, with a conservative `1x` to `2x` guard.
+- Bumped save normalization to schema 8 for route-contract claim dates and
+  added catalog, claim-idempotency, localization, and migration contracts.
+
+## Wave 23 - Route Job Profiles (September 2, 2026)
+
+- Moved route identity further into the actual driving rules. Kariakoo now
+  creates faster passenger and stop opportunities; Mwenge stays reaction-led;
+  Mbezi gives longer truck-road spacing and gentler fuel use; Posta remains
+  controlled; Kigamboni has meaningful rain and fuel pressure; and Ubungo has
+  a much higher rush-hour likelihood with tighter service rhythm.
+- Route conditions are now selected from catalog weights after onboarding, so
+  a route can have a recognizable road character without hard-coding another
+  conditional chain in the game loop. Guided runs and rewarded continues stay
+  deterministic and fair.
+- Driver Reputation now records an ordinary collision as a visible 10-point
+  service cost. Results localize that cost in the ledger, making the rating
+  agree with the player's driving outcome instead of treating a crash as free.
+- Added contracts for job profile ranges, weighted route conditions, and the
+  crash reputation cost.
+- A newly unlocked vehicle now names its strongest practical benefit in the
+  Garage in Swahili or English, turning the first vehicle purchase into a
+  small, self-explanatory progression moment.
+
+## Wave 18 - Route Mastery (September 2, 2026)
+
+- Added a permanent three-star mastery track to every route. One star requires
+  the route score target, two adds the route goal, and three adds an A Driver
+  Reputation. The next requirement is visible in Swahili and English on route
+  cards, in the pre-run briefing, and after each run.
+- New stars pay a small, one-time coin reward. Star state is saved per route,
+  results call out the exact reward, route selection totals all 18 available
+  stars, and Career Stats shows each route's score beside its current stars.
+- Bumped local save normalization to schema 6 with strict 0-3 route-mastery
+  repair. Added catalog threshold/reward, progression, idempotency, and save
+  repair logic contracts.
+
+## Wave 19 - Clear Driver Feedback (September 2, 2026)
+
+- Turned the Driver Reputation result into a bilingual service report. It now
+  shows the 50-point base, exact gains for service and skilled driving, and
+  exact costs from missed stops, fines, and fuel failure.
+- Centralized the score ledger in `GameState.calculate_reputation()` with
+  explicit positive/negative totals. The displayed rating remains capped at
+  0-100 and has a logic contract to prevent the explanation drifting from the
+  actual score.
+
+## Wave 20 - Signature Route Jobs (September 2, 2026)
+
+- Made every route moment a clear mini-job with a bilingual live action prompt.
+  Fare Rush requests a nearby stop, Boda Watch, Truck Line, and Clean
+  Checkpoint offer their specific readable traffic target, Fuel Scout offers a
+  safe can, and Jam Breaker now requires a horn press instead of completing
+  automatically.
+- Clean Checkpoint is only offered while the dala dala is not overloaded.
+  Moment opportunities are tracked when they time out, and contracts now ensure
+  every route has its required title, announcement, and action copy in both
+  supported languages.
+
+## Wave 21 - Guided City Discovery (September 2, 2026)
+
+- Added a persistent, one-at-a-time discovery sequence for the first-session
+  journey. Players are now introduced to the full city, Mwenge, Route Mastery,
+  weather/rush-hour conditions, ghost races, and police chases only as those
+  systems become relevant.
+- Bumped save normalization to schema 7 with a strict allow-list for seen
+  discoveries and idempotency coverage. Fixed the police-chase update branch so
+  it only advances while a chase actually exists.
+
+## Wave 22 - Driving Flow (September 2, 2026)
+
+- Reworked the old coin-only combo into a capped `x8` Driving Flow. Coins,
+  close calls, and serving a kituo now connect into one small, readable reward
+  loop that celebrates skilled daladala driving instead of random collection.
+- Coin value remains the only scaled reward, protecting fare, goal, mastery,
+  mission, and ad economies. Best Flow appears on results and survives a
+  rewarded continue; contracts cover its action math and hard cap.
+
+## Wave 17 - Route Operator Loop (September 2, 2026)
+
+- Turned the six routes into more distinct jobs with a single readable,
+  favorable signature moment each: Kariakoo Fare Rush, Mwenge Boda Watch,
+  Mbezi Truck Line, Posta Clean Checkpoint, Kigamboni Fuel Scout, and Ubungo
+  Jam Breaker. Moments award a small skill bonus, never add an unavoidable
+  hazard, and are tracked locally for tuning.
+- Added the offline Driver Reputation result (A-D / 0-100). It combines safe
+  drop-offs, passengers, near misses, goals, clean checkpoints, and signature
+  moments; missed stops, fines, and fuel failure reduce it. It is a feedback
+  score, not a new currency or monetization lever.
+- Added a compact Run Highlights treatment at results, personal best delta,
+  progressive discovery messages after the third guided run and first Kariakoo
+  route goal, plus delayed weather/ghost/chase exposure for new profiles.
+- Made route personality legible in the actual player flow: the route selector
+  previews each signature moment, the live HUD shows its short countdown only
+  when no urgent warning is present, and results tint the A-D reputation grade
+  by service quality.
+- Added subtle route-specific procedural horn pitch, local session/return
+  markers, route-moment and vehicle-unlock analytics events. Data stays in the
+  privacy-filtered offline journal until Firebase/Crashlytics is deliberately
+  installed and verified.
+- Bumped save normalization to schema 5 for best reputation and aggregate
+  lifecycle markers. Added route-signature and reputation logic contracts;
+  Godot 4.7.1 parser and headless contracts pass.
+
+## Wave 16 - First Route, Better Signals (August 28, 2026)
+
+- Added a persistent, non-modal three-run first-session journey for fresh
+  installs: lane change and coin collection, passenger pickup and a guided
+  kituo, then horn use and slow motion. Existing saves skip the lessons, and a
+  rewarded continue never restarts one.
+- The route briefing now introduces the current lesson when it is active; the
+  live HUD keeps its normal goal but gives the compact lesson instruction the
+  top priority until the player completes it.
+- Added a results `Next Step` line: complete a route goal to explore/improve,
+  refill earlier after a fuel finish, or retry with the crash coaching advice.
+- Moved safe balance controls into validated remote config: global and
+  per-route spawn/fuel/coin values, speed-ramp scale, and kituo cadence.
+  Defaults are gentler for new drivers: 10% lower fuel drain, 5% slower ramps,
+  and 18-28 second stops.
+- Rebalanced all six route multipliers conservatively and reduced vehicle
+  prices to 125-1400 coins so the first garage unlock arrives through ordinary
+  play rather than a long early grind.
+- Added visible near-miss shake plus a light haptic, and a dedicated horn
+  haptic so these two driving decisions have distinct mobile feedback.
+- Fixed the offline analytics journal to persist every event, sanitize values,
+  exclude names/codes, and capture app open, run funnel, tutorial funnel,
+  route selection, config source, and ad funnel events. Firebase/Crashlytics
+  delivery remains intentionally unimplemented until a tested plugin is added.
+- Bumped local save normalization to schema 4 for tutorial progress. Added
+  tutorial migration and remote-config guard contracts; Godot 4.7.1 parser and
+  headless logic contracts pass.
 
 ## Wave 15 - Offline Invite & Earn (August 24, 2026)
 
@@ -317,7 +547,7 @@ Vituo loop (constants atop `scripts/game.gd`):
 - Fares: `FARE_NORMAL 2`, `FARE_OVERLOAD 3` (+2/lvl sound upgrade per stop).
 - Overload: `OVERLOAD_HANDLING 0.07` lane-time/excess,
   `OVERLOAD_FUEL 0.04` drain/excess, `POLICE_FINE_PER_EXCESS 5`.
-- Kituo gap 20–32 s; waiting 2–5; boards up to 8 (overload only via
+- Kituo gap 18–28 s by default (remote-tunable); waiting 2–5; boards up to 8 (overload only via
   roadside pickups — deliberate player choice).
 
 Chase: every 35–55 s @50% after 40 s; 10 s duration; caught after 2.2 s
@@ -328,7 +558,7 @@ Conditions: day 40% / dusk 20% / night 20% / rain 20%; rush 25%
 
 Power-ups: magnet 6 s, slow 4 s (+1 s/brake lvl), boost 3 s ×1.45.
 
-Economy sinks: vehicles 150–1600, route unlocks 150–1400, upgrades
+Economy sinks: vehicles 125–1400, route unlocks 150–1400, upgrades
 150–1100, consumables 25–40. Sources: pickups, fares, goals 35–100,
 daily 60–100, missions 25–80, streak 10–60, season levels 30×level,
 rank-ups 50×rank.
@@ -344,5 +574,5 @@ Kariakoo.
 
 - Swahili remains default; humor in short lines.
 - No real brands/operators/logos; police content family-friendly.
-- New-player path: Kariakoo (the only unlocked route) → first kituo at
-  9 s teaches the loop → goal completion unlocks Mwenge.
+- New-player path: Kariakoo (the only unlocked route) → guided lane/coin run
+  → passenger/kituo run → horn/power-up run → regular route goals unlock Mwenge.

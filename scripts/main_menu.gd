@@ -6,6 +6,7 @@ const RoadCls    := preload("res://scripts/entities/road.gd")
 const Vehicles   := preload("res://data/vehicles.gd")
 const Routes     := preload("res://data/routes.gd")
 const DailyChallengesData := preload("res://data/daily_challenges.gd")
+const DailyRouteChallengeData := preload("res://data/daily_route_challenge.gd")
 const LoginStreakData := preload("res://data/login_streak.gd")
 const ReferralsData := preload("res://data/referrals.gd")
 
@@ -14,6 +15,8 @@ var _subtitle: Label
 var _high_score_label: Label
 var _coin_label: Label
 var _daily_label: Label
+var _daily_route_btn: Button
+var _event_label: Label
 var _streak_label: Label
 var _streak_result: Dictionary = {}
 var _rank_label: Label
@@ -28,6 +31,8 @@ var _btn_stats: Button
 var _btn_leaderboard: Button
 var _btn_missions: Button
 var _btn_referrals: Button
+var _info_grid: GridContainer
+var _utility_grid: GridContainer
 
 # Animated background
 var _scroll_t: float = 0.0
@@ -36,6 +41,8 @@ var _dala_dir: int = 1
 var _dala_draw: _DalaDalaAnim
 
 func _ready() -> void:
+	GameState.finish_daily_route_challenge()
+	get_viewport().size_changed.connect(_apply_responsive_layout)
 	# ── Animated road background ──────────────────────────────────
 	var vsize := get_viewport_rect().size
 	var bg_road := RoadCls.new()
@@ -61,8 +68,10 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.anchor_right = 1.0
 	scroll.anchor_bottom = 1.0
-	scroll.offset_left = 18
-	scroll.offset_right = -18
+	# A21-class phones are narrow enough that the menu needs a little more
+	# breathing room at both edges than the old 18px inset provided.
+	scroll.offset_left = 24
+	scroll.offset_right = -24
 	scroll.offset_top = 22 + UIFactory.safe_top_inset(vsize.y)
 	scroll.offset_bottom = -76 - UIFactory.safe_bottom_inset(vsize.y)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -85,6 +94,18 @@ func _ready() -> void:
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_subtitle)
+	_event_label = UIFactory.make_label("", 15, Color("#2ecc71"))
+	_event_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_event_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_event_label.visible = false
+	v.add_child(_event_label)
+
+	# The first decision on the menu is always the route, not a secondary system.
+	_btn_play = UIFactory.make_button("")
+	_btn_play.custom_minimum_size = Vector2(0, 64)
+	_btn_play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_play.pressed.connect(_on_play)
+	v.add_child(_btn_play)
 
 	# Career rank badge (+ rank-up reward check)
 	_rank_label = UIFactory.make_label("", 16, Color("#d4af37"))
@@ -113,6 +134,12 @@ func _ready() -> void:
 	_daily_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_daily_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_daily_label)
+	_daily_route_btn = UIFactory.make_button("", false)
+	_daily_route_btn.custom_minimum_size = Vector2(0, 50)
+	_daily_route_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_daily_route_btn.add_theme_font_size_override("font_size", 20)
+	_daily_route_btn.pressed.connect(_on_daily_route)
+	v.add_child(_daily_route_btn)
 
 	# Daily login streak (claims reward on first open of the day).
 	# Tapping the row opens the 7-day reward calendar.
@@ -132,45 +159,43 @@ func _ready() -> void:
 
 	v.add_child(_spacer(4))
 
-	_btn_play = UIFactory.make_button("")
-	_btn_play.custom_minimum_size = Vector2(0, 64)
-	_btn_play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn_play.pressed.connect(_on_play)
-	v.add_child(_btn_play)
-
-	# Stats / Leaderboard side-by-side row
-	var info_row := HBoxContainer.new()
-	info_row.add_theme_constant_override("separation", 6)
-	info_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(info_row)
+	# This row becomes a vertical list below the compact-width breakpoint.
+	_info_grid = GridContainer.new()
+	_info_grid.columns = info_menu_columns_for_width(vsize.x)
+	_info_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_info_grid.add_theme_constant_override("h_separation", 6)
+	_info_grid.add_theme_constant_override("v_separation", 6)
+	v.add_child(_info_grid)
 
 	_btn_stats = UIFactory.make_button("", false)
-	_btn_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# Compact navigation shares one row on phones. Clear UIFactory's 280px
+	# default so localized labels never push the menu wider than the viewport.
 	_btn_stats.custom_minimum_size = Vector2(0, 56)
-	_btn_stats.add_theme_font_size_override("font_size", 18)
+	_btn_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_stats.add_theme_font_size_override("font_size", 17)
 	_btn_stats.pressed.connect(func(): _go("res://scenes/stats.tscn"))
-	info_row.add_child(_btn_stats)
+	_info_grid.add_child(_btn_stats)
 
 	_btn_leaderboard = UIFactory.make_button("", false)
-	_btn_leaderboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_leaderboard.custom_minimum_size = Vector2(0, 56)
-	_btn_leaderboard.add_theme_font_size_override("font_size", 18)
+	_btn_leaderboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_leaderboard.add_theme_font_size_override("font_size", 17)
 	_btn_leaderboard.pressed.connect(func(): _go("res://scenes/leaderboard.tscn"))
-	info_row.add_child(_btn_leaderboard)
+	_info_grid.add_child(_btn_leaderboard)
 
 	_btn_missions = UIFactory.make_button("", false)
-	_btn_missions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_missions.custom_minimum_size = Vector2(0, 56)
-	_btn_missions.add_theme_font_size_override("font_size", 18)
+	_btn_missions.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_missions.add_theme_font_size_override("font_size", 17)
 	_btn_missions.pressed.connect(func(): _go("res://scenes/missions.tscn"))
-	info_row.add_child(_btn_missions)
+	_info_grid.add_child(_btn_missions)
 
-	var utility_grid := GridContainer.new()
-	utility_grid.columns = 2
-	utility_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	utility_grid.add_theme_constant_override("h_separation", 8)
-	utility_grid.add_theme_constant_override("v_separation", 8)
-	v.add_child(utility_grid)
+	_utility_grid = GridContainer.new()
+	_utility_grid.columns = utility_menu_columns_for_width(vsize.x)
+	_utility_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_utility_grid.add_theme_constant_override("h_separation", 8)
+	_utility_grid.add_theme_constant_override("v_separation", 8)
+	v.add_child(_utility_grid)
 
 	for pair in [
 		["", "res://scenes/routes.tscn"],
@@ -184,7 +209,7 @@ func _ready() -> void:
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.add_theme_font_size_override("font_size", 18)
 		btn.pressed.connect(func(): _go(path))
-		utility_grid.add_child(btn)
+		_utility_grid.add_child(btn)
 		match path:
 			"res://scenes/routes.tscn":   _btn_routes   = btn
 			"res://scenes/garage.tscn":   _btn_garage   = btn
@@ -210,11 +235,25 @@ func _ready() -> void:
 
 	LocaleManager.locale_changed.connect(_refresh_text)
 	_refresh_text()
+	call_deferred("_apply_responsive_layout")
 	AdService.show_banner(self, AdService.PLACEMENT_BANNER_MENU)
 	set_process(true)
 
 func _exit_tree() -> void:
 	AdService.hide_banner()
+
+static func info_menu_columns_for_width(viewport_width: float) -> int:
+	return 1 if viewport_width < 500.0 else 3
+
+static func utility_menu_columns_for_width(viewport_width: float) -> int:
+	return 1 if viewport_width < 380.0 else 2
+
+func _apply_responsive_layout() -> void:
+	if not is_instance_valid(_info_grid) or not is_instance_valid(_utility_grid):
+		return
+	var viewport_width: float = get_viewport_rect().size.x
+	_info_grid.columns = info_menu_columns_for_width(viewport_width)
+	_utility_grid.columns = utility_menu_columns_for_width(viewport_width)
 
 func _process(delta: float) -> void:
 	_scroll_t += delta
@@ -255,6 +294,14 @@ func _refresh_text(_l := "") -> void:
 	_coin_label.text       = "🪙 %d" % int(SaveSystem.get_value("total_coins", 0))
 	_btn_play.text         = LocaleManager.t("PLAY")
 	_daily_label.text      = _daily_text()
+	var daily_route: Dictionary = DailyRouteChallengeData.current()
+	_daily_route_btn.text = LocaleManager.t("DAILY_ROUTE_PLAY").replace(
+		"{route}", LocaleManager.t(String(Routes.get_by_id(String(daily_route.get("route_id", "kariakoo"))).get("name_key", "ROUTE_KARIAKOO"))))
+	var event_text: String = RemoteConfig.event_banner_for(LocaleManager.current_locale)
+	_event_label.text = event_text
+	_event_label.visible = not event_text.is_empty()
+	if not event_text.is_empty():
+		AnalyticsService.log_event("live_event_seen", {"active": true})
 	_streak_label.text     = _streak_text()
 	var rank_txt := "🧢 %s" % LocaleManager.t(Career.rank_key())
 	if not _rank_up.is_empty():
@@ -273,6 +320,11 @@ func _refresh_text(_l := "") -> void:
 
 func _on_play() -> void:
 	AudioManager.play_sfx("click")
+	TransitionManager.go_to("res://scenes/game.tscn")
+
+func _on_daily_route() -> void:
+	AudioManager.play_sfx("click")
+	GameState.start_daily_route_challenge()
 	TransitionManager.go_to("res://scenes/game.tscn")
 
 func _go(path: String) -> void:

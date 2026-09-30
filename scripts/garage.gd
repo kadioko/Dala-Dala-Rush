@@ -10,6 +10,8 @@ var _list_box: VBoxContainer
 var _entries: Array = []
 var _coin_label: Label
 var _livery_btn: Button
+var _unlock_notice: Label
+var _unlock_notice_text: String = ""
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
@@ -29,6 +31,10 @@ func _ready() -> void:
 	root.add_child(_title)
 	_coin_label = UIFactory.make_label("", 18, UIFactory.COL_ACCENT)
 	root.add_child(_coin_label)
+	_unlock_notice = UIFactory.make_label("", 16, Color("#2ecc71"))
+	_unlock_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_unlock_notice.visible = false
+	root.add_child(_unlock_notice)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -85,6 +91,8 @@ func _refresh(_l := "") -> void:
 	_back_btn.text = LocaleManager.t("BACK")
 	_livery_btn.text = "🎨 " + LocaleManager.t("LIVERY")
 	_coin_label.text = "%s: %d" % [LocaleManager.t("COINS"), int(SaveSystem.get_value("total_coins", 0))]
+	_unlock_notice.text = _unlock_notice_text
+	_unlock_notice.visible = not _unlock_notice_text.is_empty()
 	for e in _entries:
 		var v: Dictionary = e.veh
 		var vehicle_name := LocaleManager.t(v.name_key)
@@ -102,6 +110,7 @@ func _on_vehicle_pressed(id: String) -> void:
 	AudioManager.play_sfx("click")
 	if SaveSystem.is_vehicle_unlocked(id):
 		GameState.set_vehicle(id)
+		_unlock_notice_text = ""
 		_build_rows()
 		_refresh()
 		return
@@ -110,6 +119,10 @@ func _on_vehicle_pressed(id: String) -> void:
 	if SaveSystem.spend_coins(int(v.price)):
 		SaveSystem.unlock_vehicle(id)
 		GameState.set_vehicle(id)
+		_unlock_notice_text = LocaleManager.t("VEHICLE_READY").replace(
+			"{name}", LocaleManager.t(String(v.name_key))).replace(
+			"{perk}", _vehicle_primary_perk(v))
+		AnalyticsService.log_event("vehicle_unlocked", {"vehicle": id, "price": int(v.price)})
 		AudioManager.play_sfx("powerup")
 		_build_rows()
 	SaveSystem.end_batch()
@@ -130,3 +143,16 @@ func _vehicle_stats(vehicle: Dictionary) -> String:
 		LocaleManager.t("COIN_BONUS"), coin,
 		LocaleManager.t("HORN_CHARGES"), horns,
 	]
+
+func _vehicle_primary_perk(vehicle: Dictionary) -> String:
+	var coin_bonus: int = int(round((float(vehicle.get("coin_mult", 1.0)) - 1.0) * 100.0))
+	if coin_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_COINS").replace("{n}", str(coin_bonus))
+	var fuel_bonus: int = int(round((1.0 / float(vehicle.get("fuel_drain_mult", 1.0)) - 1.0) * 100.0))
+	if fuel_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_FUEL").replace("{n}", str(fuel_bonus))
+	var handling_bonus: int = int(round((0.14 / float(vehicle.get("lane_time", 0.14)) - 1.0) * 100.0))
+	if handling_bonus > 0:
+		return LocaleManager.t("VEHICLE_PERK_HANDLING").replace("{n}", str(handling_bonus))
+	var horns: int = int(vehicle.get("horn_charges", 3))
+	return LocaleManager.t("VEHICLE_PERK_HORN").replace("{n}", str(horns))

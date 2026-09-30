@@ -2,7 +2,8 @@
 
 Use this as the launch checklist for Dala Dala Rush TZ.
 
-Last verified against local configuration: August 19, 2026.
+Last updated against local configuration: September 30, 2026. The Play
+production track is active.
 
 Build the signed bundle with `docs/ANDROID_RELEASE_BUILD.md`, then return here
 for store assets, declarations, and rollout checks.
@@ -10,19 +11,24 @@ for store assets, declarations, and rollout checks.
 ## Build Status
 
 - Package name: `com.kadioko.daladalarush`
-- Current local closed-testing artifact: `1.0.7`
-- Current local version code: `8`
-- Artifact status: signed and locally verified; not tracked in Git
-- Local artifact: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
+- Current production-track update: `1.0.13`
+- Current version code: `14`
+- Next release candidate: `1.0.14`, code `15`
+- Candidate status: signed and locally verified; Play processing and physical-device QA remain required
+- Last production artifact: `exports/android/DalaDalaRushTZ-production-v13.aab`
+- Candidate artifact: `exports/android/DalaDalaRushTZ-production-v14.aab`
 - Min SDK: `24`
 - Target SDK: `36`
 - Export format: Android App Bundle (`.aab`)
 - Gradle/custom build: enabled for AdMob
-- Release AAB path: `exports/android/DalaDalaRushTZ-closed-testing-v7.aab`
+- Release AAB path: `exports/android/DalaDalaRushTZ-production-v14.aab`
 - Debug APK path: `exports/android/DalaDalaRushTZ-debug.apk`
 - Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
-- Source status: Wave 15 referrals and main-menu polish are included in the
-  locally verified code 8 artifact.
+- Source status: the signed code-14 artifact contains Waves 16-29, the A21s
+  main-menu fit pass plus responsive narrow-width fallback, and consent-gated cloud-pilot UI. Cloud sync,
+  online leaderboards, and Gameplay Insights remain off until each player opts
+  in. Complete two-phone QA and update Play privacy/Data Safety declarations
+  before broad rollout.
 
 Before a replacement upload, check every Play track first. Google Play rejects
 a bundle whose code is not higher than every previously uploaded artifact. If
@@ -170,7 +176,7 @@ Detailed copy/paste answers are in
 - Verify ads use test mode or test devices before public release.
 - Do not click live ads during development.
 - Confirm the release AAB uploads successfully to an internal testing track.
-- Run a closed/internal test before production.
+- Use staged production rollout and Play pre-launch reporting for every update.
 - Verify the merged release manifest contains
   `com.google.android.gms.permission.AD_ID` and the AdMob application ID.
 - Complete a reward-heavy run, force-close from results, and confirm every
@@ -186,6 +192,6 @@ Detailed copy/paste answers are in
 - Confirm `support@kadioko.com` is monitored.
 - Test real AdMob callbacks and consent behavior on a registered test device.
 - Review final Data safety answers against the exact SDK version.
-- Upload the verified code 8 AAB from current source, then inspect Play Console
-  warnings before rollout.
-- Use finalized bilingual notes from `docs/RELEASE_NOTES_1.0.7.md`.
+- Inspect Play Console warnings after the code-13 upload; make the next
+  never-before-used code only after physical-device QA identifies a fix.
+- Create finalized bilingual notes that match the newly exported AAB.

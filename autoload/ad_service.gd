@@ -63,6 +63,10 @@ func is_rewarded_available(_placement: String = "") -> bool:
 	return SIMULATE_IN_DEBUG and OS.is_debug_build()
 
 func show_rewarded(placement: String) -> void:
+	AnalyticsService.log_event("ad_rewarded_requested", {
+		"placement": placement,
+		"sdk_ready": _plugin != null,
+	})
 	if _plugin != null and _rewarded_loaded:
 		_pending_placement = placement
 		_plugin_show_rewarded()
@@ -88,6 +92,7 @@ func note_completed_run() -> void:
 	if since >= target:
 		SaveSystem.set_value("ads_pending_interstitial", true)
 	SaveSystem.end_batch()
+	AnalyticsService.log_event("ad_interstitial_paced", {"runs_since": since, "target": target})
 
 func consume_pending_interstitial() -> bool:
 	if not bool(SaveSystem.get_value("ads_pending_interstitial", false)):
@@ -100,6 +105,10 @@ func consume_pending_interstitial() -> bool:
 	return true
 
 func show_interstitial(placement: String) -> void:
+	AnalyticsService.log_event("ad_interstitial_requested", {
+		"placement": placement,
+		"sdk_ready": _plugin != null,
+	})
 	if _plugin != null and _interstitial_loaded:
 		_pending_placement = placement
 		_plugin_show_interstitial()
@@ -207,15 +216,18 @@ func _on_rewarded_loaded(ad: Variant) -> void:
 	_rewarded_ad = ad
 	_rewarded_ad.full_screen_content_callback = _rewarded_content_callback
 	_rewarded_loaded = true
+	AnalyticsService.log_event("ad_rewarded_loaded")
 
 func _on_rewarded_failed_to_load(error: Variant) -> void:
 	push_warning("Rewarded ad failed to load: " + _ad_error_message(error))
 	_rewarded_loaded = false
+	AnalyticsService.log_event("ad_rewarded_load_failed")
 
 func _on_user_earned_reward(_item: Variant) -> void:
 	_rewarded_earned = true
 	if not _rewarded_result_sent:
 		_rewarded_result_sent = true
+		AnalyticsService.log_event("ad_rewarded_earned", {"placement": _pending_placement})
 		rewarded_result.emit(_pending_placement, true)
 
 func _on_rewarded_dismissed() -> void:
@@ -235,10 +247,12 @@ func _on_interstitial_loaded(ad: Variant) -> void:
 	_interstitial_ad = ad
 	_interstitial_ad.full_screen_content_callback = _interstitial_content_callback
 	_interstitial_loaded = true
+	AnalyticsService.log_event("ad_interstitial_loaded")
 
 func _on_interstitial_failed_to_load(error: Variant) -> void:
 	push_warning("Interstitial ad failed to load: " + _ad_error_message(error))
 	_interstitial_loaded = false
+	AnalyticsService.log_event("ad_interstitial_load_failed")
 
 func _on_interstitial_dismissed() -> void:
 	interstitial_closed.emit(_pending_placement)
@@ -252,9 +266,11 @@ func _on_interstitial_failed_to_show(error: Variant) -> void:
 func _on_banner_loaded() -> void:
 	if _ad_view:
 		_ad_view.show()
+	AnalyticsService.log_event("ad_banner_loaded")
 
 func _on_banner_failed_to_load(error: Variant) -> void:
 	push_warning("Banner ad failed to load: " + _ad_error_message(error))
+	AnalyticsService.log_event("ad_banner_load_failed")
 
 func _ad_error_message(error: Variant) -> String:
 	if error is Object:

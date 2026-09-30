@@ -11,6 +11,14 @@ const LocaleScript := preload("res://autoload/locale_manager.gd")
 const AchievementScript := preload("res://autoload/achievement_manager.gd")
 const GameScript := preload("res://scripts/game.gd")
 const ReferralsData := preload("res://data/referrals.gd")
+const RemoteConfigScript := preload("res://autoload/remote_config.gd")
+const RouteContractsData := preload("res://data/route_contracts.gd")
+const OnlineServiceScript := preload("res://autoload/online_service.gd")
+const AnalyticsScript := preload("res://autoload/analytics_service.gd")
+const DailyRouteChallengeData := preload("res://data/daily_route_challenge.gd")
+const MainMenuScript := preload("res://scripts/main_menu.gd")
+const ObstacleScript := preload("res://scripts/entities/obstacle.gd")
+const LeaderboardScript := preload("res://scripts/leaderboard.gd")
 
 const OBSTACLE_IDS := [
 	"bodaboda", "bajaji", "car", "pothole", "cone", "police",
@@ -20,6 +28,9 @@ const COLLECTIBLE_IDS := [
 	"coin", "passenger", "fuel", "shield", "magnet", "speed_boost", "slow",
 ]
 const GOAL_TYPES := ["score", "coins", "distance", "near_misses", "passengers"]
+const ROUTE_SIGNATURE_IDS := [
+	"fare_rush", "boda_watch", "truck_line", "checkpoint_clear", "fuel_scout", "jam_breaker",
+]
 const MISSION_TYPES := [
 	"coins", "dropoffs", "near_misses", "passengers", "distance",
 	"horn_uses", "boosts", "fares", "score_best",
@@ -30,6 +41,7 @@ var _failures: Array[String] = []
 func _ready() -> void:
 	_check_locales()
 	_check_launch_copy()
+	_check_menu_layout_breakpoints()
 	_check_routes()
 	_check_vehicles()
 	_check_missions()
@@ -38,7 +50,19 @@ func _ready() -> void:
 	_check_referrals()
 	_check_referral_reward_idempotency()
 	_check_distance_scale()
+	_check_combo_contract()
 	_check_save_normalization()
+	_check_cloud_snapshot()
+	_check_online_account_reset()
+	_check_railway_telemetry()
+	_check_route_mastery()
+	_check_route_contracts()
+	_check_daily_route_challenge()
+	_check_daily_traffic_randomness()
+	_check_discovery_persistence()
+	_check_first_session_flow()
+	_check_remote_tuning_guards()
+	_check_reputation_contract()
 	_check_selection_guards()
 	_check_reward_idempotency()
 	if _failures.is_empty():
@@ -68,6 +92,9 @@ func _check_locales() -> void:
 	for key_value in en.keys():
 		var key := String(key_value)
 		_check(sw.has(key), "Swahili is missing locale key " + key)
+	for discovery_key in SaveScript.DISCOVERY_KEYS:
+		_check(sw.has(discovery_key) and en.has(discovery_key),
+			"Discovery %s must have Swahili and English copy" % discovery_key)
 	locale_node.free()
 
 func _check_launch_copy() -> void:
@@ -83,10 +110,29 @@ func _check_launch_copy() -> void:
 			"%s preparation copy must fit the countdown" % locale_id)
 	_check(String((all_strings.get("sw", {}) as Dictionary).get("GO_TEXT", "")) == "TWENDE!",
 		"Swahili launch cue must use the natural Twende wording")
+	_check((all_strings.get("sw", {}) as Dictionary).has("LEADERBOARD_WORLD_OPEN")
+		and (all_strings.get("en", {}) as Dictionary).has("LEADERBOARD_WORLD_OPEN"),
+		"Public World leaderboard instructions must exist in both locales")
 	locale_node.free()
+
+func _check_menu_layout_breakpoints() -> void:
+	_check(MainMenuScript.info_menu_columns_for_width(540.0) == 3,
+		"Reference portrait width should use compact three-item navigation")
+	_check(MainMenuScript.info_menu_columns_for_width(499.0) == 1,
+		"Narrow portrait widths must stack navigation instead of overflowing")
+	_check(MainMenuScript.utility_menu_columns_for_width(412.0) == 2,
+		"Common narrow phones should retain a two-column utility grid")
+	_check(MainMenuScript.utility_menu_columns_for_width(360.0) == 1,
+		"Small portrait widths must stack utility actions instead of overflowing")
+	_check(LeaderboardScript.dialog_width_for_viewport(360.0, 440) == 328,
+		"Leaderboard dialogs must fit a compact 360px phone")
+	_check(LeaderboardScript.dialog_width_for_viewport(540.0, 440) == 440,
+		"Leaderboard dialogs should retain a comfortable width on larger phones")
 
 func _check_routes() -> void:
 	var ids: Dictionary = {}
+	var locale_node: Node = LocaleScript.new()
+	var all_strings: Dictionary = locale_node.get("strings")
 	for route_value in RoutesData.LIST:
 		var route: Dictionary = route_value
 		var id := String(route.get("id", ""))
@@ -103,9 +149,51 @@ func _check_routes() -> void:
 			"Route %s needs positive difficulty" % id)
 		_check(float(route.get("spawn_interval_mult", 0.0)) > 0.0,
 			"Route %s needs a positive spawn multiplier" % id)
+		_check(float(route.get("passenger_interval_mult", 0.0)) > 0.0,
+			"Route %s needs a positive passenger cadence multiplier" % id)
+		_check(float(route.get("kituo_gap_mult", 0.0)) > 0.0,
+			"Route %s needs a positive kituo cadence multiplier" % id)
+		_check(float(route.get("fuel_drain_route_mult", 0.0)) > 0.0,
+			"Route %s needs a positive route fuel multiplier" % id)
+		var rush_chance: float = float(route.get("rush_hour_chance", -1.0))
+		_check(rush_chance >= 0.0 and rush_chance <= 1.0,
+			"Route %s needs a valid rush-hour chance" % id)
+		_check_weights(id + " conditions", route.get("condition_weights", {}), RoutesData.CONDITION_IDS)
+		_check(String(route.get("signature_id", "")) in ROUTE_SIGNATURE_IDS,
+			"Route %s needs a supported signature moment" % id)
+		_check(not String(route.get("signature_key", "")).is_empty(),
+			"Route %s needs signature copy" % id)
+		_check(not String(route.get("signature_title_key", "")).is_empty(),
+			"Route %s needs a compact signature title" % id)
+		_check(not String(route.get("signature_action_key", "")).is_empty(),
+			"Route %s needs a clear signature action" % id)
+		for locale_id in ["sw", "en"]:
+			var locale_strings: Dictionary = all_strings.get(locale_id, {})
+			for copy_key in ["signature_key", "signature_title_key", "signature_action_key"]:
+				var locale_key: String = String(route.get(copy_key, ""))
+				_check(locale_strings.has(locale_key) and not String(locale_strings.get(locale_key, "")).is_empty(),
+					"Route %s has missing %s copy in %s" % [id, copy_key, locale_id])
+		var mastery_scores: Array = route.get("mastery_scores", [])
+		var mastery_rewards: Array = route.get("mastery_rewards", [])
+		_check(mastery_scores.size() == 3 and mastery_rewards.size() == 3,
+			"Route %s needs three mastery thresholds and rewards" % id)
+		if mastery_scores.size() == 3:
+			_check(int(mastery_scores[0]) > 0 and int(mastery_scores[0]) < int(mastery_scores[1]) \
+			and int(mastery_scores[1]) < int(mastery_scores[2]),
+				"Route %s mastery thresholds must rise" % id)
+		if mastery_rewards.size() == 3:
+			for reward_value in mastery_rewards:
+				_check(int(reward_value) > 0, "Route %s mastery reward must be positive" % id)
 		_check_weights(id, route.get("obstacle_weights", {}), OBSTACLE_IDS)
 		_check_weights(id, route.get("collectible_weights", {}), COLLECTIBLE_IDS)
 	_check(ids.has("kariakoo"), "Starter route kariakoo must exist")
+	var kigamboni: Dictionary = RoutesData.get_by_id("kigamboni")
+	_check(RoutesData.pick_condition(kigamboni, 0.99) == "rain",
+		"Kigamboni's high weather roll must select its rain profile")
+	var mbezi: Dictionary = RoutesData.get_by_id("mbezi")
+	_check(RoutesData.pick_condition(mbezi, 0.10) == "day",
+		"Mbezi's low weather roll must select its day profile")
+	locale_node.free()
 
 func _check_weights(owner_id: String, value: Variant, allowed: Array) -> void:
 	_check(typeof(value) == TYPE_DICTIONARY, "%s weights must be a dictionary" % owner_id)
@@ -278,6 +366,14 @@ func _check_distance_scale() -> void:
 	_check(seconds_to_one_km >= 14.0,
 		"The 1 km achievement must not complete during the opening seconds")
 
+func _check_combo_contract() -> void:
+	_check(GameScript.next_combo(0) == 1,
+		"Driving flow must start at one action")
+	_check(GameScript.next_combo(4, 2) == 6,
+		"A fare service action must advance driving flow by its full value")
+	_check(GameScript.next_combo(GameScript.COMBO_MAX, 3) == GameScript.COMBO_MAX,
+		"Driving flow must cap coin scaling at its documented maximum")
+
 func _check_save_normalization() -> void:
 	var save_node := SaveScript.new()
 	save_node.data = SaveScript.DEFAULTS.duplicate(true)
@@ -296,8 +392,13 @@ func _check_save_normalization() -> void:
 	]
 	save_node.data["referral_claimed_invitees"] = ["DDR-ABC234", "DDR-ABC234", 42]
 	save_node.data["referral_success_count"] = 99
+	save_node.data["route_mastery"] = {"kariakoo": 9, "mwenge": -2, "bad": "stars"}
+	save_node.data["route_contract_claimed_on"] = {"kariakoo": "2026-09-02", "bad": 42, "": "2026-01-01"}
+	save_node.data["seen_discoveries"] = ["DISCOVERY_WEATHER", "DISCOVERY_WEATHER", 42, "bad"]
+	save_node.data["online_installation_id"] = 42
+	save_node.data["online_sync_token"] = []
 	save_node.call("_normalize_core_data")
-	_check(int(save_node.data.schema_version) == 3, "Old save schema was not migrated")
+	_check(int(save_node.data.schema_version) == 13, "Old save schema was not migrated")
 	_check(int(save_node.data.total_coins) == 0, "Negative saved coins were not clamped")
 	_check(float(save_node.data.total_distance_ever) == 0.0,
 		"Negative lifetime distance was not clamped")
@@ -314,7 +415,344 @@ func _check_save_normalization() -> void:
 		"Malformed or duplicate referral invitees were not removed")
 	_check(int(save_node.data.referral_success_count) == 1,
 		"Referral success count did not reconcile with claimed invitees")
+	_check((save_node.data.route_mastery as Dictionary) == {"kariakoo": 3},
+		"Malformed route mastery was not repaired")
+	_check((save_node.data.seen_discoveries as Array) == ["DISCOVERY_WEATHER"],
+		"Malformed discovery history was not repaired")
+	_check((save_node.data.route_contract_claimed_on as Dictionary) == {"kariakoo": "2026-09-02"},
+		"Malformed route contract claims were not repaired")
+	_check(String(save_node.data.online_installation_id).is_empty()
+		and String(save_node.data.online_sync_token).is_empty(),
+		"Malformed cloud-sync identity was not removed")
+	_check(SaveScript.normalize_leaderboard_name("  Konda   Juma  ") == "Konda Juma",
+		"Leaderboard name normalization should trim repeated whitespace")
+	# Keep these persistence contracts in memory; test runs must not touch a
+	# developer's actual user:// save.
+	save_node._batch_depth = 1
+	save_node.queue_leaderboard_submission("kariakoo", 400)
+	save_node.queue_leaderboard_submission("kariakoo", 650)
+	save_node.queue_leaderboard_submission("bad", 999)
+	var pending_scores: Array = save_node.get_pending_leaderboard_submissions()
+	_check(pending_scores.size() == 1 and int((pending_scores[0] as Dictionary).get("score", 0)) == 650,
+		"Pending leaderboard submissions should keep only the best route score")
+	save_node.cache_online_leaderboard("world", "kariakoo", [{"displayName": "Juma", "score": 50}])
+	_check(not save_node.get_cached_online_leaderboard("world", "kariakoo").is_empty(),
+		"Online leaderboard cache was not retained")
+	_check(SaveScript.normalize_leaderboard_name("A") == "Dereva",
+		"Too-short leaderboard names should receive a safe fallback")
+	_check(SaveScript.normalize_leaderboard_name("$$Konda@@") == "Konda",
+		"Leaderboard names should keep only the server-approved character set")
+	_check(SaveScript.is_reserved_leaderboard_name("Official_Dereva")
+		and not SaveScript.is_reserved_leaderboard_name("Konda Juma"),
+		"Reserved official-looking leaderboard names must be rejected without blocking ordinary names")
+	save_node.set_leaderboard_upload_status("retry", "kariakoo", 650)
+	var upload_state: Dictionary = save_node.get_leaderboard_upload_state()
+	_check(String(upload_state.get("status", "")) == "retry"
+		and String(upload_state.get("route", "")) == "kariakoo"
+		and int(upload_state.get("score", 0)) == 650,
+		"Leaderboard upload status should persist a local retry state")
+	save_node._batch_depth = 0
+	save_node._batch_dirty = false
 	save_node.free()
+
+func _check_cloud_snapshot() -> void:
+	var service := OnlineServiceScript.new()
+	var snapshot: Dictionary = service.cloud_snapshot({
+		"total_coins": 250,
+		"selected_route": "kariakoo",
+		"referral_invite_code": "DDR-ABC234",
+		"leaderboard": [{"name": "DDD", "score": 999}],
+		"analytics_session_count": 4,
+		"online_sync_token": "secret",
+		"leaderboard_display_name": "Konda Juma",
+		"online_leaderboard_opt_in": true,
+		"leaderboard_upload_status": "retry",
+		"leaderboard_upload_route": "kariakoo",
+		"leaderboard_upload_score": 880,
+		"leaderboard_upload_updated_at": 1000,
+	})
+	_check(int(snapshot.get("total_coins", 0)) == 250
+		and String(snapshot.get("selected_route", "")) == "kariakoo",
+		"Cloud snapshot lost allowed game progress")
+	_check(not snapshot.has("referral_invite_code") and not snapshot.has("leaderboard")
+		and not snapshot.has("analytics_session_count") and not snapshot.has("online_sync_token")
+		and not snapshot.has("leaderboard_display_name") and not snapshot.has("online_leaderboard_opt_in")
+		and not snapshot.has("leaderboard_upload_status") and not snapshot.has("leaderboard_upload_route")
+		and not snapshot.has("leaderboard_upload_score") and not snapshot.has("leaderboard_upload_updated_at"),
+		"Cloud snapshot included private local data")
+	_check(service.is_release_rollout_enabled(),
+		"Cloud service must be enabled for consent-gated phone QA")
+	service._registration_in_flight = true
+	service.register_installation()
+	_check(service.get_child_count() == 0,
+		"Concurrent online opt-ins must share one registration request")
+	service.free()
+
+func _check_online_account_reset() -> void:
+	var save_node := SaveScript.new()
+	save_node.data = SaveScript.DEFAULTS.duplicate(true)
+	save_node._batch_depth = 1
+	save_node.data["best_mwenge"] = 540
+	save_node.data["leaderboard"] = [
+		{"name": "Juma", "score": 900, "route": "kariakoo"},
+		{"name": "Juma", "score": 800, "route": "kariakoo"},
+		{"name": "Juma", "score": 700, "route": "kariakoo"},
+		{"name": "Juma", "score": 600, "route": "kariakoo"},
+		{"name": "Juma", "score": 550, "route": "kariakoo"},
+	]
+	var personal: Array = save_node.get_personal_route_scores("mwenge")
+	_check(personal.size() == 1 and int((personal[0] as Dictionary).get("score", 0)) == 540,
+		"A route record outside the global Top-5 must appear on its Personal board")
+	save_node.data["online_installation_id"] = "installation"
+	save_node.data["online_sync_token"] = "token"
+	save_node.data["online_cloud_revision"] = 3
+	save_node.data["cloud_sync_opt_in"] = true
+	save_node.data["online_leaderboard_opt_in"] = true
+	save_node.data["online_telemetry_opt_in"] = true
+	save_node.data["leaderboard_upload_status"] = "retry"
+	save_node.data["pending_leaderboard_submissions"] = [{"route": "mwenge", "score": 540}]
+	save_node.data["leaderboard_cache"] = {"world:mwenge": {"scores": []}}
+	save_node.clear_online_account()
+	_check(String(save_node.data.online_installation_id).is_empty()
+		and String(save_node.data.online_sync_token).is_empty()
+		and int(save_node.data.online_cloud_revision) == 0,
+		"Deleting an online account must remove its saved identity")
+	_check(not bool(save_node.data.cloud_sync_opt_in)
+		and not bool(save_node.data.online_leaderboard_opt_in)
+		and not bool(save_node.data.online_telemetry_opt_in),
+		"Deleting an online account must reset every online consent")
+	_check((save_node.data.pending_leaderboard_submissions as Array).is_empty()
+		and (save_node.data.leaderboard_cache as Dictionary).is_empty()
+		and String(save_node.data.leaderboard_upload_status).is_empty()
+		and int(save_node.data.best_mwenge) == 540,
+		"Deleting online data must clear stale submissions while preserving local progress")
+	save_node.free()
+
+func _check_railway_telemetry() -> void:
+	var tracker := AnalyticsScript.new()
+	var now: int = int(Time.get_unix_time_from_system())
+	tracker._queue = [
+		{"e": "run_end", "p": {"score": 100}, "t": float(now) - 0.25},
+		{"e": "run_end", "p": {}, "t": now - AnalyticsScript.RAILWAY_MAX_EVENT_AGE_SECONDS - 10},
+	]
+	var batch: Array = tracker.get_railway_batch()
+	_check(batch.size() == 1, "Railway telemetry must skip events too old for the server")
+	if not batch.is_empty():
+		_check(typeof((batch[0] as Dictionary).get("t", null)) == TYPE_INT,
+			"Railway telemetry must send whole-second timestamps, including old queued events")
+	tracker.free()
+
+func _check_daily_route_challenge() -> void:
+	var first: Dictionary = DailyRouteChallengeData.current()
+	var second: Dictionary = DailyRouteChallengeData.current()
+	_check(String(first.get("route_id", "")) in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"],
+		"Daily route must use a shipped route")
+	_check(String(first.get("vehicle_id", "")) == "classic_blue" and not bool(first.get("revives_allowed", true)),
+		"Daily route must use the shared starter vehicle and no-revive rule")
+	_check(int(first.get("traffic_seed", 0)) == int(second.get("traffic_seed", -1)),
+		"Daily route seed must be stable for the same date")
+
+func _check_daily_traffic_randomness() -> void:
+	var first_rng := RandomNumberGenerator.new()
+	var second_rng := RandomNumberGenerator.new()
+	first_rng.seed = 24513
+	second_rng.seed = 24513
+	var weights := {"coin": 6.0, "fuel": 2.0, "shield": 1.0}
+	for _attempt in range(5):
+		_check(GameScript.shuffle_with_rng(range(10), first_rng) \
+			== GameScript.shuffle_with_rng(range(10), second_rng),
+			"Equal Daily Run seeds must choose the same lane order")
+		_check(RoutesData.weighted_pick(weights, ["coin", "fuel", "shield"], "coin", first_rng) \
+			== RoutesData.weighted_pick(weights, ["coin", "fuel", "shield"], "coin", second_rng),
+			"Equal Daily Run seeds must choose the same collectible type")
+	var first_visual_rng := RandomNumberGenerator.new()
+	var second_visual_rng := RandomNumberGenerator.new()
+	first_visual_rng.seed = 100
+	second_visual_rng.seed = 200
+	var first_obstacle := ObstacleScript.new()
+	var second_obstacle := ObstacleScript.new()
+	first_obstacle.setup("bodaboda", 100.0, -130.0, first_rng, first_visual_rng)
+	second_obstacle.setup("bodaboda", 100.0, -130.0, second_rng, second_visual_rng)
+	_check(first_obstacle.drift_phase == second_obstacle.drift_phase
+		and first_obstacle.walk_dir == second_obstacle.walk_dir,
+		"Cosmetic randomness must not change seeded obstacle movement")
+	first_obstacle.free()
+	second_obstacle.free()
+
+func _check_route_mastery() -> void:
+	var route: Dictionary = RoutesData.get_by_id("kariakoo")
+	var first_star: int = RoutesData.mastery_stars(route, {"score": 400})
+	var second_star: int = RoutesData.mastery_stars(route, {
+		"score": 800, "passengers": 8, "reputation": 75,
+	})
+	var third_star: int = RoutesData.mastery_stars(route, {
+		"score": 1300, "passengers": 8, "reputation": 85,
+	})
+	_check(first_star == 1, "First route mastery star should require its score threshold")
+	_check(second_star == 2, "Second route mastery star must require score and route goal")
+	_check(third_star == 3, "Third route mastery star must require excellent reputation")
+	_check(RoutesData.mastery_reward(route, 0, 3) == 85,
+		"Route mastery must award each newly earned star exactly once")
+	_check(RoutesData.mastery_reward(route, 3, 3) == 0,
+		"Completed route mastery must not repay repeat runs")
+	var next_first: Dictionary = RoutesData.next_mastery_target(route, 0)
+	var next_second: Dictionary = RoutesData.next_mastery_target(route, 1)
+	var next_third: Dictionary = RoutesData.next_mastery_target(route, 2)
+	var mastered: Dictionary = RoutesData.next_mastery_target(route, 3)
+	_check(int(next_first.get("score", 0)) == 400 and not bool(next_first.get("needs_goal", true)),
+		"First mastery target must be score-only")
+	_check(bool(next_second.get("needs_goal", false)) and not bool(next_second.get("needs_reputation", true)),
+		"Second mastery target must add the route goal")
+	_check(bool(next_third.get("needs_goal", false)) and bool(next_third.get("needs_reputation", false)),
+		"Third mastery target must require an A reputation")
+	_check(bool(mastered.get("complete", false)), "Completed route must report a mastered target")
+
+	var save_data_before := SaveSystem.data.duplicate(true)
+	var batch_depth_before := SaveSystem._batch_depth
+	var batch_dirty_before := SaveSystem._batch_dirty
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	_check(SaveSystem.update_route_mastery("kariakoo", 2) == 2,
+		"First mastery save must record both newly earned stars")
+	_check(SaveSystem.update_route_mastery("kariakoo", 2) == 0,
+		"Repeated mastery tier must not pay a second time")
+	_check(SaveSystem.update_route_mastery("kariakoo", 3) == 1,
+		"Only the newly earned final star should be awarded later")
+	_check(SaveSystem.get_route_mastery("kariakoo") == 3,
+		"Saved mastery must retain the highest achieved tier")
+	SaveSystem.data = save_data_before
+	SaveSystem._batch_depth = batch_depth_before
+	SaveSystem._batch_dirty = batch_dirty_before
+
+func _check_route_contracts() -> void:
+	for route_value in RoutesData.LIST:
+		var route: Dictionary = route_value
+		var route_id: String = String(route.id)
+		var contract: Dictionary = RouteContractsData.current(route_id, "2026-09-02")
+		_check(not contract.is_empty(), "Route %s needs a daily contract" % route_id)
+		_check(int(contract.get("target", 0)) > 0 and int(contract.get("reward", 0)) > 0,
+			"Route %s contract needs a positive target and reward" % route_id)
+		_check(not String(contract.get("key", "")).is_empty(),
+			"Route %s contract needs localized copy" % route_id)
+
+	var save_data_before := SaveSystem.data.duplicate(true)
+	var batch_depth_before := SaveSystem._batch_depth
+	var batch_dirty_before := SaveSystem._batch_dirty
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem.data["total_runs"] = 3
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	var current: Dictionary = RouteContractsData.current("kariakoo")
+	var stats: Dictionary = {}
+	stats[String(current.get("type", "score"))] = int(current.get("target", 0))
+	_check(RouteContractsData.is_available("kariakoo"),
+		"Route contracts must begin after the first-session lessons")
+	_check(RouteContractsData.is_met(current, stats),
+		"A contract target must satisfy its own progress rule")
+	_check(RouteContractsData.mark_completed("kariakoo"),
+		"A completed route contract must claim once")
+	_check(not RouteContractsData.mark_completed("kariakoo"),
+		"A route contract must not claim twice in one day")
+	SaveSystem.data = save_data_before
+	SaveSystem._batch_depth = batch_depth_before
+	SaveSystem._batch_dirty = batch_dirty_before
+
+func _check_discovery_persistence() -> void:
+	var save_data_before := SaveSystem.data.duplicate(true)
+	var batch_depth_before := SaveSystem._batch_depth
+	var batch_dirty_before := SaveSystem._batch_dirty
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	_check(SaveSystem.mark_discovery_seen("DISCOVERY_WEATHER"),
+		"First discovery display must persist")
+	_check(not SaveSystem.mark_discovery_seen("DISCOVERY_WEATHER"),
+		"A discovery must not be shown twice")
+	_check(SaveSystem.has_seen_discovery("DISCOVERY_WEATHER"),
+		"Persisted discovery was not readable")
+	_check(not SaveSystem.mark_discovery_seen("NOT_A_DISCOVERY"),
+		"Unknown discovery key was accepted")
+	SaveSystem.data = save_data_before
+	SaveSystem._batch_depth = batch_depth_before
+	SaveSystem._batch_dirty = batch_dirty_before
+
+func _check_reputation_contract() -> void:
+	var strong: Dictionary = GameState.calculate_reputation({
+		"passengers": 12, "dropoffs": 8, "near_misses": 4, "goal_met": true,
+		"clean_checkpoints": 2, "route_moments": 1, "missed_stops": 0,
+		"fines": 0, "end_reason": "car",
+	})
+	var weak: Dictionary = GameState.calculate_reputation({
+		"passengers": 0, "dropoffs": 0, "near_misses": 0, "goal_met": false,
+		"clean_checkpoints": 0, "route_moments": 0, "missed_stops": 5,
+		"fines": 5, "end_reason": "fuel",
+	})
+	_check(int(strong.get("score", -1)) >= 85 and String(strong.get("grade", "")) == "A",
+		"Strong service run must earn an A reputation")
+	_check(int(weak.get("score", 101)) >= 0 and int(weak.get("score", -1)) < int(strong.get("score", 0)),
+		"Poor service run must be bounded and rank below a strong run")
+	var strong_ledger_score: int = clampi(int(strong.get("base", 0)) \
+		+ int(strong.get("positive_total", 0)) - int(strong.get("negative_total", 0)), 0, 100)
+	_check(int(strong.get("score", -1)) == strong_ledger_score,
+		"Reputation ledger must explain the displayed score exactly")
+	_check(int(weak.get("fuel", 0)) == 8 and int(weak.get("negative_total", 0)) \
+		== int(weak.get("missed", 0)) + int(weak.get("fines", 0)) + int(weak.get("fuel", 0)) \
+		+ int(weak.get("crash", 0)),
+		"Fuel and service penalties must be included in the reputation ledger")
+	_check(int(strong.get("crash", 0)) == 10,
+		"A collision finish must reduce Driver Reputation")
+
+func _check_first_session_flow() -> void:
+	var save_data_before := SaveSystem.data.duplicate(true)
+	var batch_depth_before := SaveSystem._batch_depth
+	var batch_dirty_before := SaveSystem._batch_dirty
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	_check(GameState.tutorial_stage_for_run(false) == 1,
+		"A brand-new player must begin the first guided run")
+	GameState.complete_tutorial_stage(1)
+	_check(int(SaveSystem.data.first_session_stage) == 1,
+		"Finishing the first lesson did not persist progress")
+	_check(GameState.tutorial_stage_for_run(false) == 2,
+		"The second guided run did not follow the first")
+	SaveSystem.data["total_runs"] = 5
+	SaveSystem.data["first_session_stage"] = 0
+	_check(GameState.tutorial_stage_for_run(false) == 0,
+		"Existing players should not be forced into new onboarding")
+	_check(GameState.tutorial_stage_for_run(true) == 0,
+		"Rewarded continues must not restart a tutorial stage")
+	SaveSystem.data = save_data_before
+	SaveSystem._batch_depth = batch_depth_before
+	SaveSystem._batch_dirty = batch_dirty_before
+
+func _check_remote_tuning_guards() -> void:
+	_check(RemoteConfigScript.REMOTE_URL.ends_with("/docs/remote-config.json"),
+		"Hosted remote config URL must match its GitHub Pages docs path")
+	var config := RemoteConfigScript.new()
+	config._values = RemoteConfigScript.DEFAULTS.duplicate(true)
+	config._values["fuel_drain_global"] = "invalid"
+	_check(config.get_float("fuel_drain_global", 1.0, 0.6, 1.4) == 1.0,
+		"Invalid global tuning should fall back safely")
+	config._values["route_tuning"] = {"kariakoo": {"spawn": 4.0, "fuel": 0.8}}
+	_check(config.get_route_float("kariakoo", "spawn", 1.0, 0.75, 1.5) == 1.5,
+		"Route tuning must clamp unsafe spawn values")
+	_check(config.get_route_float("kariakoo", "fuel", 1.0, 0.6, 1.4) == 0.8,
+		"Valid route tuning should be readable")
+	config._values = RemoteConfigScript.DEFAULTS.duplicate(true)
+	_check(config._merge_config({
+		"event_banner": "QA route event",
+		"unknown": 99,
+		"route_tuning": {"kariakoo": {"passengers": 0.93, "not_a_tuning": 3}},
+	}), "Valid hosted config should merge")
+	_check(not config._values.has("unknown"),
+		"Unknown hosted config keys must be discarded")
+	_check(config.get_route_float("kariakoo", "passengers", 1.0, 0.8, 1.2) == 0.93,
+		"New passenger cadence tuning should be readable")
+	_check(config.get_route_float("kariakoo", "not_a_tuning", 1.0, 0.8, 1.2) == 1.0,
+		"Unknown route tuning keys must be discarded")
+	config.free()
 
 func _check_selection_guards() -> void:
 	var vehicle_before := GameState.selected_vehicle_id

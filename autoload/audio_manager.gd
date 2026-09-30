@@ -74,6 +74,22 @@ func _try_load_file(key: String) -> AudioStream:
 # ─── Playback ─────────────────────────────────────────────────────
 
 func play_sfx(key: String) -> void:
+	_play_sfx(key, 1.0)
+
+## Gives each route's horn a subtle personality without new audio files.
+## Recorded/licensed route sounds can later replace this through the same key.
+func play_route_horn(route_id: String) -> void:
+	var pitch: float = 1.0
+	match route_id:
+		"kariakoo": pitch = 1.07
+		"mwenge": pitch = 1.12
+		"mbezi": pitch = 0.94
+		"posta": pitch = 0.98
+		"kigamboni": pitch = 0.91
+		"ubungo": pitch = 1.04
+	_play_sfx("horn", pitch)
+
+func _play_sfx(key: String, pitch: float) -> void:
 	if not sfx_on:
 		return
 	var stream: Variant = _sfx_streams.get(key)
@@ -84,7 +100,7 @@ func play_sfx(key: String) -> void:
 	p.stream = stream as AudioStream
 	# Keep the horn present over music without making pickups feel equally loud.
 	p.volume_db = -1.0 if key == "horn" else (-2.0 if key == "crash" else -4.0)
-	p.pitch_scale = 1.0
+	p.pitch_scale = pitch
 	p.play()
 
 func play_music() -> void:
