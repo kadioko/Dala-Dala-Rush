@@ -10,6 +10,8 @@ extends Node
 ## optional: a bad response always leaves the last safe cache/defaults in use.
 const REMOTE_URL := "https://kadioko.github.io/Dala-Dala-Rush/docs/remote-config.json"
 const CACHE_PATH := "user://remote_config.json"
+const REQUEST_TIMEOUT_SECONDS := 5.0
+const MAX_RESPONSE_BYTES := 64 * 1024
 
 const ROUTE_TUNING_KEYS := [
 	"spawn", "fuel", "coins", "kituo_min", "kituo_max",
@@ -33,6 +35,7 @@ const DEFAULTS := {
 }
 
 var _values: Dictionary = {}
+var _revision: int = 0
 
 func _ready() -> void:
 	_values = DEFAULTS.duplicate(true)
@@ -82,13 +85,20 @@ func _load_cache() -> void:
 
 func _fetch() -> void:
 	var req := HTTPRequest.new()
+	req.timeout = REQUEST_TIMEOUT_SECONDS
+	req.body_size_limit = MAX_RESPONSE_BYTES
 	add_child(req)
 	req.request_completed.connect(func(result: int, code: int, _h: PackedStringArray, body: PackedByteArray):
 		req.queue_free()
 		if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 			return
+		if body.size() > MAX_RESPONSE_BYTES:
+			return
 		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 		if typeof(parsed) != TYPE_DICTIONARY:
+			return
+		var incoming_revision: Variant = (parsed as Dictionary).get("revision", null)
+		if typeof(incoming_revision) != TYPE_INT or int(incoming_revision) < _revision:
 			return
 		if not _merge_config(parsed as Dictionary):
 			return
@@ -106,26 +116,37 @@ func _fetch() -> void:
 ## keeps a malformed or accidentally edited public JSON file from becoming an
 ## unbounded gameplay or UI input surface.
 func _merge_config(source: Dictionary) -> bool:
+	var source_revision: Variant = source.get("revision", _revision)
+	if typeof(source_revision) == TYPE_INT and int(source_revision) < _revision:
+		return false
 	var merged: bool = false
+	var candidate: Dictionary = _values.duplicate(true)
 	for raw_key in source.keys():
 		var key: String = String(raw_key)
+		if key == "revision":
+			continue
 		if not DEFAULTS.has(key):
 			continue
 		var value: Variant = source[raw_key]
 		if key == "route_tuning":
 			if typeof(value) != TYPE_DICTIONARY:
 				continue
-			_values[key] = _sanitize_route_tuning(value as Dictionary)
+			candidate[key] = _sanitize_route_tuning(value as Dictionary)
 			merged = true
 			continue
 		if key in EVENT_TEXT_KEYS:
 			if typeof(value) == TYPE_STRING:
-				_values[key] = String(value).strip_edges().substr(0, 96)
+				candidate[key] = String(value).strip_edges().substr(0, 96)
 				merged = true
 			continue
 		if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
-			_values[key] = float(value)
+			candidate[key] = float(value)
 			merged = true
+	if merged:
+		_values = candidate
+		var revision_value: Variant = source.get("revision", _revision)
+		if typeof(revision_value) == TYPE_INT:
+			_revision = maxi(_revision, int(revision_value))
 	return merged
 
 func _sanitize_route_tuning(raw_routes: Dictionary) -> Dictionary:

@@ -20,8 +20,8 @@ Play production-track updates. Store-listing work and Play Console declarations 
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
 | Current production release | Version 1.0.13, code 14 |
-| Release candidate | Version 1.0.14, code 15 |
-| Artifact status | Signed AAB exported and locally verified; Play processing and device checks remain required before rollout |
+| Last exported candidate | Version 1.0.14, code 15 |
+| Artifact status | Signed AAB is verified for the previously committed source; new menu/QA/backend changes in this work need a higher version code and a fresh export before upload |
 | Artifact path | `exports/android/DalaDalaRushTZ-production-v14.aab` |
 | Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
@@ -39,6 +39,9 @@ Complete these before rolling the verified bundle out to testers:
 - [ ] Swahili and English menus have been checked at 540x960 and on a phone.
 - [ ] Railway hardening is deployed separately, migration 005 completed, and
   the live leaderboard write/read behavior has been smoke-tested.
+- [ ] If deploying the new shared limiter, migration 006 is applied, the
+  matching API revision is deployed, and the updated privacy policy is
+  published first.
 - [ ] Complete the small-phone and two-phone competition checks in
   `DEVICE_QA.md`; update the privacy policy and review Play Data Safety before
   rollout.
@@ -181,6 +184,19 @@ Optional, when Google's `bundletool` is installed:
 
 ```powershell
 java -jar bundletool-all.jar validate --bundle $aab
+```
+
+Run the reusable artifact check after export. It verifies the JAR signature and
+bundle structure; pass `bundletool-all.jar` to also inspect version, target SDK,
+AdMob metadata, and the Advertising ID permission:
+
+```powershell
+.\tools\verify_android_release.ps1 `
+  -BundlePath $aab `
+  -BundletoolJar 'C:\path\to\bundletool-all.jar' `
+  -ExpectedVersionName '1.0.15' `
+  -ExpectedVersionCode 16 `
+  -ExpectedTargetSdk 36
 ```
 
 ### Previous Code 14 Verification Record

@@ -11,6 +11,8 @@ var strings: Dictionary = {
 	"sw": {
 		"GAME_TITLE": "Dala Dala Rush TZ",
 		"PLAY": "Cheza",
+		"MORE_OPTIONS": "Mengine",
+		"LESS_OPTIONS": "Funga menyu ya ziada",
 		"ROUTES": "Chagua Route",
 		"GARAGE": "Garage",
 		"SHOP": "Duka",
@@ -442,6 +444,7 @@ var strings: Dictionary = {
 		"LEADERBOARD_RETRY": "Jaribu Tena",
 		"LEADERBOARD_CACHED": "Inaonyesha score zilizohifadhiwa ({time} iliyopita).",
 		"LEADERBOARD_BEAT_TARGET": "Lengo la rafiki: mpite {name} kwa score {score}.",
+		"LEADERBOARD_WORLD_TARGET": "Lengo la Dunia: pata pointi {points} zaidi kumpita {name}.",
 		"DAILY_ROUTE_PLAY": "Mbio za Leo: {route}",
 		# In-game new
 		"GO_TEXT": "TWENDE!",
@@ -579,6 +582,8 @@ var strings: Dictionary = {
 	"en": {
 		"GAME_TITLE": "Dala Dala Rush TZ",
 		"PLAY": "Play",
+		"MORE_OPTIONS": "More",
+		"LESS_OPTIONS": "Hide options",
 		"ROUTES": "Routes",
 		"GARAGE": "Garage",
 		"SHOP": "Shop",
@@ -1010,6 +1015,7 @@ var strings: Dictionary = {
 		"LEADERBOARD_RETRY": "Retry",
 		"LEADERBOARD_CACHED": "Showing saved standings from {time} ago.",
 		"LEADERBOARD_BEAT_TARGET": "Friend target: beat {name} with {score}.",
+		"LEADERBOARD_WORLD_TARGET": "World target: earn {points} more points to pass {name}.",
 		"DAILY_ROUTE_PLAY": "Daily Run: {route}",
 		# In-game new
 		"GO_TEXT": "GO!",

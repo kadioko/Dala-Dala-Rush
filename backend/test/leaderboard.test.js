@@ -23,9 +23,17 @@ async function withServer(pool, run) {
 
 function leaderboardPool() {
 	const scores = new Map();
+	const rateLimits = new Map();
 	return {
 		scores,
 		async query(sql, params = []) {
+			if (sql.includes("INSERT INTO api_rate_limits")) {
+				const key = `${params[0]}:${params[1]}:${params[2]}`;
+				const count = Math.min((rateLimits.get(key) || 0) + 1, Number(params[4]));
+				rateLimits.set(key, count);
+				return { rowCount: 1, rows: [{ request_count: count }] };
+			}
+			if (sql.startsWith("DELETE FROM api_rate_limits")) return { rowCount: 0, rows: [] };
 			if (sql.startsWith("UPDATE installations")) return { rowCount: 1 };
 			if (sql.includes("INSERT INTO leaderboard_profiles")) return { rowCount: 1 };
 			if (sql.includes("INSERT INTO leaderboard_scores")) {
@@ -79,6 +87,13 @@ test("leaderboard score bursts are rate limited per installation", async () => {
 			assert.equal(response.status, 200);
 			await response.arrayBuffer();
 		}
+	});
+	await withServer(pool, async (base) => {
+		const submit = (score) => fetch(`${base}/v1/leaderboards/unverified`, {
+			method: "POST",
+			headers: HEADERS,
+			body: JSON.stringify({ routeId: "kariakoo", score, displayName: "Konda Juma" }),
+		});
 		const limited = await submit(9);
 		assert.equal(limited.status, 429);
 		assert.equal((await limited.json()).error, "rate_limited");
@@ -101,8 +116,16 @@ test("leaderboard rejects reserved staff-like names before writing scores", asyn
 });
 
 test("public world standings reads have a per-IP burst limit", async () => {
+	const rateLimits = new Map();
 	const pool = {
-		async query(sql) {
+		async query(sql, params = []) {
+			if (sql.includes("INSERT INTO api_rate_limits")) {
+				const key = `${params[0]}:${params[1]}:${params[2]}`;
+				const count = Math.min((rateLimits.get(key) || 0) + 1, Number(params[4]));
+				rateLimits.set(key, count);
+				return { rowCount: 1, rows: [{ request_count: count }] };
+			}
+			if (sql.startsWith("DELETE FROM api_rate_limits")) return { rowCount: 0, rows: [] };
 			if (sql.includes("WITH best_scores")) return { rowCount: 0, rows: [] };
 			throw new Error(`Unexpected SQL in test: ${sql}`);
 		},

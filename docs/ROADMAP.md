@@ -16,19 +16,25 @@ simultaneous opt-in registration, reliable leaderboard uploads, and server-side
 request limits. Version 1.0.14 / code 15 is the release candidate; two-phone
 checks and Play declaration review remain release gates.
 
+The current local quality pass simplifies the collapsed home screen, adds a
+two-locale/five-size main-menu screenshot and horizontal-overflow runner,
+extracts the forced-lane reachability rule into a test contract, bounds remote
+config requests, and prepares shared PostgreSQL rate limits. These changes are
+source-only and are not present in the previously exported code 15 bundle.
+
 ## Status by Area
 
 | Area | Status | Notes |
 |------|--------|-------|
 | Core driving loop | **Wave 23 QA** | Vituo passenger loop, overload risk/reward, horn, fuel, Driving Flow, near-miss, boost, police chases, a three-run non-modal first-session flow, and a distinct job profile plus favorable signature moment per route. Needs phone play-balancing. |
 | Progression | **Wave 25 QA** | Route unlock gates, Driver Reputation, three-star Route Mastery, compact daily Route Contracts, career ranks, bus upgrades, missions + season, daily challenge, login streak, achievements, consumables. Vehicle prices and beginner route pace were reduced conservatively. |
-| Social/competitive | **World view enabled; backend hardening live** | Ghost racing, livery sharing, and two-sided Invite & Earn codes work offline. Public World standings can be read; posting and Friends are opt-in. Bilingual loading/empty/offline/cache states, queued-upload feedback, small-screen scrolling, stale-tab guards, Railway rate limits, reserved-name guards, and per-route best-score storage are live. Two-phone QA remains. Scores remain unverified. |
+| Social/competitive | **World view enabled; next-rival hint in source** | Ghost racing, livery sharing, and two-sided Invite & Earn codes work offline. Public World standings can be read; posting and Friends are opt-in. Bilingual loading/empty/offline/cache states, queued-upload feedback, small-screen scrolling, stale-tab guards, and per-route best-score storage are live. The World gap-to-next-rival hint is in this source pass. Two-phone QA remains. Scores remain unverified. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
 | Android readiness | **Code 15 release candidate built** | Version 1.0.14 / code 15 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
-| Live ops | **Railway live; public World reads enabled** | Railway/PostgreSQL serves cloud backup, phone transfer, referral gates, an unverified leaderboard, and separately consented minimal Gameplay Insights. Cloud, Friends, score posting, and insights retain their individual consent gates. Rate/name/score hardening and migration 005 are deployed. Complete two-phone QA and Play privacy review before promotion. Crash reporting remains a separate future integration. |
-| QA/testing | **In progress** | Godot 4.7.1 parses cleanly; contracts cover locales, catalogs, save repair, tutorial migration, remote-tuning guards, selections, ads, ghosts, referrals, and distance. Phone handoff testing remains. |
+| Live ops | **Railway live; shared limiter prepared** | Production runs through migration 005. Source contains migration 006 and PostgreSQL-backed HMAC counters, not yet deployed. Update and publish the privacy policy before that service change. Gameplay Insights still needs a retention policy and report volume. |
+| QA/testing | **In progress** | Automated captures and horizontal-bound checks passed for collapsed and expanded menus at five portrait sizes in both languages. Physical phone QA, keyboard/banner/native safe-area checks remain manual. |
 | Store launch | **Production active** | Monitor Play reports and staged rollout health, ship only higher version codes, and use physical-device evidence before expanding optional online services. |
 
 ## Wave 27 - Railway Cloud Pilot (Consent-Gated)
@@ -68,6 +74,33 @@ checks and Play declaration review remain release gates.
   and a migration/upsert enforcing one improved best per device and route.
   Automated coverage passes; deploy the Railway revision and run the two-phone
   worksheet before shipping/promotion. Scores remain unverified and reward-free.
+
+## Wave 31 - Product Quality And Reliability (Local Source)
+
+- The collapsed menu now foregrounds Play, selected route, Garage, and
+  Leaderboards; secondary activities sit under a localized More control.
+- World board rows now show the exact extra points needed to pass the nearest
+  higher public score. The existing friend rival target is unchanged.
+- Traffic generation uses one tested helper for a clear escape lane reachable
+  in a single swipe on forced-choice waves. Existing active obstacles still
+  defer a wave when all decision lanes are blocked.
+- Remote config has a five-second timeout, a 64 KiB response cap, and monotonic
+  revisions. Increase `revision` for every published edit; rollbacks must use
+  an older value under a newer revision.
+- Backend source prepares migration 006 for shared HMAC request counters.
+  Production still uses the deployed migration 005 service until the migration,
+  matching server code, and public privacy-policy update are deployed together.
+- Added `docs/PRODUCTION_REPORTING.md` with aggregate-only queries and explicit
+  limits of the current consented event stream. Crash reporting is not included.
+- Added `tools/verify_android_release.ps1` for AAB signature/structure and
+  optional bundletool manifest verification.
+- Godot 4.7.1 editor parse, logic contracts, backend tests, PowerShell syntax
+  validation, and all 30 normal-renderer menu captures passed locally. The
+  screenshot set was visually reviewed at 360x640 in both locales and at
+  720x1600 in Swahili; real-device rendering still needs phone QA.
+- This source pass has not been exported to AAB or deployed to Railway. Run
+  Godot and backend checks, review screenshots, and complete physical phone
+  QA before selecting the next release version.
 
 ## Milestone A — Production Update QA And Balancing
 

@@ -15,6 +15,7 @@ Tune the game without shipping an update:
 
 ```json
 {
+  "revision": 2,
   "event_banner_sw": "Wikendi ya Sikukuu: zawadi mara mbili!",
   "event_banner_en": "Holiday weekend: double daily rewards!",
   "daily_reward_mult": 2.0,
@@ -30,7 +31,11 @@ Tune the game without shipping an update:
 }
 ```
 
-Values cache locally (`user://remote_config.json`) so the game stays
+Increment `revision` with each published config edit. The client rejects a
+lower revision than its cached active config, limits downloads to 64 KiB and
+five seconds, and keeps the previous valid cache if a response fails. To roll
+back, publish the earlier values under a **higher** revision number. Values
+cache locally (`user://remote_config.json`) so the game stays
 offline-first; the fetch silently no-ops without network. You can also drop
 that file on a test device manually to try values before hosting.
 
@@ -84,6 +89,10 @@ The local lifecycle fields in `save.json` are aggregate timestamps and a session
 count. They exist only to make a later retention integration possible; no data
 leaves the device in the current build.
 
+For consented Railway aggregates and caveats, see
+`docs/PRODUCTION_REPORTING.md`. It includes read-only route, tutorial, and
+leaderboard summaries and calls out the missing telemetry retention job.
+
 ## Release Guardrails
 
 - Keep remote config optional: the shipped gameplay must remain playable with
@@ -102,6 +111,12 @@ enabled, but no information leaves a phone until the player opts in to the
 specific feature. Deployment, migration, data boundaries, and the mandatory
 validation work are in
 `docs/RAILWAY_BACKEND.md`.
+
+Backend request limits now use shared PostgreSQL counters from
+`backend/sql/006_shared_rate_limits.sql`, with HMACed subjects and fixed expiry
+windows. Apply the new migration before deploying the matching server code.
+The privacy-policy source now describes these short-lived pseudonymous keys;
+publish that policy change before enabling this backend revision in production.
 
 Cloud sync sends a filtered snapshot, never the full local save: it omits
 referral codes, local leaderboard names, analytics history, and sync tokens.

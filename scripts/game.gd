@@ -1975,15 +1975,8 @@ func _spawn_wave() -> void:
 	if to_block == num_lanes - 1:
 		# A touch player should never need to cross two lanes between consecutive
 		# forced-choice waves. The free lane must also be clear of earlier traffic.
-		var reachable_choices: Array = []
-		for lane_idx in clear_lanes:
-			if abs(int(lane_idx) - player.current_lane) <= 1 \
-			and abs(int(lane_idx) - _last_safe_lane) <= 1:
-				reachable_choices.append(lane_idx)
-		if reachable_choices.is_empty():
-			for lane_idx in clear_lanes:
-				if abs(int(lane_idx) - player.current_lane) <= 1:
-					reachable_choices.append(lane_idx)
+		var reachable_choices: Array = reachable_lane_choices(
+			clear_lanes, player.current_lane, _last_safe_lane, num_lanes)
 		if reachable_choices.is_empty():
 			# No clear lane is reachable with one deliberate swipe. Defer danger.
 			return
@@ -2008,6 +2001,19 @@ func _spawn_wave() -> void:
 			_spawn_coin_trail(free_lane)
 		else:
 			_spawn_collectible_in_lane(free_lane, _pick_collectible_type(false))
+
+static func reachable_lane_choices(clear_lanes: Array, current_lane: int,
+		last_safe_lane: int, lane_count: int) -> Array:
+	var preferred: Array = []
+	var reachable: Array = []
+	for lane_value in clear_lanes:
+		var lane: int = int(lane_value)
+		if lane < 0 or lane >= lane_count or abs(lane - current_lane) > 1:
+			continue
+		reachable.append(lane)
+		if abs(lane - last_safe_lane) <= 1:
+			preferred.append(lane)
+	return preferred if not preferred.is_empty() else reachable
 
 func _clear_lanes_for_wave() -> Array:
 	var clear_lanes: Array = []

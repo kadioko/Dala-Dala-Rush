@@ -3,8 +3,9 @@
 The repository now contains a small Node 20 / Express / PostgreSQL service in
 `backend/`. It is intentionally separate from the Godot game: the game remains
 fully playable offline. The Railway service is deployed and the current client
-release switch is on. As of September 30, 2026, request limits and migration
-`005_leaderboard_one_best.sql` are live on production. Public World standings can be viewed without an account;
+release switch is on. Production currently has migration
+`005_leaderboard_one_best.sql`; migration `006_shared_rate_limits.sql` and its
+matching API code are prepared locally but are **not deployed**. Public World standings can be viewed without an account;
 posting a name/score and using Friends still require explicit in-game consent.
 Scores remain unverified and have no rewards. Complete the device and Play
 declaration checks below before expanding promotion or adding reward-bearing
@@ -25,18 +26,24 @@ competition.
 - No email addresses, contacts, precise location, advertising ID, Firebase
   data, or database credentials are accepted by the API. A player may choose a
   2-16 character driver name for the opt-in leaderboard only.
-- Source hardening: score writes retain only an improved per-route best,
-  migration `005_leaderboard_one_best.sql` removes existing duplicates and adds
-  a unique guard, and reserved staff-like names are rejected. Basic
-  process-local limits are 20 registrations per IP per hour, 90 World reads per
-  IP per minute, 8 score submissions per installation per five minutes, and 8
-  profile changes per installation per hour.
+- Deployed hardening: score writes retain only an improved per-route best,
+	migration `005_leaderboard_one_best.sql` removes existing duplicates and adds
+	a unique guard, and reserved staff-like names are rejected. The source
+	prepares shared PostgreSQL counters for 20 registrations per IP per hour, 90
+	World reads per IP per minute, 8 score submissions per installation per five
+	minutes, and 8 profile changes per installation per hour.
 
 The backend does not automatically award coins. Keep the existing offline
 referral flow as the live system until device QA, privacy review, and a stronger
 attestation strategy are complete. A client-reported run can still be forged;
 Play Integrity or equivalent server-side proof is required before referrals or
 leaderboards become reward-bearing or competitive.
+
+The prepared limiter uses a keyed HMAC of the endpoint subject. Configure a
+long random `RATE_LIMIT_HASH_KEY` in Railway before deploying; replicas must
+share the same value. The database URL is a compatibility fallback, but a
+separate key is preferred so database credential rotation does not reset active
+rate-limit buckets. Raw IP addresses are never written to the limiter table.
 
 ## Deploy To Railway
 
@@ -54,7 +61,9 @@ Do this only when you are ready to create the Railway resources. Do not put
 
    Railway supplies `PORT`; do not set it unless you have a specific reason.
 5. Deploy the service: `railway up`.
-6. Run the idempotent initial migration against the service:
+6. Apply all database migrations before deploying code that requires them.
+   Production currently has migrations through 005; the prepared shared
+   limiter requires migration 006:
 
    ```powershell
    railway run npm run migrate
@@ -64,7 +73,10 @@ Do this only when you are ready to create the Railway resources. Do not put
    private Postgres hostname. For a private-only database, configure
    `npm run migrate` as Railway's pre-deploy command in the service Deploy
    settings, or use the temporary `RUN_MIGRATIONS_ON_START=true` bootstrap
-   switch for one deployment and clear it immediately afterward.
+   switch for one deployment and clear it immediately afterward. The previous
+   production rollout required a manual migration because the pre-deploy
+   command was not active; verify migration 006 exists before deploying the
+   matching server code.
 
 7. In Railway Networking, generate a public domain. Open
    `https://YOUR-DOMAIN/health`; it must return `{ "ok": true }`.
@@ -128,14 +140,14 @@ invalidating the old phone's server access.
 
 ## Remaining Production Checks
 
-- Migration `005` and request limits were deployed to Railway on September 30,
-  2026. The API health check and one-best-per-route index were verified.
-  Confirm on a test device that a lower duplicate is not promoted.
+- Migration `005` and the previous process-local request limits are deployed.
+  The API health check and one-best-per-route index were verified. Migration
+  `006` and shared HMAC rate limits are prepared in source only; migrate and
+  deploy them together, then verify limits survive a service restart.
 - Configure Railway's production pre-deploy command as `npm run migrate`
   before the next schema migration; migration `005` was applied manually for
   this rollout.
-- The request limits are process-local abuse friction, not durable anti-cheat;
-  they reset on restart and multiply with multiple replicas. Scores remain
+- Shared request limits are abuse friction, not anti-cheat. Scores remain
   forgeable and must stay labelled unverified and reward-free.
 - Recheck the Privacy Policy and Play Data Safety form against the exact
   deployed behavior, including public visibility after a player opts in.

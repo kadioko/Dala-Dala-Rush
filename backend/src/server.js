@@ -16,30 +16,40 @@ const FRIEND_INVITE_TTL_SECONDS = 24 * 60 * 60;
 const MAX_TELEMETRY_EVENTS_PER_REQUEST = 25;
 const MAX_TELEMETRY_AGE_SECONDS = 14 * 24 * 60 * 60;
 
-function fixedWindowRateLimit({ windowMs, max, key, error = "rate_limited" }) {
-	const buckets = new Map();
+function fixedWindowRateLimit(pool, { windowMs, max, key, scope, error = "rate_limited" }) {
 	let lastCleanup = 0;
-	return (req, res, next) => {
+	const hashSecret = process.env.RATE_LIMIT_HASH_KEY || process.env.DATABASE_URL || "local-development-only";
+	return async (req, res, next) => {
 		const now = Date.now();
-		const bucketKey = String(key(req) || "unknown");
-		let bucket = buckets.get(bucketKey);
-		if (!bucket || now - bucket.startedAt >= windowMs) {
-			bucket = { startedAt: now, count: 0 };
-			buckets.set(bucketKey, bucket);
-		}
-		if (now - lastCleanup > windowMs || buckets.size > 4096) {
-			for (const [storedKey, storedBucket] of buckets) {
-				if (now - storedBucket.startedAt >= windowMs) buckets.delete(storedKey);
+		const windowStartedAt = Math.floor(now / windowMs) * windowMs;
+		const subject = String(key(req) || "unknown");
+		const subjectHash = crypto.createHmac("sha256", hashSecret).update(`${scope}:${subject}`).digest("hex");
+		try {
+			const countResult = await pool.query(
+				`INSERT INTO api_rate_limits (scope, subject_hash, window_started_at, request_count, expires_at)
+				 VALUES ($1, $2, to_timestamp($3::double precision / 1000.0), 1,
+				         to_timestamp(($3::double precision + $4::double precision) / 1000.0))
+				 ON CONFLICT (scope, subject_hash, window_started_at)
+				 DO UPDATE SET request_count = LEAST(api_rate_limits.request_count + 1, $5)
+				 RETURNING request_count`,
+				[scope, subjectHash, windowStartedAt, windowMs, max + 1],
+			);
+			if (!Number.isSafeInteger(Number(countResult.rows[0]?.request_count))) {
+				throw new Error("rate_limit_counter_missing");
 			}
-			lastCleanup = now;
+			if (now - lastCleanup >= 60_000) {
+				lastCleanup = now;
+				void pool.query("DELETE FROM api_rate_limits WHERE expires_at <= NOW()").catch(() => {});
+			}
+			if (Number(countResult.rows[0]?.request_count || 0) > max) {
+				const retryAfterSeconds = Math.max(1, Math.ceil((windowStartedAt + windowMs - now) / 1000));
+				res.set("Retry-After", String(retryAfterSeconds));
+				return res.status(429).json({ error, retryAfterSeconds });
+			}
+			return next();
+		} catch {
+			return problem(res, 503, "rate_limit_unavailable");
 		}
-		bucket.count += 1;
-		if (bucket.count > max) {
-			const retryAfterSeconds = Math.max(1, Math.ceil((windowMs - (now - bucket.startedAt)) / 1000));
-			res.set("Retry-After", String(retryAfterSeconds));
-			return res.status(429).json({ error, retryAfterSeconds });
-		}
-		return next();
 	};
 }
 
@@ -88,17 +98,17 @@ export function createApp(pool) {
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "96kb" }));
-	const limitInstallations = fixedWindowRateLimit({
-		windowMs: 60 * 60 * 1000, max: 20, key: (req) => req.ip, error: "registration_rate_limited",
+	const limitInstallations = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 60 * 1000, max: 20, key: (req) => req.ip, scope: "installations", error: "registration_rate_limited",
 	});
-	const limitWorldReads = fixedWindowRateLimit({
-		windowMs: 60 * 1000, max: 90, key: (req) => req.ip,
+	const limitWorldReads = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 1000, max: 90, key: (req) => req.ip, scope: "world_reads",
 	});
-	const limitScoreSubmissions = fixedWindowRateLimit({
-		windowMs: 5 * 60 * 1000, max: 8, key: (req) => req.installationId,
+	const limitScoreSubmissions = fixedWindowRateLimit(pool, {
+		windowMs: 5 * 60 * 1000, max: 8, key: (req) => req.installationId, scope: "score_submissions",
 	});
-	const limitProfileChanges = fixedWindowRateLimit({
-		windowMs: 60 * 60 * 1000, max: 8, key: (req) => req.installationId,
+	const limitProfileChanges = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 60 * 1000, max: 8, key: (req) => req.installationId, scope: "profile_changes",
 	});
 
   app.get("/health", async (_req, res) => {

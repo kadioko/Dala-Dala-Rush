@@ -113,11 +113,19 @@ func _check_launch_copy() -> void:
 	_check((all_strings.get("sw", {}) as Dictionary).has("LEADERBOARD_WORLD_OPEN")
 		and (all_strings.get("en", {}) as Dictionary).has("LEADERBOARD_WORLD_OPEN"),
 		"Public World leaderboard instructions must exist in both locales")
+	_check((all_strings.get("sw", {}) as Dictionary).has("MORE_OPTIONS")
+		and (all_strings.get("en", {}) as Dictionary).has("MORE_OPTIONS")
+		and (all_strings.get("sw", {}) as Dictionary).has("LESS_OPTIONS")
+		and (all_strings.get("en", {}) as Dictionary).has("LESS_OPTIONS"),
+		"Collapsed main-menu options need localized labels")
+	_check((all_strings.get("sw", {}) as Dictionary).has("LEADERBOARD_WORLD_TARGET")
+		and (all_strings.get("en", {}) as Dictionary).has("LEADERBOARD_WORLD_TARGET"),
+		"World next-rival hint must have matching Swahili and English copy")
 	locale_node.free()
 
 func _check_menu_layout_breakpoints() -> void:
-	_check(MainMenuScript.info_menu_columns_for_width(540.0) == 3,
-		"Reference portrait width should use compact three-item navigation")
+	_check(MainMenuScript.info_menu_columns_for_width(540.0) == 2,
+		"Secondary menu should keep its two options aligned on wider phones")
 	_check(MainMenuScript.info_menu_columns_for_width(499.0) == 1,
 		"Narrow portrait widths must stack navigation instead of overflowing")
 	_check(MainMenuScript.utility_menu_columns_for_width(412.0) == 2,
@@ -128,6 +136,17 @@ func _check_menu_layout_breakpoints() -> void:
 		"Leaderboard dialogs must fit a compact 360px phone")
 	_check(LeaderboardScript.dialog_width_for_viewport(540.0, 440) == 440,
 		"Leaderboard dialogs should retain a comfortable width on larger phones")
+	_check(LeaderboardScript.points_to_overtake(500, 620) == 121
+		and LeaderboardScript.points_to_overtake(700, 620) == 0,
+		"World rival hint must show the exact points needed to pass the next score")
+	_check(GameScript.reachable_lane_choices([0, 1, 2], 1, 1, 3) == [0, 1, 2],
+		"All reachable lanes should remain available when traffic is open")
+	_check(GameScript.reachable_lane_choices([0, 2], 1, 0, 3) == [0],
+		"Forced traffic should prefer a lane compatible with the last safe lane")
+	_check(GameScript.reachable_lane_choices([0, 2], 1, 99, 3) == [0, 2],
+		"Fallback traffic choices must remain one swipe from the current lane")
+	_check(GameScript.reachable_lane_choices([2], 0, 0, 3).is_empty(),
+		"Traffic must defer a wave when its only escape needs two lane switches")
 
 func _check_routes() -> void:
 	var ids: Dictionary = {}
@@ -731,6 +750,9 @@ func _check_remote_tuning_guards() -> void:
 	_check(RemoteConfigScript.REMOTE_URL.ends_with("/docs/remote-config.json"),
 		"Hosted remote config URL must match its GitHub Pages docs path")
 	var config := RemoteConfigScript.new()
+	_check(RemoteConfigScript.REQUEST_TIMEOUT_SECONDS > 0.0
+		and RemoteConfigScript.MAX_RESPONSE_BYTES >= 1024,
+		"Remote config needs bounded network time and payload size")
 	config._values = RemoteConfigScript.DEFAULTS.duplicate(true)
 	config._values["fuel_drain_global"] = "invalid"
 	_check(config.get_float("fuel_drain_global", 1.0, 0.6, 1.4) == 1.0,
@@ -742,6 +764,7 @@ func _check_remote_tuning_guards() -> void:
 		"Valid route tuning should be readable")
 	config._values = RemoteConfigScript.DEFAULTS.duplicate(true)
 	_check(config._merge_config({
+		"revision": 4,
 		"event_banner": "QA route event",
 		"unknown": 99,
 		"route_tuning": {"kariakoo": {"passengers": 0.93, "not_a_tuning": 3}},
@@ -750,6 +773,10 @@ func _check_remote_tuning_guards() -> void:
 		"Unknown hosted config keys must be discarded")
 	_check(config.get_route_float("kariakoo", "passengers", 1.0, 0.8, 1.2) == 0.93,
 		"New passenger cadence tuning should be readable")
+	_check(not config._merge_config({"revision": 3, "event_banner": "stale"}),
+		"Older remote config revisions must not replace current tuning")
+	_check(String(config.get_value("event_banner", "")) == "QA route event",
+		"Rejected stale config must leave the active config unchanged")
 	_check(config.get_route_float("kariakoo", "not_a_tuning", 1.0, 0.8, 1.2) == 1.0,
 		"Unknown route tuning keys must be discarded")
 	config.free()

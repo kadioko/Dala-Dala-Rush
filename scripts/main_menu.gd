@@ -22,7 +22,7 @@ var _streak_result: Dictionary = {}
 var _rank_label: Label
 var _rank_up: Dictionary = {}
 var _btn_play: Button
-var _btn_routes: Button
+var _btn_current_route: Button
 var _btn_garage: Button
 var _btn_shop: Button
 var _btn_settings: Button
@@ -31,6 +31,9 @@ var _btn_stats: Button
 var _btn_leaderboard: Button
 var _btn_missions: Button
 var _btn_referrals: Button
+var _btn_more: Button
+var _secondary_content: VBoxContainer
+var _more_expanded: bool = false
 var _info_grid: GridContainer
 var _utility_grid: GridContainer
 
@@ -106,6 +109,31 @@ func _ready() -> void:
 	_btn_play.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_play.pressed.connect(_on_play)
 	v.add_child(_btn_play)
+	_btn_current_route = UIFactory.make_button("", false)
+	_btn_current_route.custom_minimum_size = Vector2(0, 50)
+	_btn_current_route.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_current_route.add_theme_font_size_override("font_size", 18)
+	_btn_current_route.pressed.connect(func(): _go("res://scenes/routes.tscn"))
+	v.add_child(_btn_current_route)
+
+	var primary_grid := GridContainer.new()
+	primary_grid.columns = 2
+	primary_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	primary_grid.add_theme_constant_override("h_separation", 8)
+	primary_grid.add_theme_constant_override("v_separation", 8)
+	v.add_child(primary_grid)
+	_btn_garage = UIFactory.make_button("", false)
+	_btn_garage.custom_minimum_size = Vector2(0, 56)
+	_btn_garage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_garage.add_theme_font_size_override("font_size", 18)
+	_btn_garage.pressed.connect(func(): _go("res://scenes/garage.tscn"))
+	primary_grid.add_child(_btn_garage)
+	_btn_leaderboard = UIFactory.make_button("", false)
+	_btn_leaderboard.custom_minimum_size = Vector2(0, 56)
+	_btn_leaderboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_leaderboard.add_theme_font_size_override("font_size", 18)
+	_btn_leaderboard.pressed.connect(func(): _go("res://scenes/leaderboard.tscn"))
+	primary_grid.add_child(_btn_leaderboard)
 
 	# Career rank badge (+ rank-up reward check)
 	_rank_label = UIFactory.make_label("", 16, Color("#d4af37"))
@@ -130,16 +158,28 @@ func _ready() -> void:
 	_coin_label = UIFactory.make_label("", 18, UIFactory.COL_ACCENT)
 	stats_row.add_child(_coin_label)
 
+	_btn_more = UIFactory.make_button("", false)
+	_btn_more.custom_minimum_size = Vector2(0, 44)
+	_btn_more.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_more.add_theme_font_size_override("font_size", 16)
+	_btn_more.pressed.connect(_toggle_more)
+	v.add_child(_btn_more)
+	_secondary_content = VBoxContainer.new()
+	_secondary_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_secondary_content.add_theme_constant_override("separation", 7)
+	_secondary_content.visible = false
+	v.add_child(_secondary_content)
+
 	_daily_label = UIFactory.make_label("", 15, UIFactory.COL_ACCENT)
 	_daily_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_daily_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_child(_daily_label)
+	_secondary_content.add_child(_daily_label)
 	_daily_route_btn = UIFactory.make_button("", false)
 	_daily_route_btn.custom_minimum_size = Vector2(0, 50)
 	_daily_route_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_daily_route_btn.add_theme_font_size_override("font_size", 20)
 	_daily_route_btn.pressed.connect(_on_daily_route)
-	v.add_child(_daily_route_btn)
+	_secondary_content.add_child(_daily_route_btn)
 
 	# Daily login streak (claims reward on first open of the day).
 	# Tapping the row opens the 7-day reward calendar.
@@ -153,11 +193,11 @@ func _ready() -> void:
 		or (ev is InputEventScreenTouch and ev.pressed):
 			_show_streak_calendar()
 	)
-	v.add_child(_streak_label)
+	_secondary_content.add_child(_streak_label)
 	if _streak_result.get("claimed_now", false):
 		_pulse_streak_label()
 
-	v.add_child(_spacer(4))
+	_secondary_content.add_child(_spacer(4))
 
 	# This row becomes a vertical list below the compact-width breakpoint.
 	_info_grid = GridContainer.new()
@@ -165,7 +205,7 @@ func _ready() -> void:
 	_info_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_info_grid.add_theme_constant_override("h_separation", 6)
 	_info_grid.add_theme_constant_override("v_separation", 6)
-	v.add_child(_info_grid)
+	_secondary_content.add_child(_info_grid)
 
 	_btn_stats = UIFactory.make_button("", false)
 	# Compact navigation shares one row on phones. Clear UIFactory's 280px
@@ -175,13 +215,6 @@ func _ready() -> void:
 	_btn_stats.add_theme_font_size_override("font_size", 17)
 	_btn_stats.pressed.connect(func(): _go("res://scenes/stats.tscn"))
 	_info_grid.add_child(_btn_stats)
-
-	_btn_leaderboard = UIFactory.make_button("", false)
-	_btn_leaderboard.custom_minimum_size = Vector2(0, 56)
-	_btn_leaderboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_btn_leaderboard.add_theme_font_size_override("font_size", 17)
-	_btn_leaderboard.pressed.connect(func(): _go("res://scenes/leaderboard.tscn"))
-	_info_grid.add_child(_btn_leaderboard)
 
 	_btn_missions = UIFactory.make_button("", false)
 	_btn_missions.custom_minimum_size = Vector2(0, 56)
@@ -195,11 +228,9 @@ func _ready() -> void:
 	_utility_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_utility_grid.add_theme_constant_override("h_separation", 8)
 	_utility_grid.add_theme_constant_override("v_separation", 8)
-	v.add_child(_utility_grid)
+	_secondary_content.add_child(_utility_grid)
 
 	for pair in [
-		["", "res://scenes/routes.tscn"],
-		["", "res://scenes/garage.tscn"],
 		["", "res://scenes/shop.tscn"],
 		["", "res://scenes/settings.tscn"],
 	]:
@@ -211,8 +242,6 @@ func _ready() -> void:
 		btn.pressed.connect(func(): _go(path))
 		_utility_grid.add_child(btn)
 		match path:
-			"res://scenes/routes.tscn":   _btn_routes   = btn
-			"res://scenes/garage.tscn":   _btn_garage   = btn
 			"res://scenes/shop.tscn":     _btn_shop     = btn
 			_:                            _btn_settings = btn
 
@@ -222,14 +251,14 @@ func _ready() -> void:
 	_btn_referrals.add_theme_font_size_override("font_size", 18)
 	UIFactory.tint_button(_btn_referrals, Color("#0f8a59"))
 	_btn_referrals.pressed.connect(func(): _go("res://scenes/referrals.tscn"))
-	v.add_child(_btn_referrals)
+	_secondary_content.add_child(_btn_referrals)
 
 	_btn_how = UIFactory.make_button("", false)
 	_btn_how.custom_minimum_size = Vector2(0, 52)
 	_btn_how.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_btn_how.add_theme_font_size_override("font_size", 18)
 	_btn_how.pressed.connect(func(): _go("res://scenes/how_to_play.tscn"))
-	v.add_child(_btn_how)
+	_secondary_content.add_child(_btn_how)
 
 	_pulse_play_btn()
 
@@ -243,7 +272,7 @@ func _exit_tree() -> void:
 	AdService.hide_banner()
 
 static func info_menu_columns_for_width(viewport_width: float) -> int:
-	return 1 if viewport_width < 500.0 else 3
+	return 1 if viewport_width < 500.0 else 2
 
 static func utility_menu_columns_for_width(viewport_width: float) -> int:
 	return 1 if viewport_width < 380.0 else 2
@@ -293,6 +322,9 @@ func _refresh_text(_l := "") -> void:
 	_high_score_label.text = "★ %d" % int(SaveSystem.get_value("best_score", 0))
 	_coin_label.text       = "🪙 %d" % int(SaveSystem.get_value("total_coins", 0))
 	_btn_play.text         = LocaleManager.t("PLAY")
+	var selected_route: Dictionary = Routes.get_by_id(GameState.selected_route_id)
+	_btn_current_route.text = "%s: %s" % [LocaleManager.t("ROUTES"), LocaleManager.t(String(selected_route.get("name_key", "ROUTE_KARIAKOO")))]
+	_btn_more.text = LocaleManager.t("MORE_OPTIONS" if not _more_expanded else "LESS_OPTIONS")
 	_daily_label.text      = _daily_text()
 	var daily_route: Dictionary = DailyRouteChallengeData.current()
 	_daily_route_btn.text = LocaleManager.t("DAILY_ROUTE_PLAY").replace(
@@ -310,13 +342,17 @@ func _refresh_text(_l := "") -> void:
 	_btn_stats.text        = LocaleManager.t("STATS")
 	_btn_leaderboard.text  = LocaleManager.t("LEADERBOARD")
 	_btn_missions.text     = LocaleManager.t("MISSIONS")
-	_btn_routes.text       = LocaleManager.t("ROUTES")
 	_btn_garage.text       = LocaleManager.t("GARAGE")
 	_btn_shop.text         = LocaleManager.t("SHOP")
 	_btn_settings.text     = LocaleManager.t("SETTINGS")
 	_btn_referrals.text    = LocaleManager.t("REFERRAL_MENU_PROMO") \
 		.replace("{n}", str(ReferralsData.REFERRER_REWARD))
 	_btn_how.text          = LocaleManager.t("HOW_TO_PLAY")
+
+func _toggle_more() -> void:
+	_more_expanded = not _more_expanded
+	_secondary_content.visible = _more_expanded
+	_refresh_text()
 
 func _on_play() -> void:
 	AudioManager.play_sfx("click")

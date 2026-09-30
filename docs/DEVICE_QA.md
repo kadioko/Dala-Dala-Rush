@@ -5,6 +5,23 @@ pilot. Record the exact version code under test.
 Capture one completed form for a low-end phone and one for a mid-range phone;
 test both Swahili and English.
 
+## Automated Main-Menu Pass
+
+Run the project contract checks and the portrait screenshot/overflow runner:
+
+```powershell
+& 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe' --headless --path . res://tests/logic_contracts.tscn
+& 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64.exe' --path . res://tests/ui_layout_qa.tscn
+```
+
+The second command uses the normal renderer to capture collapsed,
+expanded-top, and expanded-bottom menu states in both locales at 360x640,
+393x873, 412x915, 540x960, and 720x1600. Screenshots are written to
+`user://ui_qa/`. It fails if visible controls extend beyond the horizontal
+viewport. Open every capture once before treating the automated pass as visual
+approval; it cannot validate touch accuracy, Android keyboard behavior, safe
+areas, native banners, or actual phone rendering.
+
 ## Device Record
 
 | Field | Record |
@@ -26,9 +43,12 @@ test both Swahili and English.
 - [ ] Menu, Route, Garage, Shop, How to Play, Settings, pause, and results fit
   cleanly with no clipped Swahili or English copy.
 - [ ] Check the main menu at 360x640, 393x873, 412x915, 540x960, and 720x1600
-  portrait classes. Below 500px, Stats/Leaderboard/Missions should stack;
-  below 380px, Route/Garage/Shop/Settings should also stack. Horizontal clipping
-  or a horizontal scrollbar is a blocker.
+  portrait classes. Play, selected route, Garage, and Leaderboards should be
+  immediately visible; daily, stats, missions, referrals, shop, settings, and
+  How to Play should be under More. No horizontal clipping is acceptable.
+- [ ] Expand More and verify every secondary action in both languages.
+- [ ] Attach the 30 generated menu captures or record their review result with
+  the tester sheet. The automated check does not replace this visual review.
 
 ## Route Balance
 
@@ -142,8 +162,8 @@ declaration matches the published privacy policy.
 - [ ] Change routes repeatedly while Friends/World data is loading. Confirm an
   older response never replaces the newly selected route.
 - [ ] Verify Refresh, saved-standings age copy, long-name truncation, friend
-  add/remove, the friend score target, and Leave Online. Confirm Leave Online
-  removes public data but not local progress.
+  add/remove, the friend score target, the World next-rival points gap, and
+  Leave Online. Confirm Leave Online removes public data but not local progress.
 - [ ] On both phones, open the same Daily Run and confirm route, Classic Blue
   vehicle, day condition, traffic pattern, no consumables, and no revive rule
   match. Record any device-specific divergence.

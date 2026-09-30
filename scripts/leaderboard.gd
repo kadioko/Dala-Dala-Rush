@@ -342,6 +342,8 @@ func _refresh_rows() -> void:
 		scores = _remote_scores
 	if _tab == TAB_FRIENDS and not scores.is_empty():
 		_add_friend_target(scores)
+	elif _tab == TAB_WORLD and not scores.is_empty():
+		_add_world_target(scores)
 	if scores.is_empty():
 		var empty_key := "NO_SCORES_YET"
 		if _tab != TAB_PERSONAL and _remote_state == "loading" and _cached_status.is_empty():
@@ -378,6 +380,30 @@ func _add_friend_target(scores: Array) -> void:
 	var target: int = int(rival.get("score", 0)) + 120
 	var hint := UIFactory.make_label(LocaleManager.t("LEADERBOARD_BEAT_TARGET") \
 		.replace("{name}", String(rival.get("displayName", ""))).replace("{score}", str(target)), 15, UIFactory.COL_PRIMARY)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_rows.add_child(hint)
+
+static func points_to_overtake(own_score: int, rival_score: int) -> int:
+	return maxi(0, rival_score - own_score + 1)
+
+func _add_world_target(scores: Array) -> void:
+	var your_score: int = SaveSystem.get_route_best(_current_route_id())
+	var rival: Dictionary = {}
+	for value in scores:
+		if value is not Dictionary:
+			continue
+		var score: Dictionary = value
+		var score_value: int = int(score.get("score", 0))
+		if bool(score.get("isYou", false)) or score_value <= your_score:
+			continue
+		if rival.is_empty() or score_value < int(rival.get("score", 0)):
+			rival = score
+	if rival.is_empty():
+		return
+	var points: int = points_to_overtake(your_score, int(rival.get("score", 0)))
+	var hint := UIFactory.make_label(LocaleManager.t("LEADERBOARD_WORLD_TARGET") \
+		.replace("{name}", String(rival.get("displayName", ""))) \
+		.replace("{points}", str(points)), 15, UIFactory.COL_PRIMARY)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_rows.add_child(hint)
 
