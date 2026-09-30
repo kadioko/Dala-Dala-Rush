@@ -3,9 +3,9 @@
 The repository now contains a small Node 20 / Express / PostgreSQL service in
 `backend/`. It is intentionally separate from the Godot game: the game remains
 fully playable offline. The Railway service is deployed and the current client
-release switch is on. Production currently has migration
-`005_leaderboard_one_best.sql`; migration `006_shared_rate_limits.sql` and its
-matching API code are prepared locally but are **not deployed**. Public World standings can be viewed without an account;
+release switch is on. As of October 1, 2026, production has migrations through
+`006_shared_rate_limits.sql`, and the matching API code uses shared PostgreSQL
+rate-limit counters. Public World standings can be viewed without an account;
 posting a name/score and using Friends still require explicit in-game consent.
 Scores remain unverified and have no rewards. Complete the device and Play
 declaration checks below before expanding promotion or adding reward-bearing
@@ -27,11 +27,12 @@ competition.
   data, or database credentials are accepted by the API. A player may choose a
   2-16 character driver name for the opt-in leaderboard only.
 - Deployed hardening: score writes retain only an improved per-route best,
-	migration `005_leaderboard_one_best.sql` removes existing duplicates and adds
-	a unique guard, and reserved staff-like names are rejected. The source
-	prepares shared PostgreSQL counters for 20 registrations per IP per hour, 90
-	World reads per IP per minute, 8 score submissions per installation per five
-	minutes, and 8 profile changes per installation per hour.
+  migration `005_leaderboard_one_best.sql` removes existing duplicates and adds
+  a unique guard, reserved staff-like names are rejected, and migration
+  `006_shared_rate_limits.sql` provides shared counters for 20 registrations
+  per IP per hour, 90 World reads per IP per minute, 8 score submissions per
+  installation per five minutes, and 8 profile changes per installation per
+  hour.
 
 The backend does not automatically award coins. Keep the existing offline
 referral flow as the live system until device QA, privacy review, and a stronger
@@ -39,11 +40,11 @@ attestation strategy are complete. A client-reported run can still be forged;
 Play Integrity or equivalent server-side proof is required before referrals or
 leaderboards become reward-bearing or competitive.
 
-The prepared limiter uses a keyed HMAC of the endpoint subject. Configure a
-long random `RATE_LIMIT_HASH_KEY` in Railway before deploying; replicas must
-share the same value. The database URL is a compatibility fallback, but a
-separate key is preferred so database credential rotation does not reset active
-rate-limit buckets. Raw IP addresses are never written to the limiter table.
+The limiter uses a keyed HMAC of the endpoint subject. A stable random
+`RATE_LIMIT_HASH_KEY` is configured in Railway and shared by replicas. The
+database URL is a compatibility fallback, but a separate key prevents database
+credential rotation from resetting active rate-limit buckets. Raw IP addresses
+are never written to the limiter table.
 
 ## Deploy To Railway
 
@@ -62,21 +63,20 @@ Do this only when you are ready to create the Railway resources. Do not put
    Railway supplies `PORT`; do not set it unless you have a specific reason.
 5. Deploy the service: `railway up`.
 6. Apply all database migrations before deploying code that requires them.
-   Production currently has migrations through 005; the prepared shared
-   limiter requires migration 006:
+   The API service's Railway `preDeployCommand` is configured as
+   `npm run migrate`; verify the migration log before considering the deploy
+   healthy. The one-time `RUN_MIGRATIONS_ON_START=true` bootstrap is a fallback
+   only and must be removed immediately after use.
 
    ```powershell
    railway run npm run migrate
    ```
 
    `railway run` executes on your computer, so it cannot resolve Railway's
-   private Postgres hostname. For a private-only database, configure
-   `npm run migrate` as Railway's pre-deploy command in the service Deploy
-   settings, or use the temporary `RUN_MIGRATIONS_ON_START=true` bootstrap
-   switch for one deployment and clear it immediately afterward. The previous
-   production rollout required a manual migration because the pre-deploy
-   command was not active; verify migration 006 exists before deploying the
-   matching server code.
+   private Postgres hostname. For a private-only database, use the configured
+   Railway pre-deploy command, which runs inside the private network. If a
+   migration must be applied manually, use a secure Railway-side execution
+   path and verify the API before removing any temporary bootstrap setting.
 
 7. In Railway Networking, generate a public domain. Open
    `https://YOUR-DOMAIN/health`; it must return `{ "ok": true }`.
@@ -140,13 +140,12 @@ invalidating the old phone's server access.
 
 ## Remaining Production Checks
 
-- Migration `005` and the previous process-local request limits are deployed.
-  The API health check and one-best-per-route index were verified. Migration
-  `006` and shared HMAC rate limits are prepared in source only; migrate and
-  deploy them together, then verify limits survive a service restart.
-- Configure Railway's production pre-deploy command as `npm run migrate`
-  before the next schema migration; migration `005` was applied manually for
-  this rollout.
+- Migrations through `006` and shared HMAC rate limits were deployed on
+  October 1, 2026. The deployment log confirms `npm run migrate` completed
+  before the API started; `/health` and the public World endpoint both returned
+  HTTP 200 afterward.
+- Railway's production pre-deploy command is now `npm run migrate`. Keep it
+  enabled for future schema changes.
 - Shared request limits are abuse friction, not anti-cheat. Scores remain
   forgeable and must stay labelled unverified and reward-free.
 - Recheck the Privacy Policy and Play Data Safety form against the exact

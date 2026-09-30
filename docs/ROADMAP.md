@@ -1,6 +1,6 @@
 # Dala Dala Rush TZ - Product Roadmap
 
-Updated September 30, 2026 after the Waves 16-30 first-session, route-operator,
+Updated October 1, 2026 after the Waves 16-31 first-session, route-operator,
 balance, telemetry, live-ops, and contract passes. Google Play production is
 active. The current signed production-track update is `1.0.13` / code `14`;
 it includes all Wave 29 competition reliability and daily-run work, the A21s
@@ -33,7 +33,7 @@ source-only and are not present in the previously exported code 15 bundle.
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
 | Android readiness | **Code 15 release candidate built** | Version 1.0.14 / code 15 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
-| Live ops | **Railway live; shared limiter prepared** | Production runs through migration 005. Source contains migration 006 and PostgreSQL-backed HMAC counters, not yet deployed. Update and publish the privacy policy before that service change. Gameplay Insights still needs a retention policy and report volume. |
+| Live ops | **Railway shared limiter deployed** | Migration 006 and PostgreSQL-backed HMAC counters are deployed; a stable limiter key and pre-deploy migration command are configured. Privacy policy and remote-config revision 2 are published. Gameplay Insights still needs a retention policy and sufficient report volume. |
 | QA/testing | **In progress** | Automated captures and horizontal-bound checks passed for collapsed and expanded menus at five portrait sizes in both languages. Physical phone QA, keyboard/banner/native safe-area checks remain manual. |
 | Store launch | **Production active** | Monitor Play reports and staged rollout health, ship only higher version codes, and use physical-device evidence before expanding optional online services. |
 
@@ -87,9 +87,9 @@ source-only and are not present in the previously exported code 15 bundle.
 - Remote config has a five-second timeout, a 64 KiB response cap, and monotonic
   revisions. Increase `revision` for every published edit; rollbacks must use
   an older value under a newer revision.
-- Backend source prepares migration 006 for shared HMAC request counters.
-  Production still uses the deployed migration 005 service until the migration,
-  matching server code, and public privacy-policy update are deployed together.
+- Railway migration 006 and the matching shared-counter API are deployed.
+  The stable HMAC key is configured; the pre-deploy migration command is
+  verified. The public privacy policy and remote-config revision 2 are live.
 - Added `docs/PRODUCTION_REPORTING.md` with aggregate-only queries and explicit
   limits of the current consented event stream. Crash reporting is not included.
 - Added `tools/verify_android_release.ps1` for AAB signature/structure and
@@ -98,9 +98,9 @@ source-only and are not present in the previously exported code 15 bundle.
   validation, and all 30 normal-renderer menu captures passed locally. The
   screenshot set was visually reviewed at 360x640 in both locales and at
   720x1600 in Swahili; real-device rendering still needs phone QA.
-- This source pass has not been exported to AAB or deployed to Railway. Run
-  Godot and backend checks, review screenshots, and complete physical phone
-  QA before selecting the next release version.
+- The Godot client/UI changes in this source pass have not been exported to a
+  new AAB. The Railway backend changes are deployed. Run the local checks and
+  complete physical phone QA before selecting the next release version.
 
 ## Milestone A — Production Update QA And Balancing
 

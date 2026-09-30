@@ -1,6 +1,6 @@
 # Live Ops Foundation
 
-Last updated: September 30, 2026. Google Play production is active. Core gameplay
+Last updated: October 1, 2026. Google Play production is active. Core gameplay
 is offline-first; optional Railway services are enabled for consented phone
 validation and must pass separate device and policy checks before broad rollout.
 
@@ -114,9 +114,10 @@ validation work are in
 
 Backend request limits now use shared PostgreSQL counters from
 `backend/sql/006_shared_rate_limits.sql`, with HMACed subjects and fixed expiry
-windows. Apply the new migration before deploying the matching server code.
-The privacy-policy source now describes these short-lived pseudonymous keys;
-publish that policy change before enabling this backend revision in production.
+windows. Migration 006 and the matching API are deployed; Railway's
+`preDeployCommand` runs `npm run migrate` before future API deployments. The
+privacy-policy update and remote-config revision 2 are published. See
+`docs/RAILWAY_BACKEND.md` for production verification and remaining device QA.
 
 Cloud sync sends a filtered snapshot, never the full local save: it omits
 referral codes, local leaderboard names, analytics history, and sync tokens.
