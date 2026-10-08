@@ -1,8 +1,7 @@
 class_name DailyRouteChallenge
 ## A deterministic, offline daily run. Every player receives the same route,
-## starter vehicle, traffic seed, and no-revive rule for a given local UTC date.
-## It is fairer than ordinary runs, though still explicitly unverified until a
-## future server-side run validator exists.
+## starter vehicle, traffic seed, and gameplay rules for a given UTC date.
+## Scores remain unverified until a future server-side run validator exists.
 
 const ROUTE_IDS: Array[String] = ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"]
 const STARTER_VEHICLE_ID := "classic_blue"

@@ -6,6 +6,8 @@ extends Node
 ## Usage: RemoteConfig.get_value("spawn_interval_mult", 1.0)
 ## Test locally by writing JSON to user://remote_config.json.
 
+signal config_updated
+
 ## Published from this repository's GitHub Pages `docs/` source. Fetching is
 ## optional: a bad response always leaves the last safe cache/defaults in use.
 const REMOTE_URL := "https://kadioko.github.io/Dala-Dala-Rush/docs/remote-config.json"
@@ -78,6 +80,9 @@ func _load_cache() -> void:
 	var f := FileAccess.open(CACHE_PATH, FileAccess.READ)
 	if f == null:
 		return
+	if f.get_length() > MAX_RESPONSE_BYTES:
+		f.close()
+		return
 	var parsed: Variant = JSON.parse_string(f.get_as_text())
 	f.close()
 	if typeof(parsed) == TYPE_DICTIONARY and _merge_config(parsed as Dictionary):
@@ -97,12 +102,8 @@ func _fetch() -> void:
 		var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 		if typeof(parsed) != TYPE_DICTIONARY:
 			return
-		var incoming_revision: Variant = (parsed as Dictionary).get("revision", null)
-		if typeof(incoming_revision) != TYPE_INT or int(incoming_revision) < _revision:
+		if not _apply_remote_payload(parsed as Dictionary):
 			return
-		if not _merge_config(parsed as Dictionary):
-			return
-		AnalyticsService.log_event("remote_config_loaded", {"source": "network"})
 		var f := FileAccess.open(CACHE_PATH, FileAccess.WRITE)
 		if f:
 			f.store_string(JSON.stringify(parsed))
@@ -111,6 +112,16 @@ func _fetch() -> void:
 	var result: Error = req.request(REMOTE_URL)
 	if result != OK:
 		req.queue_free()
+
+func _apply_remote_payload(source: Dictionary) -> bool:
+	var incoming_revision: Variant = source.get("revision", null)
+	if typeof(incoming_revision) != TYPE_INT or int(incoming_revision) < _revision:
+		return false
+	if not _merge_config(source):
+		return false
+	AnalyticsService.log_event("remote_config_loaded", {"source": "network"})
+	config_updated.emit()
+	return true
 
 ## Only documented, primitive tuning values may change the live defaults. This
 ## keeps a malformed or accidentally edited public JSON file from becoming an

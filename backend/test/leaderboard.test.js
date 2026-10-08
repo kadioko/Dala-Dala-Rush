@@ -141,3 +141,101 @@ test("public world standings reads have a per-IP burst limit", async () => {
 		assert.equal((await limited.json()).error, "rate_limited");
 	});
 });
+
+test("leaderboard reports use opaque public references and accept one report per target", async () => {
+	const targetId = "b47ac10b-58cc-4372-a567-0e02b2c3d479";
+	const reportRef = "c47ac10b-58cc-4372-a567-0e02b2c3d479";
+	let reportRows = 0;
+	const limits = new Map();
+	const pool = {
+		async query(sql, params = []) {
+			if (sql.includes("INSERT INTO api_rate_limits")) {
+				const key = `${params[0]}:${params[1]}:${params[2]}`;
+				const count = Math.min((limits.get(key) || 0) + 1, Number(params[4]));
+				limits.set(key, count);
+				return { rowCount: 1, rows: [{ request_count: count }] };
+			}
+			if (sql.startsWith("DELETE FROM api_rate_limits")) return { rowCount: 0 };
+			if (sql.startsWith("UPDATE installations")) return { rowCount: 1 };
+			if (sql.includes("SELECT profile.installation_id, profile.display_name")) {
+				assert.equal(params[0], reportRef);
+				return { rowCount: 1, rows: [{ installation_id: targetId, display_name: "Konda Juma" }] };
+			}
+			if (sql.includes("INSERT INTO leaderboard_reports")) {
+				reportRows += 1;
+				return { rowCount: reportRows === 1 ? 1 : 0, rows: reportRows === 1 ? [{ id: 1 }] : [] };
+			}
+			throw new Error(`Unexpected SQL in report test: ${sql}`);
+		},
+	};
+	await withServer(pool, async (base) => {
+		const submit = () => fetch(`${base}/v1/leaderboards/reports`, {
+			method: "POST",
+			headers: HEADERS,
+			body: JSON.stringify({ reportRef, routeId: "kariakoo", reason: "impersonation" }),
+		});
+		const first = await submit();
+		assert.equal(first.status, 201);
+		assert.deepEqual(await first.json(), { accepted: true, duplicate: false });
+		const duplicate = await submit();
+		assert.equal(duplicate.status, 200);
+		assert.deepEqual(await duplicate.json(), { accepted: true, duplicate: true });
+		const invalid = await fetch(`${base}/v1/leaderboards/reports`, {
+			method: "POST", headers: HEADERS,
+			body: JSON.stringify({ reportRef, routeId: "kariakoo", reason: "free text" }),
+		});
+		assert.equal(invalid.status, 400);
+	});
+});
+
+test("blocking a friend severs the link and supports unblocking", async () => {
+	const friendId = "b47ac10b-58cc-4372-a567-0e02b2c3d479";
+	const statements = [];
+	let isBlocked = false;
+	const pool = {
+		async query(sql) {
+			if (sql.startsWith("UPDATE installations")) return { rowCount: 1 };
+			if (sql.startsWith("DELETE FROM leaderboard_blocks")) {
+				const wasBlocked = isBlocked;
+				isBlocked = false;
+				return { rowCount: wasBlocked ? 1 : 0 };
+			}
+			if (sql.includes("FROM leaderboard_blocks AS block")) {
+				return { rowCount: isBlocked ? 1 : 0, rows: isBlocked ? [{
+					installation_id: friendId, display_name: "Konda Juma", created_at: "2026-10-08T00:00:00Z",
+				}] : [] };
+			}
+			throw new Error(`Unexpected SQL in block test: ${sql}`);
+		},
+		async connect() {
+			return {
+				async query(sql) {
+					statements.push(sql);
+					if (sql.startsWith("INSERT INTO leaderboard_blocks")) isBlocked = true;
+					return { rowCount: 1, rows: [] };
+				},
+				release() {},
+			};
+		},
+	};
+	await withServer(pool, async (base) => {
+		const blocked = await fetch(`${base}/v1/leaderboards/blocks/${friendId}`, {
+			method: "POST", headers: HEADERS,
+		});
+		assert.equal(blocked.status, 200);
+		assert.deepEqual(await blocked.json(), { blocked: true });
+		assert.ok(statements.includes("BEGIN"));
+		assert.ok(statements.some((sql) => sql.startsWith("DELETE FROM leaderboard_friendships")));
+		assert.ok(statements.includes("COMMIT"));
+
+		const listed = await fetch(`${base}/v1/leaderboards/blocks`, { headers: HEADERS });
+		assert.deepEqual((await listed.json()).blocks.map((row) => row.friendId), [friendId]);
+
+		const unblocked = await fetch(`${base}/v1/leaderboards/blocks/${friendId}`, {
+			method: "DELETE", headers: HEADERS,
+		});
+		assert.deepEqual(await unblocked.json(), { unblocked: true });
+		const empty = await fetch(`${base}/v1/leaderboards/blocks`, { headers: HEADERS });
+		assert.deepEqual((await empty.json()).blocks, []);
+	});
+});

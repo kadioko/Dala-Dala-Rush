@@ -49,6 +49,7 @@ var _last_safe_lane: int = 1
 var difficulty_mult: float = 1.0
 var current_route: Dictionary = {}
 var current_vehicle: Dictionary = {}
+var _daily_run_active: bool = false
 var spawn_interval_mult: float = 1.0
 var passenger_interval_mult: float = 1.0
 var kituo_gap_mult: float = 1.0
@@ -175,6 +176,13 @@ var combo_timer: float = 0.0
 var combo_peak: int = 0
 const COMBO_WINDOW := 3.2
 const COMBO_MAX := 8
+const NEAR_MISS_MIN_PASS_GAP := 20.0
+const NEAR_MISS_VERTICAL_PADDING := 24.0
+const NEAR_MISS_HORIZONTAL_GAP := 92.0
+const TRAFFIC_WARNING_LEAD_TIME := 1.0
+const TRAFFIC_WARNING_SAMPLE_COUNT := 16
+const BODABODA_DRIFT := 26.0
+const MBUZI_SPEED := 42.0
 
 # ── Horn ──────────────────────────────────────────────────────────
 var horn_charges: int = 3
@@ -189,6 +197,7 @@ var _lane_warnings: Array = []
 
 # ── Countdown ─────────────────────────────────────────────────────
 var _counting_down: bool = true
+var _restart_countdown_on_resume: bool = false
 var _countdown_layer: CanvasLayer
 var _countdown_label: Label
 var _countdown_bg: ColorRect
@@ -245,8 +254,10 @@ const SCORE_JAM  := 1500
 # ═════════════════════════ READY ══════════════════════════════════
 
 func _ready() -> void:
+	AudioManager.set_game_paused(false)
 	_fx_rng.randomize()
-	if GameState.is_daily_route_challenge_active():
+	_daily_run_active = GameState.is_daily_route_challenge_active()
+	if _daily_run_active:
 		_rng.seed = int(GameState.daily_route_challenge.get("traffic_seed", 1))
 	else:
 		_rng.randomize()
@@ -257,17 +268,22 @@ func _ready() -> void:
 	difficulty_mult = float(current_route.difficulty)
 	spawn_interval_mult = float(current_route.get("spawn_interval_mult", 1.0))
 	passenger_interval_mult = clampf(float(current_route.get("passenger_interval_mult", 1.0)) \
-		* RemoteConfig.get_route_float(String(current_route.id), "passengers", 1.0, 0.80, 1.20), 0.70, 1.35)
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_route_float(String(current_route.id), "passengers", 1.0, 0.80, 1.20)), 0.70, 1.35)
 	kituo_gap_mult = clampf(float(current_route.get("kituo_gap_mult", 1.0)) \
-		* RemoteConfig.get_route_float(String(current_route.id), "kituo_gap", 1.0, 0.85, 1.15), 0.70, 1.35)
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_route_float(String(current_route.id), "kituo_gap", 1.0, 0.85, 1.15)), 0.70, 1.35)
 	reduced_effects = bool(SaveSystem.get_value("reduced_effects", false))
 	var resume_state: Dictionary = {}
 	if GameState.continue_pending:
 		resume_state = GameState.continue_state.duplicate(true)
 	var is_continuing: bool = GameState.continue_pending and not resume_state.is_empty()
-	tutorial_stage = GameState.tutorial_stage_for_run(is_continuing)
-	spawn_interval_mult *= RemoteConfig.get_float("spawn_interval_global", 1.0, 0.75, 1.50)
-	spawn_interval_mult *= RemoteConfig.get_route_float(String(current_route.id), "spawn", 1.0, 0.75, 1.50)
+	tutorial_stage = effective_tutorial_stage(_daily_run_active,
+		GameState.tutorial_stage_for_run(is_continuing))
+	spawn_interval_mult *= run_tuning_multiplier(_daily_run_active,
+		RemoteConfig.get_float("spawn_interval_global", 1.0, 0.75, 1.50))
+	spawn_interval_mult *= run_tuning_multiplier(_daily_run_active,
+		RemoteConfig.get_route_float(String(current_route.id), "spawn", 1.0, 0.75, 1.50))
 
 	# Give new drivers two clear runs before introducing weather and rush hour.
 	var completed_runs: int = int(SaveSystem.get_value("total_runs", 0))
@@ -319,19 +335,23 @@ func _ready() -> void:
 	speed_lines.setup(view_size, reduced_effects)
 	entity_layer.add_child(speed_lines)
 
-	_upg_engine = Career.upgrade_level("upg_engine")
-	_upg_brakes = Career.upgrade_level("upg_brakes")
-	_upg_sound = Career.upgrade_level("upg_sound")
+	_upg_engine = effective_upgrade_level(_daily_run_active, Career.upgrade_level("upg_engine"))
+	_upg_brakes = effective_upgrade_level(_daily_run_active, Career.upgrade_level("upg_brakes"))
+	_upg_sound = effective_upgrade_level(_daily_run_active, Career.upgrade_level("upg_sound"))
 	slow_max = SLOW_MAX + float(_upg_brakes)
 
 	current_vehicle = Vehicles.get_by_id(GameState.selected_vehicle_id)
 	fuel_drain_mult = float(current_vehicle.get("fuel_drain_mult", 1.0)) \
 		* clampf(float(current_route.get("fuel_drain_route_mult", 1.0)), 0.70, 1.35) \
-		* RemoteConfig.get_float("fuel_drain_global", 1.0, 0.60, 1.40) \
-		* RemoteConfig.get_route_float(String(current_route.id), "fuel", 1.0, 0.60, 1.40)
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_float("fuel_drain_global", 1.0, 0.60, 1.40)) \
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_route_float(String(current_route.id), "fuel", 1.0, 0.60, 1.40))
 	coin_mult = float(current_vehicle.get("coin_mult", 1.0)) \
-		* RemoteConfig.get_float("coin_reward_global", 1.0, 0.60, 1.60) \
-		* RemoteConfig.get_route_float(String(current_route.id), "coins", 1.0, 0.60, 1.60)
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_float("coin_reward_global", 1.0, 0.60, 1.60)) \
+		* run_tuning_multiplier(_daily_run_active,
+			RemoteConfig.get_route_float(String(current_route.id), "coins", 1.0, 0.60, 1.60))
 	max_horn_charges = int(current_vehicle.get("horn_charges", 3))
 	horn_charges = max_horn_charges
 
@@ -342,7 +362,7 @@ func _ready() -> void:
 	# The bus needs its own clear road space above the driving dock.
 	# Include gesture-navigation clearance so Android devices keep the same gap.
 	var gameplay_bottom_inset: float = UIFactory.safe_bottom_inset(view_size.y)
-	player.position.y = view_size.y - 246 - gameplay_bottom_inset
+	player.position.y = player_y_for_view(view_size.y, gameplay_bottom_inset)
 	_base_lane_time = player.lane_switch_time
 	if condition == "rain":
 		_base_lane_time *= 1.18  # wet road: heavier steering
@@ -377,7 +397,8 @@ func _ready() -> void:
 	entity_layer.add_child(kituo)
 
 	# Ghost racing is revealed after the first few independent runs.
-	if completed_runs >= 5 and bool(SaveSystem.get_value("ghost_on", true)):
+	if daily_run_ghost_allowed(_daily_run_active, completed_runs,
+		bool(SaveSystem.get_value("ghost_on", true))):
 		var rival: Variant = SaveSystem.get_value("ghost_rival", null)
 		var own: Variant = SaveSystem.get_value("ghost_best", null)
 		var g: Dictionary = GhostDataLib.sanitize(rival)
@@ -612,8 +633,9 @@ func _build_countdown() -> void:
 		cond_lbl.anchor_right = 0.5
 		cond_lbl.anchor_top = 0.5
 		cond_lbl.anchor_bottom = 0.5
-		cond_lbl.offset_left = -180
-		cond_lbl.offset_right = 180
+		var condition_half_width: float = minf(180.0, view_size.x * 0.5 - 16.0)
+		cond_lbl.offset_left = -condition_half_width
+		cond_lbl.offset_right = condition_half_width
 		cond_lbl.offset_top = 112
 		cond_lbl.offset_bottom = 150
 		_countdown_layer.add_child(cond_lbl)
@@ -857,7 +879,11 @@ func _build_hud() -> void:
 	drive_dock = PanelContainer.new()
 	drive_dock.anchor_left = 0.5; drive_dock.anchor_right = 0.5
 	drive_dock.anchor_top = 1.0; drive_dock.anchor_bottom = 1.0
-	drive_dock.offset_left = -204; drive_dock.offset_right = 204
+	var dock_metrics: Dictionary = drive_dock_metrics(view_size.x)
+	var dock_width: float = float(dock_metrics.width)
+	var control_scale: float = float(dock_metrics.scale)
+	drive_dock.offset_left = -dock_width * 0.5
+	drive_dock.offset_right = dock_width * 0.5
 	drive_dock.offset_top = -130 - safe_bottom; drive_dock.offset_bottom = -18 - safe_bottom
 	# The whole dock is a no-swipe zone. This prevents a thumb starting in the
 	# gap beside a button from being mistaken for a steering gesture.
@@ -876,14 +902,14 @@ func _build_hud() -> void:
 
 	var drive_row := HBoxContainer.new()
 	drive_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	drive_row.add_theme_constant_override("separation", 12)
+	drive_row.add_theme_constant_override("separation", roundi(12.0 * control_scale))
 	drive_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	drive_dock.add_child(drive_row)
 
 	# ── Lane tap buttons ──────────────────────────────────────────
 	btn_left = _DriveButton.new()
 	(btn_left as _DriveButton).icon_kind = _DriveButton.IconKind.LEFT
-	btn_left.custom_minimum_size = Vector2(104, 82)
+	btn_left.custom_minimum_size = Vector2(104, 82) * control_scale
 	btn_left.tooltip_text = LocaleManager.t("CTRL_SWIPE")
 	_style_drive_button(btn_left, Color("#1f78bd"))
 	btn_left.pressed.connect(_move_left)
@@ -894,7 +920,7 @@ func _build_hud() -> void:
 	var horn_control := _horn_btn as _DriveButton
 	horn_control.icon_kind = _DriveButton.IconKind.HORN
 	horn_control.charge_capacity = max_horn_charges
-	_horn_btn.custom_minimum_size = Vector2(128, 82)
+	_horn_btn.custom_minimum_size = Vector2(128, 82) * control_scale
 	_horn_btn.tooltip_text = LocaleManager.t("HORN_CHARGES")
 	_style_drive_button(_horn_btn, Color("#d98218"))
 	_horn_btn.pressed.connect(_use_horn)
@@ -902,7 +928,7 @@ func _build_hud() -> void:
 
 	btn_right = _DriveButton.new()
 	(btn_right as _DriveButton).icon_kind = _DriveButton.IconKind.RIGHT
-	btn_right.custom_minimum_size = Vector2(104, 82)
+	btn_right.custom_minimum_size = Vector2(104, 82) * control_scale
 	btn_right.tooltip_text = LocaleManager.t("CTRL_SWIPE")
 	_style_drive_button(btn_right, Color("#1f78bd"))
 	btn_right.pressed.connect(_move_right)
@@ -983,7 +1009,10 @@ func _build_pause_overlay() -> void:
 	var panel := UIFactory.make_panel(Color(0.045, 0.065, 0.09, 0.98))
 	panel.anchor_left = 0.5; panel.anchor_right = 0.5
 	panel.anchor_top = 0.5; panel.anchor_bottom = 0.5
-	panel.offset_left = -184; panel.offset_right = 184
+	var panel_width: float = pause_panel_width(view_size.x)
+	var action_width: float = minf(280.0, maxf(220.0, panel_width - 48.0))
+	panel.offset_left = -panel_width * 0.5
+	panel.offset_right = panel_width * 0.5
 	panel.offset_top = -220; panel.offset_bottom = 220
 	pause_overlay.add_child(panel)
 
@@ -1003,15 +1032,18 @@ func _build_pause_overlay() -> void:
 	_pause_menu.add_child(_pause_stats_label)
 
 	var rs := UIFactory.make_button(LocaleManager.t("RESUME"))
+	rs.custom_minimum_size.x = action_width
 	rs.pressed.connect(_toggle_pause)
 	_pause_menu.add_child(rs)
 
 	var restart := UIFactory.make_button(LocaleManager.t("RESTART"), false)
+	restart.custom_minimum_size.x = action_width
 	restart.pressed.connect(func(): _request_pause_exit(
 		"res://scenes/game.tscn", "CONFIRM_RESTART"))
 	_pause_menu.add_child(restart)
 
 	var mb := UIFactory.make_button(LocaleManager.t("MAIN_MENU"), false)
+	mb.custom_minimum_size.x = action_width
 	mb.pressed.connect(func(): _request_pause_exit(
 		"res://scenes/main_menu.tscn", "CONFIRM_MAIN_MENU"))
 	_pause_menu.add_child(mb)
@@ -1034,10 +1066,12 @@ func _build_pause_overlay() -> void:
 	_pause_confirm.add_child(confirm_stats)
 
 	var confirm_btn := UIFactory.make_button(LocaleManager.t("CONFIRM_EXIT"), false)
+	confirm_btn.custom_minimum_size.x = action_width
 	confirm_btn.add_theme_color_override("font_color", UIFactory.COL_DANGER.lightened(0.18))
 	confirm_btn.pressed.connect(_confirm_pause_exit)
 	_pause_confirm.add_child(confirm_btn)
 	var cancel_btn := UIFactory.make_button(LocaleManager.t("CANCEL"))
+	cancel_btn.custom_minimum_size.x = action_width
 	cancel_btn.pressed.connect(_cancel_pause_exit)
 	_pause_confirm.add_child(cancel_btn)
 
@@ -1078,19 +1112,42 @@ func _confirm_pause_exit() -> void:
 func _toggle_pause() -> void:
 	if game_over or _counting_down: return
 	paused = not paused
+	AudioManager.set_game_paused(paused)
 	pause_overlay.visible = paused
 	if paused:
 		_show_pause_menu()
 	AudioManager.play_sfx("click")
 
 func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_RESUMED, NOTIFICATION_WM_WINDOW_FOCUS_IN]:
+		if _restart_countdown_on_resume and not game_over:
+			_restart_countdown_on_resume = false
+			paused = false
+			AudioManager.set_game_paused(false)
+			pause_overlay.visible = false
+			if is_instance_valid(_countdown_layer):
+				_countdown_layer.queue_free()
+			_counting_down = true
+			_build_countdown()
+		return
 	if what not in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_WINDOW_FOCUS_OUT]:
 		return
-	if game_over or _counting_down or paused or not is_instance_valid(pause_overlay):
+	if game_over or paused or not is_instance_valid(pause_overlay):
+		return
+	if _counting_down:
+		_restart_countdown_on_resume = true
+		paused = true
+		AudioManager.set_game_paused(true)
+		if is_instance_valid(_countdown_layer):
+			_countdown_layer.visible = false
 		return
 	paused = true
+	AudioManager.set_game_paused(true)
 	pause_overlay.visible = true
 	_show_pause_menu()
+
+func _exit_tree() -> void:
+	AudioManager.set_game_paused(false)
 
 # ═════════════════════════ HUD UPDATE ═════════════════════════════
 
@@ -1290,7 +1347,7 @@ func _spawn_tutorial_obstacle(type_id: String, lane_idx: int) -> void:
 		return
 	var safe_lane: int = clampi(lane_idx, 0, num_lanes - 1)
 	var o: Obstacle = obstacles_free.pop_back()
-	o.setup(type_id, lanes[safe_lane], -360.0, _rng, _fx_rng)
+	o.setup(type_id, lanes[safe_lane], minf(-360.0, obstacle_spawn_y(type_id)), _rng, _fx_rng)
 	obstacles_active.append(o)
 
 func _spawn_tutorial_kituo() -> void:
@@ -1319,7 +1376,8 @@ func _process(delta: float) -> void:
 	_update_tutorial(delta)
 	# Escalate every 20 seconds, then hold a demanding but readable end-game pace.
 	var ramps: int = mini(int(elapsed / 20.0), MAX_SPEED_RAMPS)
-	var speed_ramp: float = 0.15 * RemoteConfig.get_float("speed_ramp_global", 1.0, 0.60, 1.40)
+	var speed_ramp: float = 0.15 * run_tuning_multiplier(_daily_run_active,
+		RemoteConfig.get_float("speed_ramp_global", 1.0, 0.60, 1.40))
 	speed = base_speed * difficulty_mult * (1.0 + speed_ramp * ramps)
 	speed_lines.speed_ref = speed
 	AudioManager.set_music_intensity(clampf(elapsed / 160.0, 0.0, 1.0))
@@ -1366,6 +1424,12 @@ func _process(delta: float) -> void:
 	if fuel <= 0.0:
 		_end_reason = "fuel"
 		_spawn_float_label(LocaleManager.t("FUEL_EMPTY"), player.position, Color("#e74c3c"))
+		AnalyticsService.log_event("fuel_failure", {
+			"route": String(current_route.id),
+			"elapsed": elapsed,
+			"distance": distance,
+			"tutorial_stage": tutorial_stage,
+		})
 		_end_run()
 		return
 
@@ -1439,7 +1503,8 @@ func _process(delta: float) -> void:
 	# ── Police chase event ────────────────────────────────────────
 	if chase_active:
 		_update_chase(delta)
-	elif _completed_runs >= 6 and (tutorial_stage <= 0 or elapsed >= 24.0):
+	elif daily_run_chases_allowed(_daily_run_active, _completed_runs) \
+	and (tutorial_stage <= 0 or elapsed >= 24.0):
 		chase_check_timer -= delta
 		if chase_check_timer <= 0.0:
 			chase_check_timer = _rng.randf_range(35.0, 55.0)
@@ -1486,46 +1551,70 @@ func _process(delta: float) -> void:
 func _move_entities(move: float, delta: float) -> void:
 	var road_left: float = lanes[0] - 40.0
 	var road_right: float = lanes[num_lanes - 1] + 40.0
-	for o in obstacles_active.duplicate():
+	var obstacle_index: int = 0
+	while obstacle_index < obstacles_active.size():
+		var o := obstacles_active[obstacle_index] as Obstacle
 		o.position.y += move
 		# Type-specific horizontal behaviour
 		match o.type_id:
 			"bodaboda":
 				# Weaves around its lane like a real bodaboda
-				o.position.x = o.base_x + sin(o.position.y * 0.012 + o.drift_phase) * 26.0
+				o.position.x = o.base_x + sin(o.position.y * 0.012 + o.drift_phase) * BODABODA_DRIFT
 			"mbuzi":
 				# Goat slowly wanders across the road, turning at the edges
-				o.position.x += o.walk_dir * 42.0 * delta
+				o.position.x += o.walk_dir * MBUZI_SPEED * delta
 				if o.position.x < road_left:
 					o.position.x = road_left
 					o.walk_dir = 1
 				elif o.position.x > road_right:
 					o.position.x = road_right
 					o.walk_dir = -1
-		# Telegraph the lane as the obstacle reaches the visible road, rather
-		# than flashing while it is still above the screen.
-		if not o.warning_announced and o.position.y >= 118.0:
+		# Warn for a full reaction window before the collision boxes can overlap.
+		var obstacle_speed: float = move / maxf(delta, 0.001)
+		if not o.warning_announced \
+		and o.position.y >= traffic_warning_y(
+			player.position.y, obstacle_speed,
+			player.get_collision_aabb().size.y * 0.5,
+			o.get_collision_aabb().size.y * 0.5):
 			o.warning_announced = true
-			var warning_lane: int = _nearest_lane_index(o.position.x)
-			if warning_lane < _lane_warnings.size():
-				(_lane_warnings[warning_lane] as _LaneWarning).flash(0.82)
+			var vertical_clearance: float = player.get_collision_aabb().size.y * 0.5 + o.get_collision_aabb().size.y * 0.5
+			var contact_time: float = maxf(0.0,
+				(player.position.y - o.position.y - vertical_clearance) / maxf(obstacle_speed, 1.0))
+			var warning_lanes: Array = predicted_hazard_lanes(
+				o.type_id, o.position.x, o.base_x, o.position.y, o.drift_phase,
+				o.walk_dir, contact_time, obstacle_speed, lanes,
+				o.get_collision_aabb().size.x * 0.5,
+				player.get_collision_aabb().size.x * 0.5,
+				road_left, road_right)
+			for warning_lane_value in warning_lanes:
+				var warning_lane: int = int(warning_lane_value)
+				if warning_lane < _lane_warnings.size():
+					(_lane_warnings[warning_lane] as _LaneWarning).flash(1.20)
 		if o.position.y > view_size.y + 140:
 			_despawn_obstacle(o)
-	for c in collectibles_active.duplicate():
+		else:
+			obstacle_index += 1
+	var collectible_index: int = 0
+	while collectible_index < collectibles_active.size():
+		var c := collectibles_active[collectible_index] as Collectible
 		c.position.y += move
 		if magnet_time > 0.0 and c.type_id == "coin":
 			var dx: float = player.position.x - c.position.x
 			c.position.x += sign(dx) * min(abs(dx), 380.0 * delta)
 		if c.position.y > view_size.y + 140:
 			_despawn_collectible(c)
+		else:
+			collectible_index += 1
 
 func _check_collisions() -> void:
 	var prect: Rect2 = player.get_collision_aabb()
-	for o in obstacles_active.duplicate():
+	var obstacle_index: int = 0
+	while obstacle_index < obstacles_active.size():
+		var o := obstacles_active[obstacle_index] as Obstacle
 		var orect: Rect2 = o.get_collision_aabb()
-		if not near_miss_done.get(o.get_instance_id(), false) and o.position.y > player.position.y + 20:
-			var h_gap: float = abs(o.position.x - player.position.x)
-			if h_gap < 92.0 and not prect.intersects(orect):
+		if not near_miss_done.get(o.get_instance_id(), false):
+			var h_gap: float = absf(o.position.x - player.position.x)
+			if near_miss_is_eligible(prect, orect, h_gap):
 				near_miss_done[o.get_instance_id()] = true
 				# Passing a police checkpoint while overloaded = fine!
 				if o.type_id == "police" and _overload_excess() > 0:
@@ -1544,10 +1633,13 @@ func _check_collisions() -> void:
 						if _route_moment_id == "checkpoint_clear":
 							_complete_route_moment()
 					_on_near_miss(o.position, o.type_id)
+			elif near_miss_window_expired(prect, orect):
+				near_miss_done[o.get_instance_id()] = true
 		if prect.intersects(orect):
 			if grace_time > 0.0:
+				obstacle_index += 1
 				continue
-			if boost_time > 0.0:
+			elif boost_time > 0.0:
 				# Boosting: smash through the obstacle.
 				bonus_score += 50
 				_burst(o.position, Color("#2ecc71"), 10)
@@ -1556,11 +1648,48 @@ func _check_collisions() -> void:
 				AudioManager.play_sfx("powerup")
 				_despawn_obstacle(o)
 				continue
-			_on_hit(o)
-			return
-	for c in collectibles_active.duplicate():
+			else:
+				_on_hit(o)
+				return
+		obstacle_index += 1
+	var collectible_index: int = 0
+	while collectible_index < collectibles_active.size():
+		var c := collectibles_active[collectible_index] as Collectible
 		if prect.intersects(c.get_aabb()):
 			_on_collect(c)
+		else:
+			collectible_index += 1
+
+static func near_miss_is_eligible(player_rect: Rect2, obstacle_rect: Rect2,
+		horizontal_center_gap: float) -> bool:
+	var vertical_center_gap: float = obstacle_rect.get_center().y - player_rect.get_center().y
+	return vertical_center_gap > NEAR_MISS_MIN_PASS_GAP \
+		and vertical_center_gap <= near_miss_vertical_limit(player_rect, obstacle_rect) \
+		and horizontal_center_gap < NEAR_MISS_HORIZONTAL_GAP \
+		and not player_rect.intersects(obstacle_rect)
+
+static func near_miss_window_expired(player_rect: Rect2, obstacle_rect: Rect2) -> bool:
+	return obstacle_rect.get_center().y - player_rect.get_center().y \
+		> near_miss_vertical_limit(player_rect, obstacle_rect)
+
+static func near_miss_vertical_limit(player_rect: Rect2, obstacle_rect: Rect2) -> float:
+	return (player_rect.size.y + obstacle_rect.size.y) * 0.5 + NEAR_MISS_VERTICAL_PADDING
+
+static func run_tuning_multiplier(daily_run: bool, configured_value: float) -> float:
+	return 1.0 if daily_run else configured_value
+
+static func effective_upgrade_level(daily_run: bool, player_level: int) -> int:
+	return 0 if daily_run else maxi(0, player_level)
+
+static func effective_tutorial_stage(daily_run: bool, player_stage: int) -> int:
+	return 0 if daily_run else player_stage
+
+static func daily_run_ghost_allowed(daily_run: bool, completed_runs: int,
+		ghost_enabled: bool) -> bool:
+	return not daily_run and completed_runs >= 5 and ghost_enabled
+
+static func daily_run_chases_allowed(daily_run: bool, completed_runs: int) -> bool:
+	return not daily_run and completed_runs >= 6
 
 # ═════════════════════════ EVENTS ════════════════════════════════
 
@@ -1803,10 +1932,13 @@ func _spawn_kituo() -> void:
 	_kituo_warned = false
 
 func _next_kituo_gap() -> float:
-	var minimum: float = RemoteConfig.get_float("kituo_min_gap", 20.0, 12.0, 45.0)
-	var maximum: float = RemoteConfig.get_float("kituo_max_gap", 32.0, minimum, 60.0)
-	minimum = RemoteConfig.get_route_float(String(current_route.id), "kituo_min", minimum, 12.0, 45.0)
-	maximum = RemoteConfig.get_route_float(String(current_route.id), "kituo_max", maximum, minimum, 60.0)
+	var minimum: float = 20.0
+	var maximum: float = 32.0
+	if not _daily_run_active:
+		minimum = RemoteConfig.get_float("kituo_min_gap", minimum, 12.0, 45.0)
+		maximum = RemoteConfig.get_float("kituo_max_gap", maximum, minimum, 60.0)
+		minimum = RemoteConfig.get_route_float(String(current_route.id), "kituo_min", minimum, 12.0, 45.0)
+		maximum = RemoteConfig.get_route_float(String(current_route.id), "kituo_max", maximum, minimum, 60.0)
 	return clampf(_rng.randf_range(minimum, maximum) * kituo_gap_mult, 12.0, 60.0)
 
 func _update_route_moment(delta: float) -> void:
@@ -1965,33 +2097,20 @@ func _spawn_wave() -> void:
 	if tutorial_stage > 0 and elapsed < 16.0:
 		max_blocked = 1
 	var to_block: int = _rng.randi_range(1, max_blocked)
-	var blocked_lanes: Array = []
-	var free_lane: int = -1
 	var clear_lanes: Array = _clear_lanes_for_wave()
 	if clear_lanes.is_empty():
 		# Existing traffic already occupies every lane's decision corridor. Skip
 		# this wave instead of creating an impossible last-second road choice.
 		return
+	# Select the blocked set only after accounting for current and existing traffic.
+	var wave: Dictionary = plan_wave_lanes(
+		clear_lanes, player.current_lane, _last_safe_lane, num_lanes, to_block, _rng)
+	if wave.is_empty():
+		return
+	var blocked_lanes: Array = wave.blocked_lanes
+	var free_lane: int = int(wave.free_lane)
 	if to_block == num_lanes - 1:
-		# A touch player should never need to cross two lanes between consecutive
-		# forced-choice waves. The free lane must also be clear of earlier traffic.
-		var reachable_choices: Array = reachable_lane_choices(
-			clear_lanes, player.current_lane, _last_safe_lane, num_lanes)
-		if reachable_choices.is_empty():
-			# No clear lane is reachable with one deliberate swipe. Defer danger.
-			return
-		reachable_choices = shuffle_with_rng(reachable_choices, _rng)
-		free_lane = int(reachable_choices[0])
 		_last_safe_lane = free_lane
-		for lane_idx in range(num_lanes):
-			if lane_idx != free_lane:
-				blocked_lanes.append(lane_idx)
-		blocked_lanes = shuffle_with_rng(blocked_lanes, _rng)
-	else:
-		var indices: Array = shuffle_with_rng(range(num_lanes), _rng)
-		for i in range(to_block):
-			blocked_lanes.append(indices[i])
-		free_lane = int(indices[to_block])
 
 	for lane_idx in blocked_lanes:
 		_spawn_obstacle_in_lane(int(lane_idx))
@@ -2015,24 +2134,123 @@ static func reachable_lane_choices(clear_lanes: Array, current_lane: int,
 			preferred.append(lane)
 	return preferred if not preferred.is_empty() else reachable
 
+static func plan_wave_lanes(clear_lanes: Array, current_lane: int,
+		last_safe_lane: int, lane_count: int, blocked_count: int,
+		rng: RandomNumberGenerator) -> Dictionary:
+	if lane_count < 2 or clear_lanes.is_empty():
+		return {}
+	var safe_candidates: Array = shuffle_with_rng(clear_lanes, rng)
+	var blocked_count_clamped: int = mini(
+		clampi(blocked_count, 1, lane_count - 1), clear_lanes.size() - 1)
+	if blocked_count_clamped <= 0:
+		return {}
+	# Try every randomized blocked-set candidate; this is tiny (three lanes) and
+	# prevents a wave from being generated with no one-swipe clear lane.
+	var attempts: int = maxi(1, lane_count * lane_count)
+	for _attempt in range(attempts):
+		var order: Array = shuffle_with_rng(clear_lanes, rng)
+		var blocked: Array = order.slice(0, blocked_count_clamped)
+		var clear: Array = []
+		for lane_value in clear_lanes:
+			if int(lane_value) not in blocked:
+				clear.append(int(lane_value))
+		var reachable: Array = reachable_lane_choices(
+			clear, current_lane, last_safe_lane, lane_count)
+		if reachable.is_empty():
+			continue
+		var preferred: Array = []
+		for lane_value in safe_candidates:
+			if int(lane_value) in reachable:
+				preferred.append(int(lane_value))
+		var choices: Array = preferred if not preferred.is_empty() else reachable
+		return {"blocked_lanes": blocked, "free_lane": int(choices[rng.randi_range(0, choices.size() - 1)])}
+	return {}
+
+static func drive_dock_metrics(view_width: float) -> Dictionary:
+	var dock_width: float = minf(408.0, maxf(280.0, view_width - 20.0))
+	var control_scale: float = clampf((dock_width - 24.0) / 360.0, 0.68, 1.0)
+	return {
+		"width": dock_width,
+		"scale": control_scale,
+		"content_width": 360.0 * control_scale + 24.0,
+	}
+
+static func pause_panel_width(view_width: float) -> float:
+	return minf(368.0, maxf(280.0, view_width - 24.0))
+
+static func player_y_for_view(view_height: float, safe_bottom: float = 0.0) -> float:
+	return view_height - 290.0 - safe_bottom
+
 func _clear_lanes_for_wave() -> Array:
 	var clear_lanes: Array = []
 	for lane_idx in range(num_lanes):
 		var blocked: bool = false
 		for candidate in obstacles_active:
 			var obstacle := candidate as Obstacle
-			if _nearest_lane_index(obstacle.position.x) != lane_idx:
-				continue
 			# Only traffic in the next decision corridor matters. Obstacles above
 			# it are still being telegraphed; obstacles below have already passed.
 			var half_height: float = obstacle.size.y * 0.5 + 40.0
 			if obstacle.position.y + half_height >= -140.0 \
 			and obstacle.position.y - half_height <= player.position.y + 120.0:
-				blocked = true
-				break
+				var collision_half_width: float = obstacle.get_collision_aabb().size.x * 0.5
+				if obstacle_blocks_lane(obstacle.type_id, obstacle.position.x,
+					collision_half_width, float(lanes[lane_idx]),
+					player.get_collision_aabb().size.x * 0.5):
+					blocked = true
+					break
 		if not blocked:
 			clear_lanes.append(lane_idx)
 	return clear_lanes
+
+static func obstacle_blocks_lane(type_id: String, obstacle_x: float,
+		obstacle_half_width: float, lane_x: float, player_half_width: float) -> bool:
+	if type_id == "mbuzi":
+		return true
+	# The center may already be at one edge of its 26px weave, so reserve the
+	# full 52px swept range around its current position.
+	var movement_envelope: float = BODABODA_DRIFT * 2.0 if type_id == "bodaboda" else 0.0
+	return absf(lane_x - obstacle_x) \
+		<= obstacle_half_width + player_half_width + movement_envelope
+
+static func traffic_warning_y(player_y: float, obstacle_speed: float,
+		player_half_height: float = 0.0, obstacle_half_height: float = 0.0) -> float:
+	var collision_clearance: float = maxf(0.0, player_half_height) + maxf(0.0, obstacle_half_height)
+	return player_y - collision_clearance - maxf(72.0, obstacle_speed * TRAFFIC_WARNING_LEAD_TIME)
+
+## Projects moving hazards to the collision window and marks every lane their
+## collision envelope may enter. Static hazards produce a single-lane warning.
+static func predicted_hazard_lanes(type_id: String, current_x: float, base_x: float,
+		current_y: float, drift_phase: float, walk_dir: int, contact_time: float,
+		vertical_speed: float, lane_xs: Array, obstacle_half_width: float,
+		player_half_width: float, road_left: float, road_right: float) -> Array:
+	var threatened: Array = []
+	var sample_count: int = TRAFFIC_WARNING_SAMPLE_COUNT if type_id in ["bodaboda", "mbuzi"] else 1
+	for lane_index in range(lane_xs.size()):
+		var lane_x: float = float(lane_xs[lane_index])
+		for sample in range(sample_count + 1):
+			var fraction: float = float(sample) / float(sample_count)
+			var sample_time: float = contact_time * fraction
+			var projected_x: float = current_x
+			match type_id:
+				"bodaboda":
+					projected_x = base_x + sin((current_y + vertical_speed * sample_time) * 0.012 + drift_phase) * BODABODA_DRIFT
+				"mbuzi":
+					projected_x = _project_wandering_x(
+						current_x, walk_dir, MBUZI_SPEED * sample_time, road_left, road_right)
+			if absf(lane_x - projected_x) <= obstacle_half_width + player_half_width:
+				threatened.append(lane_index)
+				break
+	return threatened
+
+static func _project_wandering_x(start_x: float, direction: int, distance: float,
+		road_left: float, road_right: float) -> float:
+	var span: float = maxf(0.0, road_right - road_left)
+	if span <= 0.0:
+		return start_x
+	var unfolded: float = start_x - road_left + float(direction) * distance
+	var period: float = span * 2.0
+	var folded: float = fposmod(unfolded, period)
+	return road_left + (folded if folded <= span else period - folded)
 
 static func shuffle_with_rng(values: Array, rng: RandomNumberGenerator) -> Array:
 	var shuffled: Array = values.duplicate()
@@ -2064,9 +2282,27 @@ func _spawn_obstacle_in_lane(lane_idx: int, forced_type: String = "") -> bool:
 		return false
 	var o: Obstacle = obstacles_free.pop_back()
 	var t: String = forced_type if forced_type in OBSTACLE_TYPES else _pick_obstacle_type()
-	o.setup(t, lanes[lane_idx], -130.0, _rng, _fx_rng)
+	var spawn_y: float = obstacle_spawn_y(t)
+	o.setup(t, lanes[lane_idx], spawn_y, _rng, _fx_rng)
 	obstacles_active.append(o)
 	return true
+
+func obstacle_spawn_y(type_id: String) -> float:
+	var definition: Dictionary = ObstacleCls.TYPES.get(type_id, ObstacleCls.TYPES["car"])
+	var visual_size: Vector2 = definition.get("size", Vector2(70, 100))
+	var obstacle_half_height: float = ObstacleCls.collision_size(type_id, visual_size).y * 0.5
+	var player_half_height: float = player.get_collision_aabb().size.y * 0.5
+	var approach_speed: float = maxf(speed, base_speed)
+	if slow_time > 0.0:
+		approach_speed *= 0.5
+	if boost_time > 0.0:
+		approach_speed *= BOOST_SPEED_MULT
+	return obstacle_spawn_y_for(player.position.y, player_half_height, obstacle_half_height, approach_speed)
+
+static func obstacle_spawn_y_for(player_y: float, player_half_height: float,
+		obstacle_half_height: float, obstacle_speed: float) -> float:
+	var speed_margin: float = maxf(0.0, obstacle_speed) * TRAFFIC_WARNING_LEAD_TIME * 1.2
+	return minf(-130.0, player_y - player_half_height - obstacle_half_height - speed_margin)
 
 func _nearest_lane_index(world_x: float) -> int:
 	var closest_index: int = 0
@@ -2340,6 +2576,7 @@ func _end_run() -> void:
 		"score": _current_score(),
 		"coins": coins,
 		"distance": int(distance),
+		"elapsed": snappedf(elapsed, 1.0),
 		"passengers": passengers,
 		"dropoffs": dropoffs,
 		"near_misses": _run_near_misses,
@@ -2352,7 +2589,7 @@ func _end_run() -> void:
 		"daily_route": GameState.is_daily_route_challenge_active(),
 	})
 	# Save ghost of best fresh (non-continued) run
-	if not _was_continued:
+	if not _was_continued and not _daily_run_active:
 		var score_now: int = _current_score()
 		var best: Variant = SaveSystem.get_value("ghost_best", null)
 		if typeof(best) != TYPE_DICTIONARY or score_now > int((best as Dictionary).get("score", 0)):
@@ -2383,6 +2620,7 @@ func _end_run() -> void:
 		"rush_hour": rush_hour,
 		"end_reason": _end_reason,
 		"tutorial_stage": tutorial_stage,
+		"daily_route": _daily_run_active,
 	})
 	if tutorial_stage > 0 and not _was_continued:
 		GameState.complete_tutorial_stage(tutorial_stage)

@@ -5,24 +5,32 @@ pilot. Record the exact version code under test.
 Capture one completed form for a low-end phone and one for a mid-range phone;
 test both Swahili and English.
 
-## Automated Main-Menu Pass
+## Automated Portrait UI Pass
 
-Run the project contract checks and the portrait screenshot/overflow runner:
+Run the project contract checks and the portrait UI screenshot/overflow runner:
 
 ```powershell
 & 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe' --headless --path . res://tests/logic_contracts.tscn
 & 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64.exe' --path . res://tests/ui_layout_qa.tscn
 ```
 
-The second command uses the normal renderer to capture collapsed,
-expanded-top, and expanded-bottom menu states in both locales at 360x640,
-393x873, 412x915, 540x960, and 720x1600. Screenshots are written to
-`user://ui_qa/`. It fails if visible controls extend beyond the horizontal
-viewport. Open every capture once before treating the automated pass as visual
-approval; it cannot validate touch accuracy, Android keyboard behavior, safe
-areas, native banners, or actual phone rendering.
+The second command checks collapsed, expanded-top, and expanded-bottom menu
+states plus the weather/rush-hour run intro and live gameplay HUD in both
+locales at 320x568, 360x640, 393x873, 412x915, 540x960, and 720x1600. It also
+checks pause and exit-confirmation bounds and verifies the steering/horn targets
+remain at least 48x48 viewport units. A compact-screen interaction check verifies
+that a horn-origin drag cannot steer, an open-road swipe moves one lane, and an
+interrupted intro restarts on app resume. The normal renderer writes 60 screenshots
+to `user://ui_qa/`. Open every capture
+once before treating the automated pass as visual approval; it cannot validate
+touch accuracy, Android keyboard behavior, safe areas, native banners, or actual
+phone rendering.
 
 ## Device Record
+
+No physical-device results are implied by the automated checks above. Complete
+one record per device and attach the tested AAB version code before marking the
+release gate complete.
 
 | Field | Record |
 |---|---|
@@ -42,27 +50,43 @@ areas, native banners, or actual phone rendering.
   appear one at a time and do not repeat after relaunch.
 - [ ] Menu, Route, Garage, Shop, How to Play, Settings, pause, and results fit
   cleanly with no clipped Swahili or English copy.
-- [ ] Check the main menu at 360x640, 393x873, 412x915, 540x960, and 720x1600
+- [ ] Check the menu and gameplay HUD at 320x568, 360x640, 393x873, 412x915,
+  540x960, and 720x1600
   portrait classes. Play, selected route, Garage, and Leaderboards should be
   immediately visible; daily, stats, missions, referrals, shop, settings, and
   How to Play should be under More. No horizontal clipping is acceptable.
 - [ ] Expand More and verify every secondary action in both languages.
-- [ ] Attach the 30 generated menu captures or record their review result with
+- [ ] Attach the 60 generated menu/intro/gameplay captures or record their review result with
   the tester sheet. The automated check does not replace this visual review.
+- [ ] On short (320x568/360x640) and tall (540x960) portrait layouts, verify
+  each hazard warning appears before its collision box reaches the player.
+  Check cars/trucks, weaving bodabodas, and crossing mbuzi separately; multiple
+  warning lanes should match the mover's projected path.
+- [ ] At the fastest speed ramp, confirm late hazards still enter with a usable
+  reaction window and never appear on top of the player. Repeat with a shield
+  and without one, and confirm a protected hit grants recovery time.
+- [ ] Verify the visible hitboxes feel fair for cones, potholes, barriers,
+  pedestrians, tires, vehicles, and mbuzi; record any art/collision mismatch.
 
 ## Route Balance
 
 Play at least ten Kariakoo/Mwenge runs and five on every other route. Record
 the result values below before changing `docs/remote-config.json`.
 
-| Route | Runs | Fuel finishes | Collisions | Goal wins | Avg coins | First notable moment | Notes |
-|---|---:|---:|---:|---:|---:|---|---|
-| Kariakoo | | | | | | Fare Rush | Fast, frequent fares should feel rewarding. |
-| Mwenge | | | | | | Boda Watch | Lane decisions should be readable. |
-| Mbezi | | | | | | Truck Line | Longer road and fuel efficiency should register. |
-| Posta | | | | | | Clean Checkpoint | Controlled driving should be rewarded. |
-| Kigamboni | | | | | | Fuel Scout | Rain/fuel pressure must remain fair. |
-| Ubungo | | | | | | Jam Breaker | Dense traffic must remain escapable. |
+| Route | Runs | Fuel finishes | Collisions | Goal wins | Avg duration | Avg coins | Signature moment | Notes |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Kariakoo | | | | | | | Fare Rush | Fast, frequent fares should feel rewarding. |
+| Mwenge | | | | | | | Boda Watch | Lane decisions should be readable. |
+| Mbezi | | | | | | | Truck Line | Longer road and fuel efficiency should register. |
+| Posta | | | | | | | Clean Checkpoint | Controlled driving should be rewarded. |
+| Kigamboni | | | | | | | Fuel Scout | Rain/fuel pressure must remain fair. |
+| Ubungo | | | | | | | Jam Breaker | Dense traffic must remain escapable. |
+
+For each route, trigger its signature event twice in each language. Note whether
+the title, action, target, and timeout/success feedback are understandable. Do
+not increase route rewards based on a few runs; correlate phone observations
+with consented Railway events after the client and backend allowlists are both
+deployed.
 
 ## Ads, Saves, and Resume
 

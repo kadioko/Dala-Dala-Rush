@@ -1,10 +1,11 @@
 # Dala Dala Rush TZ - Product Roadmap
 
-Updated October 1, 2026 after the Waves 16-31 first-session, route-operator,
-balance, telemetry, live-ops, and contract passes. Google Play production is
-active. The current signed production-track update is `1.0.13` / code `14`;
-it includes all Wave 29 competition reliability and daily-run work, the A21s
-main-menu fit pass, responsive narrow-width fallback, and consent-gated Railway phone validation.
+Updated October 8, 2026. Google Play production is active. Signed AAB
+`1.0.16` / code `17` (API 36) is built and bundle-validated from current source
+as a test candidate; A21s and second-phone QA plus Play testing remain. The
+candidate includes compact-menu, daily-run, collision-envelope, projected
+warning, lane-planner, and opt-in fuel/route-event telemetry changes. It is not
+approved for production rollout until device QA passes.
 The public World leaderboard read endpoint is enabled in source and live; the
 current server board is empty until opted-in players submit scores. Score
 submission and Friends remain opt-in, and scores are unverified. Broader
@@ -28,13 +29,13 @@ source-only and are not present in the previously exported code 15 bundle.
 |------|--------|-------|
 | Core driving loop | **Wave 23 QA** | Vituo passenger loop, overload risk/reward, horn, fuel, Driving Flow, near-miss, boost, police chases, a three-run non-modal first-session flow, and a distinct job profile plus favorable signature moment per route. Needs phone play-balancing. |
 | Progression | **Wave 25 QA** | Route unlock gates, Driver Reputation, three-star Route Mastery, compact daily Route Contracts, career ranks, bus upgrades, missions + season, daily challenge, login streak, achievements, consumables. Vehicle prices and beginner route pace were reduced conservatively. |
-| Social/competitive | **World view enabled; next-rival hint in source** | Ghost racing, livery sharing, and two-sided Invite & Earn codes work offline. Public World standings can be read; posting and Friends are opt-in. Bilingual loading/empty/offline/cache states, queued-upload feedback, small-screen scrolling, stale-tab guards, and per-route best-score storage are live. The World gap-to-next-rival hint is in this source pass. Two-phone QA remains. Scores remain unverified. |
+| Social/competitive | **Reporting/blocking deployed; phone QA pending** | Public World standings can be read; posting and Friends are opt-in. Fixed-reason name reports, friend blocking, and report-rate limits are deployed. Moderation is still a manual review queue. Two-phone QA remains. Scores remain unverified. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
-| Android readiness | **Code 15 release candidate built** | Version 1.0.14 / code 15 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
+| Android readiness | **Code 17 test candidate built** | Version 1.0.16 / code 17 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
-| Live ops | **Railway shared limiter deployed** | Migration 006 and PostgreSQL-backed HMAC counters are deployed; a stable limiter key and pre-deploy migration command are configured. Privacy policy and remote-config revision 2 are published. Gameplay Insights still needs a retention policy and sufficient report volume. |
-| QA/testing | **In progress** | Automated captures and horizontal-bound checks passed for collapsed and expanded menus at five portrait sizes in both languages. Physical phone QA, keyboard/banner/native safe-area checks remain manual. |
+| Live ops | **Railway safety and retention deployed** | Shared PostgreSQL-backed HMAC limits, 90-day telemetry/report cleanup, and leaderboard report/block APIs are deployed. Useful reports still require consented event volume; there is no live dashboard. |
+| QA/testing | **Local release gates pass; device QA pending** | Godot parse/contracts, UI bounds, and backend tests pass locally. A pinned Godot 4.7.1 GitHub Actions workflow now runs these gates. Physical phone QA, keyboard/banner/native safe-area checks remain manual. |
 | Store launch | **Production active** | Monitor Play reports and staged rollout health, ship only higher version codes, and use physical-device evidence before expanding optional online services. |
 
 ## Wave 27 - Railway Cloud Pilot (Consent-Gated)
@@ -98,9 +99,86 @@ source-only and are not present in the previously exported code 15 bundle.
   validation, and all 30 normal-renderer menu captures passed locally. The
   screenshot set was visually reviewed at 360x640 in both locales and at
   720x1600 in Swahili; real-device rendering still needs phone QA.
-- The Godot client/UI changes in this source pass have not been exported to a
-  new AAB. The Railway backend changes are deployed. Run the local checks and
-  complete physical phone QA before selecting the next release version.
+- The Godot client/UI changes are included in the signed version 1.0.16 / code
+  17 test candidate. Bundle validation has passed; physical phone QA and Play
+  testing remain before production rollout. Railway backend changes are deployed.
+
+## Wave 32 - Fair Traffic And Actionable Run Evidence (Code 17 Candidate)
+
+- Hazard hitboxes now have explicit per-type scales bounded inside their art.
+- Lane warnings are measured from collision-box contact, not vehicle-center
+  alignment, and crossing/weaving hazards warn for projected lanes.
+- Obstacles spawn farther above compact portrait viewports at higher speeds so
+  they retain a reaction window. This also makes time-to-contact more
+  consistent across screen heights.
+- Fuel failures and route-moment start/complete/timeout events join the
+  consent-gated Railway allowlist. The backend allowlist was deployed on
+  October 8, 2026; no schema migration is needed. These events still require a
+  client release with Gameplay Insights enabled and the player's consent.
+- Automated contracts cover hitbox bounds, reaction time, crossing-lane
+  predictions, and compact-screen spawn spacing. They do not replace A21s and
+  second-device play QA, especially for cue visibility and route balance.
+
+## Wave 33 - Telemetry Retention And Release Gates (Backend Deployed)
+
+- Railway removes Gameplay Insights events older than 90 days in bounded
+  batches at startup and every six hours. Migration 004 adds the cleanup index.
+- The public privacy policy describes the retention schedule and deletion
+  behavior.
+- `tools/verify_project.ps1` runs Godot parsing/contracts, backend tests, and
+  optional signed-AAB verification in one local release gate. It passed with
+  Godot 4.7.1, responsive UI bounds, 12 backend tests, and the signed version
+  1.0.16 / code 17 AAB. Headless mode skipped screenshots; visual review and
+  physical-device validation remain.
+- GitHub Actions runs the backend tests plus pinned Godot 4.7.1 parsing, logic,
+  and layout bounds checks for pushes and pull requests.
+
+## Wave 34 - Competition Safety And Measured Progression (Backend Deployed)
+
+- Migration `007_competition_safety.sql` adds opaque report references, fixed-
+  reason public-name reports, and persistent friend blocks. Railway migration
+  and service deployment completed October 8, 2026.
+- Reports are rate-limited and retained up to 90 days. Review is manual using
+  the documented aggregate-safe query; no automated enforcement or moderator
+  dashboard exists. Players can report World entries and block Friends in the
+  client UI. Two-phone validation and an unblock-list UX remain.
+- Consented `vehicle_unlocked` events record vehicle type, coin price, and
+  number of runs at purchase. A higher-version client AAB is required before
+  phones can generate these events or use the new report/block UI.
+- The public privacy policy was updated for fixed-reason reporting, block
+  behavior, vehicle-unlock telemetry, and the 90-day schedule. GitHub source is
+  updated; recheck the Pages URL after CDN propagation.
+- Current local gates pass: Godot 4.7.1 parse, logic contracts, UI bounds, and
+  12 backend tests. Headless UI checks do not capture screenshots.
+
+## Still Required Before Calling The Remaining Work Complete
+
+- Physical QA on the Samsung A21s and a second Android phone: both languages,
+  all six routes, real touch, warnings, fuel, ad callbacks, resume, saves,
+  brightness/contrast, and a long-run performance/thermal check. No device was
+  connected during this pass.
+- Tune route fuel, traffic, passenger cadence, and economy only after recording
+  the real-device run worksheet and time-to-first-unlock evidence.
+- Exercise report, block, friend deletion, public-name visibility, and score
+  upload with two real installations. Scores remain explicitly unverified;
+  server-verifiable run proofs and score rejection are not implemented.
+- Review moderation reports operationally, add an authenticated moderator
+  action path before meaningful scale, and test unblocking UX.
+- Wait for the updated Privacy Policy GitHub Pages content to propagate, then
+  check the Play Data Safety declaration and in-app link against actual SDK and
+  deployment behavior.
+- Generate and install a higher-version AAB before testing the new client-side
+  reporting/blocking controls and vehicle-unlock event. The existing code 17
+  AAB does not include these latest client changes.
+- Collect enough opt-in telemetry for useful aggregate reports; monitor Play
+  Console Android Vitals manually. No crash/ANR SDK or production dashboard is
+  included.
+- Validate old saves on a device upgraded from a real prior release. In-memory
+  schema fixtures pass, but are not a substitute for a real profile backup.
+- Long-horizon items remain deferred: distinct new city packs, reproducible
+  rival runs, fully server-settled referrals, SACCO crews, replay clips, and
+  sustained seasonal content. Build these only after core retention and
+  reliability evidence supports them.
 
 ## Milestone A — Production Update QA And Balancing
 

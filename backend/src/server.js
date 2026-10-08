@@ -15,6 +15,37 @@ const TRANSFER_TTL_SECONDS = 15 * 60;
 const FRIEND_INVITE_TTL_SECONDS = 24 * 60 * 60;
 const MAX_TELEMETRY_EVENTS_PER_REQUEST = 25;
 const MAX_TELEMETRY_AGE_SECONDS = 14 * 24 * 60 * 60;
+const TELEMETRY_RETENTION_DAYS = 90;
+const TELEMETRY_PURGE_BATCH_SIZE = 1000;
+const TELEMETRY_PURGE_MAX_BATCHES = 20;
+
+export async function purgeExpiredTelemetry(pool) {
+	let deleted = 0;
+	for (let batch = 0; batch < TELEMETRY_PURGE_MAX_BATCHES; batch += 1) {
+		const result = await pool.query(
+			`DELETE FROM telemetry_events
+			 WHERE id IN (
+			   SELECT id FROM telemetry_events
+			   WHERE received_at < NOW() - ($1 * INTERVAL '1 day')
+			   ORDER BY received_at, id LIMIT $2
+			 ) RETURNING id`,
+			[TELEMETRY_RETENTION_DAYS, TELEMETRY_PURGE_BATCH_SIZE],
+		);
+		const batchDeleted = result.rowCount ?? result.rows?.length ?? 0;
+		deleted += batchDeleted;
+		if (batchDeleted < TELEMETRY_PURGE_BATCH_SIZE) break;
+	}
+	await pool.query(
+		`DELETE FROM leaderboard_reports
+		 WHERE id IN (
+		   SELECT id FROM leaderboard_reports
+		   WHERE created_at < NOW() - ($1 * INTERVAL '1 day')
+		   ORDER BY created_at, id LIMIT $2
+		 )`,
+		[TELEMETRY_RETENTION_DAYS, TELEMETRY_PURGE_BATCH_SIZE],
+	);
+	return deleted;
+}
 
 function fixedWindowRateLimit(pool, { windowMs, max, key, scope, error = "rate_limited" }) {
 	let lastCleanup = 0;
@@ -109,6 +140,9 @@ export function createApp(pool) {
 	});
 	const limitProfileChanges = fixedWindowRateLimit(pool, {
 		windowMs: 60 * 60 * 1000, max: 8, key: (req) => req.installationId, scope: "profile_changes",
+	});
+	const limitLeaderboardReports = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 60 * 1000, max: 3, key: (req) => req.installationId, scope: "leaderboard_reports",
 	});
 
   app.get("/health", async (_req, res) => {
@@ -295,6 +329,7 @@ export function createApp(pool) {
 			await client.query("DELETE FROM leaderboard_scores WHERE installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friend_invites WHERE owner_installation_id = $1 OR claimed_by_installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friendships WHERE first_installation_id = $1 OR second_installation_id = $1", [req.installationId]);
+			await client.query("DELETE FROM leaderboard_blocks WHERE blocker_installation_id = $1 OR blocked_installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_profiles WHERE installation_id = $1", [req.installationId]);
 			await client.query("COMMIT");
 			transactionStarted = false;
@@ -348,7 +383,7 @@ export function createApp(pool) {
            WHERE score.route_id = $1
            ORDER BY score.installation_id, score.score DESC, score.created_at ASC
          )
-         SELECT best_scores.score, best_scores.created_at, profile.display_name
+		 SELECT best_scores.score, best_scores.created_at, profile.display_name, profile.report_token
          FROM best_scores
          INNER JOIN leaderboard_profiles AS profile
            ON profile.installation_id = best_scores.installation_id
@@ -356,7 +391,8 @@ export function createApp(pool) {
         [req.params.routeId],
       );
       return res.json({ verification: "unverified", scores: result.rows.map((row, index) => ({
-        rank: index + 1, displayName: row.display_name, score: row.score, submittedAt: row.created_at,
+			rank: index + 1, displayName: row.display_name, score: row.score, submittedAt: row.created_at,
+			reportRef: row.report_token,
       })) });
     } catch {
       return problem(res, 503, "database_unavailable");
@@ -388,6 +424,37 @@ export function createApp(pool) {
 		}
 	});
 
+	app.post("/v1/leaderboards/reports", requireInstallation, limitLeaderboardReports, async (req, res) => {
+		const { reportRef, routeId, reason } = req.body || {};
+		if (!isUuid(reportRef) || !validRoute(routeId)
+			|| !["impersonation", "offensive_name", "other"].includes(reason)) {
+			return problem(res, 400, "invalid_report");
+		}
+		try {
+			const target = await pool.query(
+				`SELECT profile.installation_id, profile.display_name
+				 FROM leaderboard_profiles AS profile
+				 INNER JOIN leaderboard_scores AS score ON score.installation_id = profile.installation_id
+				 WHERE profile.report_token = $1 AND score.route_id = $2`,
+				[reportRef, routeId],
+			);
+			if (target.rowCount !== 1) return problem(res, 404, "report_target_not_found");
+			if (target.rows[0].installation_id === req.installationId) return problem(res, 400, "cannot_report_self");
+			const result = await pool.query(
+				`INSERT INTO leaderboard_reports
+				 (reporter_installation_id, reported_installation_id, reported_name, reason, route_id)
+				 VALUES ($1, $2, $3, $4, $5)
+				 ON CONFLICT (reporter_installation_id, reported_installation_id) DO NOTHING
+				 RETURNING id`,
+				[req.installationId, target.rows[0].installation_id, target.rows[0].display_name, reason, routeId],
+			);
+			return res.status(result.rowCount === 1 ? 201 : 200)
+				.json({ accepted: true, duplicate: result.rowCount !== 1 });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
+
 	app.post("/v1/leaderboards/friends/claim", requireInstallation, async (req, res) => {
 		const inviteCode = String(req.body?.inviteCode || "").trim().toUpperCase();
 		if (!/^DDR-F-[A-Z0-9_-]{8,32}$/.test(inviteCode)) return problem(res, 400, "invalid_invite");
@@ -412,6 +479,18 @@ export function createApp(pool) {
 				await client.query("ROLLBACK");
 				transactionStarted = false;
 				return problem(res, 400, "self_friend");
+			}
+			const blocked = await client.query(
+				`SELECT 1 FROM leaderboard_blocks
+				 WHERE (blocker_installation_id = $1 AND blocked_installation_id = $2)
+				    OR (blocker_installation_id = $2 AND blocked_installation_id = $1)
+				 LIMIT 1`,
+				[req.installationId, ownerId],
+			);
+			if (blocked.rowCount > 0) {
+				await client.query("ROLLBACK");
+				transactionStarted = false;
+				return problem(res, 409, "friend_blocked");
 			}
 			const [firstId, secondId] = friendshipPair(ownerId, req.installationId);
 			const friendship = await client.query(
@@ -471,6 +550,75 @@ export function createApp(pool) {
 		}
 	});
 
+	app.get("/v1/leaderboards/blocks", requireInstallation, async (req, res) => {
+		try {
+			const result = await pool.query(
+				`SELECT block.blocked_installation_id AS installation_id, profile.display_name, block.created_at
+				 FROM leaderboard_blocks AS block
+				 LEFT JOIN leaderboard_profiles AS profile
+				   ON profile.installation_id = block.blocked_installation_id
+				 WHERE block.blocker_installation_id = $1
+				 ORDER BY block.created_at DESC LIMIT 100`,
+				[req.installationId],
+			);
+			return res.json({ blocks: result.rows.map((row) => ({
+				friendId: row.installation_id, displayName: row.display_name || "Dereva", blockedAt: row.created_at,
+			})) });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
+
+	app.post("/v1/leaderboards/blocks/:friendId", requireInstallation, async (req, res) => {
+		const blockedId = req.params.friendId;
+		if (!isUuid(blockedId) || blockedId === req.installationId) return problem(res, 400, "invalid_friend");
+		const [firstId, secondId] = friendshipPair(req.installationId, blockedId);
+		let client;
+		let transactionStarted = false;
+		try {
+			client = await pool.connect();
+			await client.query("BEGIN");
+			transactionStarted = true;
+			await client.query(
+				`INSERT INTO leaderboard_blocks (blocker_installation_id, blocked_installation_id)
+				 VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+				[req.installationId, blockedId],
+			);
+			await client.query(
+				"DELETE FROM leaderboard_friendships WHERE first_installation_id = $1 AND second_installation_id = $2",
+				[firstId, secondId],
+			);
+			await client.query(
+				`DELETE FROM leaderboard_friend_invites
+				 WHERE (owner_installation_id = $1 AND claimed_by_installation_id = $2)
+				    OR (owner_installation_id = $2 AND claimed_by_installation_id = $1)`,
+				[req.installationId, blockedId],
+			);
+			await client.query("COMMIT");
+			transactionStarted = false;
+			return res.json({ blocked: true });
+		} catch {
+			if (client != null && transactionStarted) await client.query("ROLLBACK");
+			return problem(res, 503, "database_unavailable");
+		} finally {
+			if (client != null) client.release();
+		}
+	});
+
+	app.delete("/v1/leaderboards/blocks/:friendId", requireInstallation, async (req, res) => {
+		const blockedId = req.params.friendId;
+		if (!isUuid(blockedId) || blockedId === req.installationId) return problem(res, 400, "invalid_friend");
+		try {
+			const result = await pool.query(
+				"DELETE FROM leaderboard_blocks WHERE blocker_installation_id = $1 AND blocked_installation_id = $2",
+				[req.installationId, blockedId],
+			);
+			return res.json({ unblocked: result.rowCount === 1 });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
+
 	app.get("/v1/leaderboards/friends/:routeId", requireInstallation, async (req, res) => {
 		if (!validRoute(req.params.routeId)) return problem(res, 400, "invalid_route");
 		try {
@@ -489,7 +637,8 @@ export function createApp(pool) {
 					WHERE score.route_id = $2
 					ORDER BY score.installation_id, score.score DESC, score.created_at ASC
 				)
-				SELECT best_scores.installation_id, best_scores.score, best_scores.created_at, profile.display_name
+				SELECT best_scores.installation_id, best_scores.score, best_scores.created_at,
+					profile.display_name, profile.report_token
 				FROM best_scores INNER JOIN leaderboard_profiles AS profile
 					ON profile.installation_id = best_scores.installation_id
 				ORDER BY best_scores.score DESC, best_scores.created_at ASC LIMIT 25`,
@@ -497,9 +646,10 @@ export function createApp(pool) {
 			);
 			return res.json({ verification: "unverified", scores: result.rows.map((row, index) => ({
 				rank: index + 1,
-				displayName: row.display_name,
+					displayName: row.display_name,
 				score: row.score,
 				isYou: row.installation_id === req.installationId,
+				reportRef: row.report_token,
 			})) });
 		} catch {
 			return problem(res, 503, "database_unavailable");
@@ -617,6 +767,14 @@ async function start() {
 		await migrate(pool);
 		console.log("Database migration completed during deployment bootstrap.");
 	}
+	const purgeTelemetry = () => purgeExpiredTelemetry(pool)
+		.then((deleted) => {
+			if (deleted > 0) console.log(`Expired gameplay events removed: ${deleted}`);
+		})
+		.catch(() => console.error("Gameplay event retention cleanup failed."));
+	void purgeTelemetry();
+	const retentionTimer = setInterval(() => { void purgeTelemetry(); }, 6 * 60 * 60 * 1000);
+	retentionTimer.unref();
 	const app = createApp(pool);
   const port = Number.parseInt(process.env.PORT || "3000", 10);
   const server = app.listen(port, "0.0.0.0", () => console.log(`Dala Dala Rush service on ${port}`));

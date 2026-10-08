@@ -13,6 +13,8 @@ const RAILWAY_MAX_EVENT_AGE_SECONDS := 14 * 24 * 60 * 60
 const RAILWAY_EVENT_NAMES: Array[String] = [
 	"tutorial_stage_finished", "run_end", "online_leaderboard_submit",
 	"online_leaderboard_global", "online_leaderboard_friends", "retention_return",
+	"fuel_failure", "route_moment_start", "route_moment_complete", "route_moment_timeout",
+	"vehicle_unlocked",
 ]
 
 var _queue: Array = []

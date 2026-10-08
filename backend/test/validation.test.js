@@ -28,5 +28,8 @@ test("validates concise public leaderboard names", () => {
 test("accepts only the documented minimal telemetry event names", () => {
   assert.equal(validTelemetryEvent("run_end"), true);
   assert.equal(validTelemetryEvent("tutorial_stage_finished"), true);
+  assert.equal(validTelemetryEvent("fuel_failure"), true);
+  assert.equal(validTelemetryEvent("route_moment_timeout"), true);
+  assert.equal(validTelemetryEvent("vehicle_unlocked"), true);
   assert.equal(validTelemetryEvent("player_name"), false);
 });

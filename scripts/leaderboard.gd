@@ -42,6 +42,7 @@ var _joining_online := false
 var _request_serial: int = 0
 var _active_request_id: int = 0
 var _friends: Array = []
+var _blocked_friends: Array = []
 var _cached_status: String = ""
 var _cached_fetched_at: int = 0
 var _remote_state: String = "idle"
@@ -429,6 +430,13 @@ func _add_score_row(rank: int, entry: Dictionary) -> void:
 	var score_label := UIFactory.make_label(str(int(entry.get("score", 0))), 19, UIFactory.COL_ACCENT)
 	score_label.custom_minimum_size = Vector2(82, 0)
 	row.add_child(score_label)
+	var report_ref: String = String(entry.get("reportRef", ""))
+	if _tab != TAB_PERSONAL and not bool(entry.get("isYou", false)) and not report_ref.is_empty():
+		var report := UIFactory.make_button("⚑", false)
+		report.custom_minimum_size = Vector2(40, 40)
+		report.tooltip_text = LocaleManager.t("LEADERBOARD_REPORT")
+		report.pressed.connect(func(): _show_report_dialog(report_ref))
+		row.add_child(report)
 
 func _select_tab(tab_id: String) -> void:
 	if _tab == tab_id:
@@ -569,6 +577,13 @@ func _show_friend_manager() -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 6)
 	scroll.add_child(list)
+	var blocked_button := UIFactory.make_button(LocaleManager.t("LEADERBOARD_MANAGE_BLOCKED"), false)
+	blocked_button.custom_minimum_size = Vector2(0, 42)
+	blocked_button.pressed.connect(func():
+		OnlineService.fetch_leaderboard_blocks()
+		dialog.queue_free()
+	)
+	list.add_child(blocked_button)
 	if _friends.is_empty():
 		list.add_child(UIFactory.make_label(LocaleManager.t("LEADERBOARD_NO_FRIENDS"), 16, UIFactory.COL_MUTED))
 	for value in _friends:
@@ -584,15 +599,94 @@ func _show_friend_manager() -> void:
 		name.tooltip_text = name.text
 		row.add_child(name)
 		var remove := UIFactory.make_button(LocaleManager.t("LEADERBOARD_REMOVE_FRIEND"), false)
-		remove.custom_minimum_size = Vector2(105, 40)
+		remove.custom_minimum_size = Vector2(82, 40)
 		remove.pressed.connect(func():
 			OnlineService.remove_leaderboard_friend(String(friend.get("friendId", "")))
 			dialog.queue_free()
 		)
 		row.add_child(remove)
+		var block := UIFactory.make_button(LocaleManager.t("LEADERBOARD_BLOCK_FRIEND"), false)
+		block.custom_minimum_size = Vector2(82, 40)
+		UIFactory.tint_button(block, UIFactory.COL_DANGER)
+		block.pressed.connect(func():
+			_show_block_dialog(String(friend.get("friendId", "")), String(friend.get("displayName", "Dereva")))
+			dialog.queue_free()
+		)
+		row.add_child(block)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog)
 	dialog.popup_centered(Vector2i(dialog_width_for_viewport(get_viewport_rect().size.x, 460), 0))
+
+func _show_block_manager() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = LocaleManager.t("LEADERBOARD_MANAGE_BLOCKED")
+	dialog.ok_button_text = LocaleManager.t("BACK")
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 240)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	dialog.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+	if _blocked_friends.is_empty():
+		list.add_child(UIFactory.make_label(LocaleManager.t("LEADERBOARD_NO_BLOCKED"), 16, UIFactory.COL_MUTED))
+	for value in _blocked_friends:
+		if value is not Dictionary:
+			continue
+		var blocked: Dictionary = value
+		var row := HBoxContainer.new()
+		row.custom_minimum_size = Vector2(0, 46)
+		list.add_child(row)
+		var driver_name := UIFactory.make_label(String(blocked.get("displayName", "Dereva")), 16)
+		driver_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		driver_name.clip_text = true
+		driver_name.tooltip_text = driver_name.text
+		row.add_child(driver_name)
+		var unblock := UIFactory.make_button(LocaleManager.t("LEADERBOARD_UNBLOCK"), false)
+		unblock.custom_minimum_size = Vector2(100, 40)
+		unblock.pressed.connect(func():
+			OnlineService.unblock_leaderboard_friend(String(blocked.get("friendId", "")))
+			dialog.queue_free()
+		)
+		row.add_child(unblock)
+	dialog.canceled.connect(func(): dialog.queue_free())
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(dialog_width_for_viewport(get_viewport_rect().size.x, 420), 0))
+
+func _show_report_dialog(report_ref: String) -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = LocaleManager.t("LEADERBOARD_REPORT_TITLE")
+	dialog.dialog_text = LocaleManager.t("LEADERBOARD_REPORT_BODY")
+	dialog.ok_button_text = LocaleManager.t("LEADERBOARD_REPORT")
+	dialog.cancel_button_text = LocaleManager.t("CANCEL")
+	var reason := OptionButton.new()
+	var reason_ids := ["impersonation", "offensive_name", "other"]
+	var reason_keys := ["LEADERBOARD_REPORT_IMPERSONATION", "LEADERBOARD_REPORT_OFFENSIVE", "LEADERBOARD_REPORT_OTHER"]
+	for key in reason_keys:
+		reason.add_item(LocaleManager.t(key))
+	dialog.add_child(reason)
+	dialog.confirmed.connect(func():
+		OnlineService.report_leaderboard_entry(report_ref, _current_route_id(), reason_ids[reason.selected])
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(func(): dialog.queue_free())
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(dialog_width_for_viewport(get_viewport_rect().size.x, 440), 0))
+
+func _show_block_dialog(friend_id: String, friend_name: String) -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = LocaleManager.t("LEADERBOARD_BLOCK_FRIEND")
+	dialog.dialog_text = LocaleManager.t("LEADERBOARD_BLOCK_CONFIRM") + "\n" + friend_name
+	dialog.ok_button_text = LocaleManager.t("LEADERBOARD_BLOCK_FRIEND")
+	dialog.cancel_button_text = LocaleManager.t("CANCEL")
+	dialog.confirmed.connect(func():
+		OnlineService.block_leaderboard_friend(friend_id)
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(func(): dialog.queue_free())
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(dialog_width_for_viewport(get_viewport_rect().size.x, 440), 0))
 
 func _confirm_leave_online() -> void:
 	var dialog := ConfirmationDialog.new()
@@ -677,10 +771,38 @@ func _on_online_request_finished(operation: String, success: bool, payload: Dict
 		else:
 			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
 		return
+	if operation == "leaderboard_block_list":
+		if success:
+			var raw_blocks: Variant = payload.get("blocks", [])
+			_blocked_friends = raw_blocks as Array if raw_blocks is Array else []
+			_show_block_manager()
+		else:
+			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
+		return
+	if operation == "leaderboard_friend_unblock":
+		if success:
+			_status.text = LocaleManager.t("LEADERBOARD_UNBLOCKED")
+		else:
+			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
+		return
 	if operation == "leaderboard_friend_remove":
 		if success:
 			_status.text = LocaleManager.t("LEADERBOARD_FRIEND_REMOVED")
 			_request_remote_scores()
+		else:
+			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
+		return
+	if operation == "leaderboard_friend_block":
+		if success:
+			_status.text = LocaleManager.t("LEADERBOARD_BLOCKED")
+			_request_remote_scores()
+		else:
+			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
+		return
+	if operation == "leaderboard_report":
+		if success:
+			_status.text = LocaleManager.t("LEADERBOARD_REPORT_DUPLICATE") if bool(payload.get("duplicate", false)) \
+				else LocaleManager.t("LEADERBOARD_REPORT_SENT")
 		else:
 			_status.text = LocaleManager.t("LEADERBOARD_ERROR")
 		return

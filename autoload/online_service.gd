@@ -194,6 +194,21 @@ func fetch_leaderboard_friends(request_id: int = 0) -> void:
 	_request_json("/v1/leaderboards/friends", HTTPClient.METHOD_GET, {},
 		"leaderboard_friend_list", true, {"request_id": request_id})
 
+func fetch_leaderboard_blocks() -> void:
+	if not is_enabled() or not has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("leaderboard_block_list", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/leaderboards/blocks", HTTPClient.METHOD_GET, {},
+		"leaderboard_block_list", true)
+
+func unblock_leaderboard_friend(friend_id: String) -> void:
+	if not is_enabled() or not has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("leaderboard_friend_unblock", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/leaderboards/blocks/" + friend_id.uri_encode(),
+		HTTPClient.METHOD_DELETE, {}, "leaderboard_friend_unblock", true,
+		{"friend_id": friend_id})
+
 func remove_leaderboard_friend(friend_id: String) -> void:
 	if not is_enabled() or not has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
 		_finish("leaderboard_friend_remove", false, {"reason": "not_ready"})
@@ -201,6 +216,22 @@ func remove_leaderboard_friend(friend_id: String) -> void:
 	_request_json("/v1/leaderboards/friends/" + friend_id.uri_encode(),
 		HTTPClient.METHOD_DELETE, {}, "leaderboard_friend_remove", true,
 		{"friend_id": friend_id})
+
+func block_leaderboard_friend(friend_id: String) -> void:
+	if not is_enabled() or not has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("leaderboard_friend_block", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/leaderboards/blocks/" + friend_id.uri_encode(),
+		HTTPClient.METHOD_POST, {}, "leaderboard_friend_block", true,
+		{"friend_id": friend_id})
+
+func report_leaderboard_entry(report_ref: String, route_id: String, reason: String) -> void:
+	if not is_enabled() or not has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("leaderboard_report", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/leaderboards/reports", HTTPClient.METHOD_POST,
+		{"reportRef": report_ref, "routeId": route_id, "reason": reason},
+		"leaderboard_report", true)
 
 func leave_online_leaderboard() -> void:
 	if not is_enabled() or not has_identity():

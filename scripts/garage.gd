@@ -122,7 +122,11 @@ func _on_vehicle_pressed(id: String) -> void:
 		_unlock_notice_text = LocaleManager.t("VEHICLE_READY").replace(
 			"{name}", LocaleManager.t(String(v.name_key))).replace(
 			"{perk}", _vehicle_primary_perk(v))
-		AnalyticsService.log_event("vehicle_unlocked", {"vehicle": id, "price": int(v.price)})
+		AnalyticsService.log_event("vehicle_unlocked", {
+			"vehicle": id,
+			"price": int(v.price),
+			"runs": int(SaveSystem.get_value("total_runs", 0)),
+		})
 		AudioManager.play_sfx("powerup")
 		_build_rows()
 	SaveSystem.end_batch()

@@ -38,6 +38,11 @@ export const TELEMETRY_EVENT_NAMES = new Set([
   "online_leaderboard_global",
   "online_leaderboard_friends",
   "retention_return",
+  "fuel_failure",
+  "route_moment_start",
+  "route_moment_complete",
+  "route_moment_timeout",
+  "vehicle_unlocked",
 ]);
 
 export function validTelemetryEvent(value) {

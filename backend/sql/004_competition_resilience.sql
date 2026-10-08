@@ -15,3 +15,5 @@ CREATE INDEX IF NOT EXISTS telemetry_events_name_received_idx
   ON telemetry_events (event_name, received_at DESC);
 CREATE INDEX IF NOT EXISTS telemetry_events_route_received_idx
   ON telemetry_events (route_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS telemetry_events_retention_idx
+  ON telemetry_events (received_at, id);

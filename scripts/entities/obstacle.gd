@@ -17,6 +17,20 @@ const TYPES := {
 	"mbuzi":      {"color": Color("#d7ccc8"), "size": Vector2(44, 52)},
 }
 
+const COLLISION_SCALE_BY_TYPE := {
+	"bodaboda": Vector2(0.70, 0.82),
+	"bajaji": Vector2(0.78, 0.80),
+	"car": Vector2(0.82, 0.82),
+	"police": Vector2(0.82, 0.82),
+	"truck": Vector2(0.84, 0.88),
+	"pothole": Vector2(0.72, 0.72),
+	"cone": Vector2(0.72, 0.72),
+	"barrier": Vector2(0.78, 0.68),
+	"pedestrian": Vector2(0.78, 0.68),
+	"tire": Vector2(0.72, 0.72),
+	"mbuzi": Vector2(0.76, 0.78),
+}
+
 var type_id: String = "car"
 var size: Vector2 = Vector2(70, 100)
 var color: Color = Color("#9b59b6")
@@ -62,14 +76,12 @@ func get_aabb() -> Rect2:
 
 ## Keep collision inside the visible object so a clean-looking dodge is safe.
 func get_collision_aabb() -> Rect2:
-	var hit_scale := Vector2(0.84, 0.84)
-	match type_id:
-		"pothole", "cone", "tire":
-			hit_scale = Vector2(0.72, 0.72)
-		"pedestrian", "barrier":
-			hit_scale = Vector2(0.78, 0.68)
-	var hit_size: Vector2 = size * hit_scale
+	var hit_size: Vector2 = collision_size(type_id, size)
 	return Rect2(global_position - hit_size * 0.5, hit_size)
+
+static func collision_size(obstacle_type: String, visual_size: Vector2) -> Vector2:
+	var hit_scale: Vector2 = COLLISION_SCALE_BY_TYPE.get(obstacle_type, Vector2(0.82, 0.82))
+	return visual_size * hit_scale
 
 func deactivate() -> void:
 	active = false

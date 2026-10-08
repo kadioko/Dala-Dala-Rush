@@ -1,7 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { createApp } from "../src/server.js";
+import { createApp, purgeExpiredTelemetry } from "../src/server.js";
+
+test("telemetry retention removes expired events in bounded 90-day batches", async () => {
+  const calls = [];
+  const pool = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (sql.includes("DELETE FROM telemetry_events")) {
+        return { rowCount: 2, rows: [{ id: 1 }, { id: 2 }] };
+      }
+      if (sql.includes("DELETE FROM leaderboard_reports")) return { rowCount: 1 };
+      throw new Error(`Unexpected SQL in retention test: ${sql}`);
+    },
+  };
+  const deleted = await purgeExpiredTelemetry(pool);
+  assert.equal(deleted, 2);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].params, [90, 1000]);
+  assert.deepEqual(calls[1].params, [90, 1000]);
+  assert.match(calls[0].sql, /received_at < NOW\(\)/);
+  assert.match(calls[0].sql, /LIMIT \$2/);
+});
 
 test("telemetry endpoint accepts whole seconds and rejects fractional timestamps", async () => {
   const inserts = [];

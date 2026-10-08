@@ -16,6 +16,7 @@ const VOICE_POOL := 5  # simultaneous SFX
 
 var music_on: bool = true
 var sfx_on: bool = true
+var game_paused: bool = false
 
 var _sfx_players: Array = []
 var _next_voice: int = 0
@@ -90,7 +91,7 @@ func play_route_horn(route_id: String) -> void:
 	_play_sfx("horn", pitch)
 
 func _play_sfx(key: String, pitch: float) -> void:
-	if not sfx_on:
+	if not sfx_on or game_paused:
 		return
 	var stream: Variant = _sfx_streams.get(key)
 	if stream == null:
@@ -104,10 +105,21 @@ func _play_sfx(key: String, pitch: float) -> void:
 	p.play()
 
 func play_music() -> void:
-	if _music_stream == null or _music_player.playing:
+	if _music_stream == null or not is_instance_valid(_music_player):
 		return
-	_music_player.stream = _music_stream
-	_music_player.play()
+	if not _music_player.playing:
+		_music_player.stream = _music_stream
+		_music_player.play()
+	_music_player.stream_paused = game_paused
+
+func set_game_paused(paused: bool) -> void:
+	game_paused = paused
+	if is_instance_valid(_music_player):
+		_music_player.stream_paused = paused
+	for player_value in _sfx_players:
+		var player := player_value as AudioStreamPlayer
+		if is_instance_valid(player):
+			player.stream_paused = paused
 
 func stop_music() -> void:
 	_music_player.stop()

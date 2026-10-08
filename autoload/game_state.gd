@@ -75,7 +75,7 @@ func tutorial_stage_for_run(is_continuing: bool = false) -> int:
 	if is_continuing:
 		return 0
 	var completed_lessons: int = clampi(int(SaveSystem.get_value("first_session_stage", 0)), 0, 3)
-	if completed_lessons == 0 and int(SaveSystem.get_value("total_runs", 0)) > 0:
+	if completed_lessons == 0 and int(SaveSystem.get_value("regular_runs", 0)) > 0:
 		return 0
 	return completed_lessons + 1 if completed_lessons < 3 else 0
 
@@ -340,7 +340,8 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 	var earned_coins := new_coins + last_bonus_coins + last_daily_bonus_coins \
 		+ last_mastery_bonus_coins + last_route_contract_bonus_coins
 	SaveSystem.add_coins(earned_coins)
-	SaveSystem.add_run_stats(new_distance, earned_coins, new_passengers, not _run_counted)
+	SaveSystem.add_run_stats(new_distance, earned_coins, new_passengers, not _run_counted,
+		bool(extra.get("daily_route", false)))
 
 	_banked_coins = coins
 	_banked_distance = distance

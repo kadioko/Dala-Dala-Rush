@@ -1,6 +1,6 @@
 # Android Release Build Runbook
 
-Last updated: September 30, 2026.
+Last updated: October 8, 2026.
 
 Use this document to create and validate a signed Android App Bundle for Google
 Play production-track updates. Store-listing work and Play Console declarations are in
@@ -20,9 +20,9 @@ Play production-track updates. Store-listing work and Play Console declarations 
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
 | Current production release | Version 1.0.13, code 14 |
-| Last exported candidate | Version 1.0.14, code 15 |
-| Artifact status | Signed AAB is verified for the previously committed source; new menu/QA/backend changes in this work need a higher version code and a fresh export before upload |
-| Artifact path | `exports/android/DalaDalaRushTZ-production-v14.aab` |
+| Last exported candidate | Version 1.0.16, code 17 |
+| Artifact status | Signed candidate built and bundle-validated from current source. A21s/second-phone QA and Play processing remain before rollout. |
+| Artifact path | `exports/android/DalaDalaRushTZ-production-v16.aab` |
 | Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
@@ -39,9 +39,8 @@ Complete these before rolling the verified bundle out to testers:
 - [ ] Swahili and English menus have been checked at 540x960 and on a phone.
 - [ ] Railway hardening is deployed separately, migration 005 completed, and
   the live leaderboard write/read behavior has been smoke-tested.
-- [ ] If deploying the new shared limiter, migration 006 is applied, the
-  matching API revision is deployed, and the updated privacy policy is
-  published first.
+- [x] Shared limiter migration 006 and matching API revision are deployed;
+  the updated privacy policy is published.
 - [ ] Complete the small-phone and two-phone competition checks in
   `DEVICE_QA.md`; update the privacy policy and review Play Data Safety before
   rollout.
@@ -58,11 +57,11 @@ signing configuration.
 
 ## 1. Confirm The Version
 
-The release candidate is exported from the Android AAB preset with:
+The current release candidate is exported from the Android AAB preset with:
 
 ```text
-Version name: 1.0.14
-Version code: 15
+Version name: 1.0.16
+Version code: 17
 ```
 
 The code must be greater than every active artifact in every Play track,
@@ -126,10 +125,10 @@ Preferred editor path:
 Project > Export > Android AAB Release > Export Project
 ```
 
-The current verified source build is:
+The current test candidate is:
 
 ```text
-exports/android/DalaDalaRushTZ-production-v14.aab
+exports/android/DalaDalaRushTZ-production-v16.aab
 ```
 
 Equivalent command-line export:
@@ -138,7 +137,7 @@ Equivalent command-line export:
 $godot = 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe'
 & $godot --headless --path '.' `
   --export-release 'Android AAB Release' `
-  'exports/android/DalaDalaRushTZ-production-v14.aab'
+  'exports/android/DalaDalaRushTZ-production-v16.aab'
 ```
 
 Do not interrupt the process. A successful command must return exit code 0 and
@@ -146,10 +145,25 @@ the requested AAB must have a new modification time.
 
 ## 5. Verify The Artifact
 
+Run the repeatable source/backend gate before exporting or uploading:
+
+```powershell
+.\tools\verify_project.ps1 -GodotPath 'C:\path\to\Godot_v4.7.1-stable_win64_console.exe'
+```
+
+The source gate includes locale/data contracts and headless responsive UI bounds
+across the documented portrait sizes. Screenshot review still requires the
+normal renderer or a phone.
+
+Pass `-BundlePath`, `-BundletoolJar`, `-ExpectedVersionName`,
+`-ExpectedVersionCode`, and `-ExpectedTargetSdk` to include signed artifact
+verification in the same run. The script intentionally does not claim that
+physical-device QA or Play Console review has passed.
+
 Set the artifact path once:
 
 ```powershell
-$aab = 'exports/android/DalaDalaRushTZ-production-v14.aab'
+$aab = 'exports/android/DalaDalaRushTZ-production-v16.aab'
 ```
 
 Confirm it exists, record its size, and create a checksum:
@@ -194,8 +208,8 @@ AdMob metadata, and the Advertising ID permission:
 .\tools\verify_android_release.ps1 `
   -BundlePath $aab `
   -BundletoolJar 'C:\path\to\bundletool-all.jar' `
-  -ExpectedVersionName '1.0.15' `
-  -ExpectedVersionCode 16 `
+  -ExpectedVersionName '1.0.16' `
+  -ExpectedVersionCode 17 `
   -ExpectedTargetSdk 36
 ```
 
@@ -220,6 +234,31 @@ AdMob metadata, and the Advertising ID permission:
 
 These checks verify bundle structure and signing only. They do not replace the
 physical-device, consent, or Play pre-launch checks below.
+
+### Code 16 Verification Record
+
+- Artifact: `exports/android/DalaDalaRushTZ-production-v15.aab`
+- Size: `61,551,226` bytes.
+- SHA-256: `834DCB20E7C0A7CC0229C765DC5037F0BCC80A44B6FC7F32B4331F470DA72153`.
+- `jarsigner` reports `jar verified` and the reusable verifier confirms the
+  AAB structure.
+- The generated Gradle bundle manifest reports version `1.0.15`, code `16`,
+  target API `36`, AdMob application-ID metadata, and
+  `com.google.android.gms.permission.AD_ID`.
+- Godot 4.7.1 export completed. Physical-device and Play Console validation
+  remain outstanding.
+
+### Code 17 Test Candidate
+
+- Artifact: `exports/android/DalaDalaRushTZ-production-v16.aab`
+- Size: `61,572,416` bytes.
+- SHA-256: `35B5EBD8D3EFA454CF21118918754342A21FD17DDA64FBE80C42379EBC4B527F`.
+- `jarsigner` reports `jar verified`; bundletool 1.18.3 validation passes.
+- Manifest confirms version `1.0.16`, code `17`, minimum API `24`, target API
+  `36`, `armeabi-v7a` and `arm64-v8a`, AdMob application-ID metadata, and both
+  Advertising ID permissions.
+- This is a test candidate, not a phone-validated production rollout. Install
+  through the intended Play testing track and complete `DEVICE_QA.md` first.
 
 ## 6. Install Through Play Testing
 
@@ -256,11 +295,11 @@ Use the complete device matrix in `ANDROID_EXPORT.md`.
 ## 7. Upload Checklist
 
 - [ ] Upload the newly verified versioned AAB to the intended Play track.
-- [ ] Confirm Play Console reads version code 15 and target API 36.
+- [ ] Confirm Play Console reads version code 17 and target API 36.
 - [ ] Confirm the Advertising ID warning is absent for the new artifact.
 - [ ] Review native-code debug-symbol and deobfuscation notices. These are
   warnings unless obfuscation is enabled, but record the decision.
-- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.14.md`.
+- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.16.md`.
 - [ ] Recheck Ads, Data safety, target audience, content rating, app access,
   financial, health, and government declarations.
 - [ ] Confirm the public privacy URL opens:

@@ -180,7 +180,11 @@ func _try_buy(id: String) -> void:
 		return
 	SaveSystem.unlock_vehicle(id)
 	SaveSystem.end_batch()
-	AnalyticsService.log_event("vehicle_unlocked", {"vehicle": id, "price": int(v.price)})
+	AnalyticsService.log_event("vehicle_unlocked", {
+		"vehicle": id,
+		"price": int(v.price),
+		"runs": int(SaveSystem.get_value("total_runs", 0)),
+	})
 	AudioManager.play_sfx("powerup")
 	_msg.text = ""
 	_build_rows()

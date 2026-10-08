@@ -70,7 +70,7 @@ changed.
   and hit-stop without changing scoring or collision timing.
 - Test with sound and vibration enabled.
 - Test with Swahili and English text.
-- Check 360x640, 393x873, 412x915, 540x960, and 720x1600 portrait layouts.
+- Check 320x568, 360x640, 393x873, 412x915, 540x960, and 720x1600 portrait layouts.
   The main menu intentionally stacks compact navigation below 500px and utility
   actions below 380px instead of allowing horizontal overflow.
 

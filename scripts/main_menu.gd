@@ -9,6 +9,7 @@ const DailyChallengesData := preload("res://data/daily_challenges.gd")
 const DailyRouteChallengeData := preload("res://data/daily_route_challenge.gd")
 const LoginStreakData := preload("res://data/login_streak.gd")
 const ReferralsData := preload("res://data/referrals.gd")
+const STREAK_PULSE_SCALE := 1.03
 
 var _title: Label
 var _subtitle: Label
@@ -17,6 +18,7 @@ var _coin_label: Label
 var _daily_label: Label
 var _daily_route_btn: Button
 var _event_label: Label
+var _last_event_banner: String = ""
 var _streak_label: Label
 var _streak_result: Dictionary = {}
 var _rank_label: Label
@@ -71,10 +73,9 @@ func _ready() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.anchor_right = 1.0
 	scroll.anchor_bottom = 1.0
-	# A21-class phones are narrow enough that the menu needs a little more
-	# breathing room at both edges than the old 18px inset provided.
-	scroll.offset_left = 24
-	scroll.offset_right = -24
+	var menu_inset := minf(24.0, vsize.x * 0.05)
+	scroll.offset_left = menu_inset
+	scroll.offset_right = -menu_inset
 	scroll.offset_top = 22 + UIFactory.safe_top_inset(vsize.y)
 	scroll.offset_bottom = -76 - UIFactory.safe_bottom_inset(vsize.y)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -95,6 +96,7 @@ func _ready() -> void:
 
 	_subtitle = UIFactory.make_label("", 16, UIFactory.COL_MUTED)
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_subtitle)
 	_event_label = UIFactory.make_label("", 15, Color("#2ecc71"))
@@ -112,6 +114,7 @@ func _ready() -> void:
 	_btn_current_route = UIFactory.make_button("", false)
 	_btn_current_route.custom_minimum_size = Vector2(0, 50)
 	_btn_current_route.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_current_route.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_btn_current_route.add_theme_font_size_override("font_size", 18)
 	_btn_current_route.pressed.connect(func(): _go("res://scenes/routes.tscn"))
 	v.add_child(_btn_current_route)
@@ -177,6 +180,7 @@ func _ready() -> void:
 	_daily_route_btn = UIFactory.make_button("", false)
 	_daily_route_btn.custom_minimum_size = Vector2(0, 50)
 	_daily_route_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_daily_route_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_daily_route_btn.add_theme_font_size_override("font_size", 20)
 	_daily_route_btn.pressed.connect(_on_daily_route)
 	_secondary_content.add_child(_daily_route_btn)
@@ -263,6 +267,7 @@ func _ready() -> void:
 	_pulse_play_btn()
 
 	LocaleManager.locale_changed.connect(_refresh_text)
+	RemoteConfig.config_updated.connect(_refresh_event_banner)
 	_refresh_text()
 	call_deferred("_apply_responsive_layout")
 	AdService.show_banner(self, AdService.PLACEMENT_BANNER_MENU)
@@ -277,12 +282,18 @@ static func info_menu_columns_for_width(viewport_width: float) -> int:
 static func utility_menu_columns_for_width(viewport_width: float) -> int:
 	return 1 if viewport_width < 380.0 else 2
 
+static func title_font_size_for_width(viewport_width: float) -> int:
+	return 26 if viewport_width < 360.0 else (30 if viewport_width < 400.0 else 34)
+
 func _apply_responsive_layout() -> void:
 	if not is_instance_valid(_info_grid) or not is_instance_valid(_utility_grid):
 		return
 	var viewport_width: float = get_viewport_rect().size.x
 	_info_grid.columns = info_menu_columns_for_width(viewport_width)
 	_utility_grid.columns = utility_menu_columns_for_width(viewport_width)
+	_title.add_theme_font_size_override("font_size", title_font_size_for_width(viewport_width))
+	_subtitle.add_theme_font_size_override("font_size", 13 if viewport_width < 360.0 else 15)
+	_btn_current_route.add_theme_font_size_override("font_size", 15 if viewport_width < 360.0 else 18)
 
 func _process(delta: float) -> void:
 	_scroll_t += delta
@@ -329,11 +340,7 @@ func _refresh_text(_l := "") -> void:
 	var daily_route: Dictionary = DailyRouteChallengeData.current()
 	_daily_route_btn.text = LocaleManager.t("DAILY_ROUTE_PLAY").replace(
 		"{route}", LocaleManager.t(String(Routes.get_by_id(String(daily_route.get("route_id", "kariakoo"))).get("name_key", "ROUTE_KARIAKOO"))))
-	var event_text: String = RemoteConfig.event_banner_for(LocaleManager.current_locale)
-	_event_label.text = event_text
-	_event_label.visible = not event_text.is_empty()
-	if not event_text.is_empty():
-		AnalyticsService.log_event("live_event_seen", {"active": true})
+	_refresh_event_banner()
 	_streak_label.text     = _streak_text()
 	var rank_txt := "🧢 %s" % LocaleManager.t(Career.rank_key())
 	if not _rank_up.is_empty():
@@ -348,6 +355,14 @@ func _refresh_text(_l := "") -> void:
 	_btn_referrals.text    = LocaleManager.t("REFERRAL_MENU_PROMO") \
 		.replace("{n}", str(ReferralsData.REFERRER_REWARD))
 	_btn_how.text          = LocaleManager.t("HOW_TO_PLAY")
+
+func _refresh_event_banner() -> void:
+	var event_text: String = RemoteConfig.event_banner_for(LocaleManager.current_locale)
+	_event_label.text = event_text
+	_event_label.visible = not event_text.is_empty()
+	if not event_text.is_empty() and event_text != _last_event_banner:
+		_last_event_banner = event_text
+		AnalyticsService.log_event("live_event_seen", {"active": true})
 
 func _toggle_more() -> void:
 	_more_expanded = not _more_expanded
@@ -474,7 +489,7 @@ func _pulse_streak_label() -> void:
 	_streak_label.pivot_offset = _streak_label.size * 0.5
 	var tw := _streak_label.create_tween()
 	tw.set_loops(4)
-	tw.tween_property(_streak_label, "scale", Vector2(1.1, 1.1), 0.25)
+	tw.tween_property(_streak_label, "scale", Vector2.ONE * STREAK_PULSE_SCALE, 0.25)
 	tw.tween_property(_streak_label, "scale", Vector2.ONE, 0.25)
 
 # ══════════════════════ Inner draw nodes ══════════════════════════

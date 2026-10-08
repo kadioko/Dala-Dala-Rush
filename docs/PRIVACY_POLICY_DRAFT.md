@@ -1,12 +1,13 @@
 # Privacy Policy Source
 
-Source updated: September 30, 2026. The matching HTML is published; review the
-Play Data Safety declaration against the currently enabled Railway features.
+Source updated: October 8, 2026. The matching HTML is published at the URL
+below. Review the Play Data Safety declaration against the currently enabled
+Railway features before the next store submission.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: September 30, 2026
+Effective date: October 8, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -51,6 +52,11 @@ have no prizes and scores are labelled unverified. You can avoid this sharing
 by not joining online leaderboards; the personal leaderboard remains on-device.
 Players can also leave public competition from the leaderboard, which removes
 their public profile, submitted scores, friend links, and active friend codes.
+Players who join online competition may report a public display name using a
+fixed reason; the report contains no free-text message. Players may block a
+friend, which removes the friend link and prevents a new link until unblocked.
+Reports and moderation snapshots are kept for up to 90 days, then scheduled for
+deletion. Deleting Cloud Data also deletes reports submitted by that installation.
 
 When the game connects to online services, the backend temporarily processes
 the connection IP address in memory to enforce request limits and reduce abuse.
@@ -61,13 +67,18 @@ under its own privacy practices.
 ## Optional Gameplay Insights
 
 Gameplay Insights have their own in-app opt-in separate from Cloud Backup and
-Online Leaderboards. After you opt in, the game sends only a small allowlist of
-sanitized,
-aggregate product events: tutorial completion, run end reason, fuel failures,
-leaderboard request success/failure, and day-1/day-7 return markers. The
-service rejects names, friend codes, tokens, advertising IDs, contact details,
-and free-form nested data. You can turn this option off in Settings at any
-time; this stops future uploads.
+Online Leaderboards. After you opt in, the game sends a small allowlist of
+sanitized gameplay events associated with an anonymous installation identifier.
+Events include tutorial completion, route and run outcomes (including score,
+distance, elapsed time, and end reason), route-moment starts/completions/timeouts,
+fuel failures, vehicle unlock type/price/run count, leaderboard request
+success/failure, and day-1/day-7 return markers. Reports use aggregated counts
+and do not include player-entered names.
+The service rejects names, friend codes, tokens, advertising IDs, contact
+details, and free-form nested data. You can turn this option off in Settings at
+any time; this stops future uploads. Gameplay Insights events and leaderboard
+reports are scheduled for deletion after 90 days. Cleanup is periodic, so
+service interruptions may delay removal until service resumes.
 
 You can turn Cloud Backup off at any time. The in-game **Delete Cloud Data**
 control permanently deletes the anonymous installation's cloud backup, online

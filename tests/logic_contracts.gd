@@ -18,6 +18,7 @@ const AnalyticsScript := preload("res://autoload/analytics_service.gd")
 const DailyRouteChallengeData := preload("res://data/daily_route_challenge.gd")
 const MainMenuScript := preload("res://scripts/main_menu.gd")
 const ObstacleScript := preload("res://scripts/entities/obstacle.gd")
+const CollectibleScript := preload("res://scripts/entities/collectible.gd")
 const LeaderboardScript := preload("res://scripts/leaderboard.gd")
 
 const OBSTACLE_IDS := [
@@ -42,6 +43,7 @@ func _ready() -> void:
 	_check_locales()
 	_check_launch_copy()
 	_check_menu_layout_breakpoints()
+	_check_near_miss_window()
 	_check_routes()
 	_check_vehicles()
 	_check_missions()
@@ -65,6 +67,7 @@ func _ready() -> void:
 	_check_reputation_contract()
 	_check_selection_guards()
 	_check_reward_idempotency()
+	_check_pooled_entity_reset()
 	if _failures.is_empty():
 		print("LOGIC CONTRACTS: PASS")
 		_release_audio_for_headless_exit()
@@ -124,6 +127,8 @@ func _check_launch_copy() -> void:
 	locale_node.free()
 
 func _check_menu_layout_breakpoints() -> void:
+	_check(MainMenuScript.STREAK_PULSE_SCALE > 1.0 and MainMenuScript.STREAK_PULSE_SCALE <= 1.05,
+		"Daily streak reward pulse must remain subtle enough for compact screens")
 	_check(MainMenuScript.info_menu_columns_for_width(540.0) == 2,
 		"Secondary menu should keep its two options aligned on wider phones")
 	_check(MainMenuScript.info_menu_columns_for_width(499.0) == 1,
@@ -132,6 +137,10 @@ func _check_menu_layout_breakpoints() -> void:
 		"Common narrow phones should retain a two-column utility grid")
 	_check(MainMenuScript.utility_menu_columns_for_width(360.0) == 1,
 		"Small portrait widths must stack utility actions instead of overflowing")
+	_check(MainMenuScript.title_font_size_for_width(320.0) == 26,
+		"Main-menu title must scale down on the narrowest phones")
+	_check(MainMenuScript.title_font_size_for_width(412.0) == 34,
+		"Main-menu title must retain its normal size on wider phones")
 	_check(LeaderboardScript.dialog_width_for_viewport(360.0, 440) == 328,
 		"Leaderboard dialogs must fit a compact 360px phone")
 	_check(LeaderboardScript.dialog_width_for_viewport(540.0, 440) == 440,
@@ -147,6 +156,85 @@ func _check_menu_layout_breakpoints() -> void:
 		"Fallback traffic choices must remain one swipe from the current lane")
 	_check(GameScript.reachable_lane_choices([2], 0, 0, 3).is_empty(),
 		"Traffic must defer a wave when its only escape needs two lane switches")
+	var planner_rng := RandomNumberGenerator.new()
+	for clear_set in [[0, 1, 2], [0, 1], [1, 2]]:
+		for current_lane in range(3):
+			for last_lane in range(3):
+				for blocked_count in [1, 2]:
+					for seed in range(1, 21):
+						planner_rng.seed = seed
+						var planned: Dictionary = GameScript.plan_wave_lanes(
+							clear_set, current_lane, last_lane, 3, blocked_count, planner_rng)
+						_check(not planned.is_empty(),
+							"Planner should find a safe lane for every reachable generated-wave case")
+						if planned.is_empty():
+							continue
+						var chosen_lane: int = int(planned.free_lane)
+						_check(chosen_lane in clear_set and abs(chosen_lane - current_lane) <= 1,
+							"Generated waves must leave a current, one-swipe reachable escape lane")
+						_check((planned.blocked_lanes as Array).size() < clear_set.size(),
+							"Generated waves must not fill every currently clear lane")
+	_check(not GameScript.obstacle_blocks_lane("car", 100.0, 30.0, 185.0, 28.0),
+		"A stationary car must not reserve a physically clear neighboring lane")
+	_check(GameScript.obstacle_blocks_lane("bodaboda", 100.0, 17.0, 170.0, 28.0),
+		"A weaving bodaboda must reserve a lane inside its drift and collision envelope")
+	_check(not GameScript.obstacle_blocks_lane("bodaboda", 100.0, 17.0, 202.0, 28.0),
+		"Bodaboda reservation must stop outside its full swept collision envelope")
+	_check(GameScript.obstacle_blocks_lane("mbuzi", 100.0, 22.0, 900.0, 28.0),
+		"A road-crossing goat must not be treated as a stable single-lane obstacle")
+	var warning_y: float = GameScript.traffic_warning_y(900.0, 250.0, 42.0, 55.0)
+	_check(is_equal_approx((900.0 - 42.0 - 55.0 - warning_y) / 250.0, 1.0),
+		"Traffic warning must allow a full second after collision boxes stop touching")
+	_check(GameScript.traffic_warning_y(1310.0, 500.0)
+		< GameScript.traffic_warning_y(1310.0, 250.0),
+		"Fast obstacles must trigger their lane cue earlier to preserve reaction time")
+	var stationary_lanes: Array = GameScript.predicted_hazard_lanes(
+		"car", 100.0, 100.0, 0.0, 0.0, 1, 1.0, 300.0,
+		[0.0, 100.0, 200.0], 30.0, 28.0, 0.0, 200.0)
+	_check(stationary_lanes == [1], "A stationary vehicle should only warn for its collision lane")
+	var crossing_lanes: Array = GameScript.predicted_hazard_lanes(
+		"mbuzi", 20.0, 20.0, 0.0, 0.0, 1, 4.0, 300.0,
+		[0.0, 100.0, 200.0], 18.0, 28.0, 0.0, 200.0)
+	_check(crossing_lanes.size() == 3,
+		"A crossing goat should warn every lane it can enter before contact")
+	var compact_player_y: float = GameScript.player_y_for_view(640.0)
+	var compact_spawn: float = GameScript.obstacle_spawn_y_for(compact_player_y, 46.2, 57.2, 700.0)
+	_check(compact_spawn < -130.0,
+		"A fast late-run obstacle on a compact viewport must spawn early enough to react")
+	for obstacle_id in ObstacleScript.TYPES.keys():
+		var obstacle_type: String = String(obstacle_id)
+		var definition: Dictionary = ObstacleScript.TYPES[obstacle_type]
+		var visual: Vector2 = definition.get("size", Vector2.ZERO)
+		var hit: Vector2 = ObstacleScript.collision_size(obstacle_type, visual)
+		_check(hit.x > 0.0 and hit.y > 0.0 and hit.x <= visual.x and hit.y <= visual.y,
+			"%s collision bounds must remain inside its visible art" % obstacle_type)
+	for viewport_width in [320.0, 360.0, 393.0, 412.0, 540.0]:
+		var dock: Dictionary = GameScript.drive_dock_metrics(viewport_width)
+		_check(float(dock.width) <= viewport_width and float(dock.content_width) <= float(dock.width) + 0.1,
+			"Driving controls must stay inside the %dpx viewport" % int(viewport_width))
+	_check(float(GameScript.drive_dock_metrics(360.0).scale) >= 0.85,
+		"Small-phone steering and horn targets must remain comfortably tappable")
+	for viewport_width in [320.0, 360.0, 393.0, 412.0, 540.0]:
+		_check(GameScript.pause_panel_width(viewport_width) <= viewport_width,
+			"Pause actions must stay on-screen at %dpx width" % int(viewport_width))
+	for safe_bottom in [0.0, 18.0, 32.0]:
+		var player_bottom: float = GameScript.player_y_for_view(640.0, safe_bottom) + 55.0
+		var powerup_top: float = 640.0 - 183.0 - safe_bottom
+		_check(powerup_top - player_bottom >= 40.0,
+			"Player vehicle must not crowd power-up indicators above the control dock")
+
+func _check_near_miss_window() -> void:
+	var player_rect := Rect2(0.0, 0.0, 80.0, 100.0)
+	var close_pass := Rect2(95.0, 60.0, 70.0, 80.0)
+	var late_pass := Rect2(95.0, 140.0, 70.0, 80.0)
+	var collision := Rect2(20.0, 60.0, 70.0, 80.0)
+	_check(GameScript.near_miss_is_eligible(player_rect, close_pass, 90.0),
+		"A close, non-colliding pass should earn near-miss credit")
+	_check(not GameScript.near_miss_is_eligible(player_rect, late_pass, 90.0)
+		and GameScript.near_miss_window_expired(player_rect, late_pass),
+		"Changing lanes after a hazard passes must not earn delayed near-miss credit")
+	_check(not GameScript.near_miss_is_eligible(player_rect, collision, 15.0),
+		"A real collision must not be reported as a near miss")
 
 func _check_routes() -> void:
 	var ids: Dictionary = {}
@@ -212,6 +300,15 @@ func _check_routes() -> void:
 	var mbezi: Dictionary = RoutesData.get_by_id("mbezi")
 	_check(RoutesData.pick_condition(mbezi, 0.10) == "day",
 		"Mbezi's low weather roll must select its day profile")
+	var kariakoo: Dictionary = RoutesData.get_by_id("kariakoo")
+	_check(float(kariakoo.passenger_interval_mult) < float(mbezi.passenger_interval_mult),
+		"Kariakoo should create more frequent fare/passenger opportunities than Mbezi")
+	_check(float(kigamboni.fuel_drain_route_mult) > float(mbezi.fuel_drain_route_mult),
+		"Kigamboni should exert more fuel pressure than the Mbezi efficiency route")
+	var ubungo: Dictionary = RoutesData.get_by_id("ubungo")
+	_check(float(kariakoo.spawn_interval_mult) / float(kariakoo.difficulty)
+		> float(ubungo.spawn_interval_mult) / float(ubungo.difficulty),
+		"Ubungo should have a denser traffic rhythm than starter Kariakoo")
 	locale_node.free()
 
 func _check_weights(owner_id: String, value: Variant, allowed: Array) -> void:
@@ -397,6 +494,8 @@ func _check_save_normalization() -> void:
 	var save_node := SaveScript.new()
 	save_node.data = SaveScript.DEFAULTS.duplicate(true)
 	save_node.data["schema_version"] = 2
+	save_node.data["total_runs"] = 5
+	save_node.data.erase("regular_runs")
 	save_node.data["total_coins"] = -100
 	save_node.data["total_distance_ever"] = -25.0
 	save_node.data["locale"] = "invalid"
@@ -417,7 +516,9 @@ func _check_save_normalization() -> void:
 	save_node.data["online_installation_id"] = 42
 	save_node.data["online_sync_token"] = []
 	save_node.call("_normalize_core_data")
-	_check(int(save_node.data.schema_version) == 13, "Old save schema was not migrated")
+	_check(int(save_node.data.schema_version) == 14, "Old save schema was not migrated")
+	_check(int(save_node.data.regular_runs) == 5,
+		"Legacy runs must migrate as regular runs to preserve experienced-player status")
 	_check(int(save_node.data.total_coins) == 0, "Negative saved coins were not clamped")
 	_check(float(save_node.data.total_distance_ever) == 0.0,
 		"Negative lifetime distance was not clamped")
@@ -473,6 +574,25 @@ func _check_save_normalization() -> void:
 	save_node._batch_depth = 0
 	save_node._batch_dirty = false
 	save_node.free()
+	for old_schema in [2, 8, 13]:
+		var legacy := SaveScript.new()
+		legacy.data = SaveScript.DEFAULTS.duplicate(true)
+		legacy.data["schema_version"] = old_schema
+		legacy.data["total_runs"] = old_schema + 10
+		legacy.data.erase("regular_runs")
+		legacy.data["total_coins"] = 23
+		legacy.call("_normalize_core_data")
+		_check(int(legacy.data.schema_version) == 14
+			and int(legacy.data.regular_runs) == old_schema + 10
+			and int(legacy.data.total_coins) == 23,
+			"Legacy schema %d migration must preserve runs and currency" % old_schema)
+		legacy.free()
+	AudioManager.set_game_paused(true)
+	_check(AudioManager.game_paused,
+		"Pausing gameplay must persistently silence audio managed by the audio service")
+	AudioManager.set_game_paused(false)
+	_check(not AudioManager.game_paused,
+		"Resuming gameplay must restore the shared audio service")
 
 func _check_cloud_snapshot() -> void:
 	var service := OnlineServiceScript.new()
@@ -570,6 +690,40 @@ func _check_daily_route_challenge() -> void:
 		"Daily route must use the shared starter vehicle and no-revive rule")
 	_check(int(first.get("traffic_seed", 0)) == int(second.get("traffic_seed", -1)),
 		"Daily route seed must be stable for the same date")
+	_check(GameScript.run_tuning_multiplier(true, 1.4) == 1.0
+		and GameScript.run_tuning_multiplier(false, 1.4) == 1.4,
+		"Daily Run must ignore live tuning while regular runs retain it")
+	_check(GameScript.effective_upgrade_level(true, 3) == 0
+		and GameScript.effective_upgrade_level(false, 3) == 3,
+		"Career upgrades must not alter shared Daily Run rules")
+	_check(GameScript.effective_tutorial_stage(true, 2) == 0
+		and GameScript.effective_tutorial_stage(false, 2) == 2,
+		"Daily Run traffic must not depend on onboarding progress")
+	_check(not GameScript.daily_run_ghost_allowed(true, 20, true)
+		and GameScript.daily_run_ghost_allowed(false, 20, true),
+		"Account-specific ghosts must not alter Daily Run scores")
+	_check(not GameScript.daily_run_chases_allowed(true, 0)
+		and not GameScript.daily_run_chases_allowed(true, 20)
+		and GameScript.daily_run_chases_allowed(false, 6)
+		and not GameScript.daily_run_chases_allowed(false, 5),
+		"Daily Runs must consistently omit account-gated police chases")
+	var original_save: Dictionary = SaveSystem.data.duplicate(true)
+	var original_batch_depth: int = SaveSystem._batch_depth
+	var original_batch_dirty: bool = SaveSystem._batch_dirty
+	SaveSystem.data = SaveScript.DEFAULTS.duplicate(true)
+	SaveSystem._batch_depth = 1
+	SaveSystem._batch_dirty = false
+	SaveSystem.add_run_stats(0.0, 0, 0, true, true)
+	_check(int(SaveSystem.data.total_runs) == 1 and int(SaveSystem.data.regular_runs) == 0,
+		"Daily runs must count toward lifetime totals without marking onboarding as completed")
+	_check(GameState.tutorial_stage_for_run(false) == 1,
+		"A new player who first plays Daily Run must still receive the first regular tutorial")
+	SaveSystem.add_run_stats(0.0, 0, 0, true, false)
+	_check(int(SaveSystem.data.total_runs) == 2 and int(SaveSystem.data.regular_runs) == 1,
+		"Regular runs must increment both lifetime and regular-run totals")
+	SaveSystem.data = original_save
+	SaveSystem._batch_depth = original_batch_depth
+	SaveSystem._batch_dirty = original_batch_dirty
 
 func _check_daily_traffic_randomness() -> void:
 	var first_rng := RandomNumberGenerator.new()
@@ -737,6 +891,7 @@ func _check_first_session_flow() -> void:
 	_check(GameState.tutorial_stage_for_run(false) == 2,
 		"The second guided run did not follow the first")
 	SaveSystem.data["total_runs"] = 5
+	SaveSystem.data["regular_runs"] = 5
 	SaveSystem.data["first_session_stage"] = 0
 	_check(GameState.tutorial_stage_for_run(false) == 0,
 		"Existing players should not be forced into new onboarding")
@@ -779,7 +934,61 @@ func _check_remote_tuning_guards() -> void:
 		"Rejected stale config must leave the active config unchanged")
 	_check(config.get_route_float("kariakoo", "not_a_tuning", 1.0, 0.8, 1.2) == 1.0,
 		"Unknown route tuning keys must be discarded")
+	var refresh_count: Array[int] = [0]
+	config.config_updated.connect(func(): refresh_count[0] += 1)
+	_check(config._apply_remote_payload({
+		"revision": 5, "event_banner_en": "New route event",
+	}), "New valid remote payload should apply")
+	_check(refresh_count[0] == 1,
+		"Applying remote config must notify open UI to refresh its live event banner")
+	_check(not config._apply_remote_payload({
+		"revision": 5.5, "event_banner_en": "Invalid revision",
+	}), "Remote payload must reject a non-integer revision")
+	_check(not config._apply_remote_payload({
+		"revision": 4, "event_banner_en": "Stale event",
+	}), "Remote payload must reject stale revisions")
+	_check(not config._apply_remote_payload({
+		"revision": "6", "event_banner_en": "Wrong type",
+	}), "Remote config must reject a string revision")
+	_check(not config._merge_config({
+		"revision": 6, "route_tuning": [],
+	}), "Malformed route tuning must not replace the current config")
+	_check(not config._merge_config({
+		"revision": 6, "unknown": {"unbounded": true},
+	}), "Unknown-only payloads must be rejected")
+	_check(String(config.get_value("event_banner_en", "")) == "New route event",
+		"Rejected malformed payloads must leave the previous config intact")
 	config.free()
+
+func _check_pooled_entity_reset() -> void:
+	var obstacle := ObstacleScript.new()
+	add_child(obstacle)
+	obstacle.setup("bodaboda", 100.0, 200.0)
+	obstacle.warning_announced = true
+	obstacle.scale = Vector2(2.0, 0.5)
+	obstacle.rotation = 0.4
+	obstacle.modulate = Color.RED
+	obstacle.deactivate()
+	obstacle.setup("car", 220.0, -300.0)
+	_check(obstacle.active and obstacle.visible and not obstacle.warning_announced
+		and obstacle.scale == Vector2.ONE and is_zero_approx(obstacle.rotation)
+		and obstacle.modulate == Color.WHITE and obstacle.position == Vector2(220.0, -300.0),
+		"Reused obstacles must reset visibility, warning state, transform, and color")
+	var collectible := CollectibleScript.new()
+	add_child(collectible)
+	collectible.setup("coin", 100.0, 200.0)
+	collectible.spin = 30.0
+	collectible.scale = Vector2(0.5, 2.0)
+	collectible.rotation = -0.3
+	collectible.modulate = Color.RED
+	collectible.deactivate()
+	collectible.setup("fuel", 220.0, -300.0)
+	_check(collectible.active and collectible.visible and is_zero_approx(collectible.spin)
+		and collectible.scale == Vector2.ONE and is_zero_approx(collectible.rotation)
+		and collectible.modulate == Color.WHITE and collectible.position == Vector2(220.0, -300.0),
+		"Reused collectibles must reset animation state, transform, and color")
+	obstacle.free()
+	collectible.free()
 
 func _check_selection_guards() -> void:
 	var vehicle_before := GameState.selected_vehicle_id

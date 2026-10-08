@@ -13,7 +13,7 @@ var _batch_depth: int = 0
 var _batch_dirty: bool = false
 
 const DEFAULTS := {
-	"schema_version": 13,
+	"schema_version": 14,
 	"best_score": 0,
 	"best_reputation": 0,
 	"total_coins": 0,
@@ -28,6 +28,7 @@ const DEFAULTS := {
 	"locale": "sw",
 	# Career stats
 	"total_runs": 0,
+	"regular_runs": 0,
 	"total_distance_ever": 0.0,
 	"total_coins_ever": 0,
 	"total_passengers_ever": 0,
@@ -130,6 +131,8 @@ func _load_from(path: String) -> bool:
 			push_warning("Save: ignored invalid value for '%s'." % key)
 			continue
 		data[key] = value
+	if not parsed.has("regular_runs"):
+		data["regular_runs"] = int(data.get("total_runs", 0))
 	_normalize_core_data()
 	return true
 
@@ -141,9 +144,11 @@ func _is_compatible_value(default_value: Variant, loaded_value: Variant) -> bool
 	return expected_type == loaded_type
 
 func _normalize_core_data() -> void:
+	if not data.has("regular_runs"):
+		data["regular_runs"] = int(data.get("total_runs", 0))
 	data["schema_version"] = int(DEFAULTS["schema_version"])
 	var non_negative_ints: Array[String] = [
-		"best_score", "best_reputation", "total_coins", "total_runs", "total_coins_ever",
+		"best_score", "best_reputation", "total_coins", "total_runs", "regular_runs", "total_coins_ever",
 		"total_passengers_ever", "route_goals_completed",
 		"daily_challenges_completed", "ads_runs_since_interstitial",
 		"ads_next_interstitial_at", "streak_count",
@@ -505,9 +510,12 @@ func update_route_mastery(route_id: String, stars: int) -> int:
 
 # ── Career stats ─────────────────────────────────────────────────
 
-func add_run_stats(distance: float, coins: int, passengers: int, count_run: bool = true) -> void:
+func add_run_stats(distance: float, coins: int, passengers: int, count_run: bool = true,
+		daily_run: bool = false) -> void:
 	if count_run:
 		data["total_runs"]      = int(data.get("total_runs", 0)) + 1
+		if not daily_run:
+			data["regular_runs"] = int(data.get("regular_runs", 0)) + 1
 	data["total_distance_ever"] = float(data.get("total_distance_ever", 0.0)) + distance
 	data["total_coins_ever"]    = int(data.get("total_coins_ever", 0)) + coins
 	data["total_passengers_ever"] = int(data.get("total_passengers_ever", 0)) + passengers

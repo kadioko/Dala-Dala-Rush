@@ -193,6 +193,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/CONTENT_GUIDE.md` | How to add routes/vehicles/obstacles/missions/etc. |
 | `docs/ANDROID_EXPORT.md` | Export setup + on-device QA checklist |
 | `docs/ANDROID_RELEASE_BUILD.md` | Signed AAB build, verification, and upload runbook |
+| `docs/DEPENDENCY_MAINTENANCE.md` | Checked engine, Android, backend, and CLI versions; safe upgrade workflow |
 | `docs/ADMOB_SETUP.md` | Installed AdMob integration and release QA |
 | `docs/MONETIZATION.md` | IAP, carrier billing (TZ), season pass plan |
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |

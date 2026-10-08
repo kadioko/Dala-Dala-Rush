@@ -1,12 +1,71 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
-Google Play production is active. The current signed production-track update is
-version 1.0.13 (code 14), built with Godot 4.7.1 / API 36 and including Waves
-16-29, the A21s main-menu fit pass, a responsive narrow-width fallback, and consent-gated Railway phone validation.
+Google Play production is active. The latest locally verified signed test
+candidate is version 1.0.16 (code 17), built with Godot 4.7.1 / API 36.
+Physical-device and Play testing remain outstanding; do not treat this
+candidate as approved for production rollout.
 Cloud sync, online leaderboards, and Gameplay Insights are enabled only after
 their separate in-app consents; complete phone QA and Play declarations before
 broad rollout. This is a historical implementation log; release readiness is
 tracked in `ROADMAP.md`.
+
+## Unreleased - Live Event Banner Refresh (October 8, 2026)
+
+- Added a remote-config update signal so the main-menu event banner refreshes
+  when the network response arrives after the menu has already opened.
+- Reject malformed/non-integer network revisions, preserve monotonic revisions,
+  and ignore oversized local config caches before reading/parsing them.
+- Added contracts for banner refresh notification and invalid/stale revisions.
+
+## Unreleased - Intro Pause And Resume Safety (October 8, 2026)
+
+- Backgrounding the app during the route briefing now suspends the run and
+  restarts the briefing when the player returns, instead of letting the start
+  countdown and first gameplay seconds pass unseen.
+- Added a lifecycle regression check to the compact-phone UI suite.
+
+## Unreleased - Movement-Aware Safe-Lane Checks (October 8, 2026)
+
+- Wave generation now marks an escape lane unsafe when the obstacle's collision
+  width and the player's collision width overlap it, rather than comparing only
+  the obstacle's current center lane.
+- Bodaboda weaving is included as a horizontal drift envelope, and a wandering
+  goat conservatively reserves the road while it is in the next decision
+  corridor. The generator still defers waves when no one-swipe escape exists.
+- Lane warning cues now trigger about one second before contact based on actual
+  obstacle speed, keeping them useful on both short and tall screens and during
+  slow-motion or boost effects.
+- Added contracts for stationary traffic, bodaboda drift boundaries, and
+  cross-road goat behavior, plus warning timing at multiple screen heights and
+  speeds. Physical device balance checks remain necessary.
+
+## Unreleased - Compact Menu Pulse And Deterministic Layout QA (October 8, 2026)
+
+- Reduced the daily streak reward pulse from 110% to 103% so it remains inside
+  the viewport on compact portrait screens.
+- Made the layout runner seed an unclaimed daily streak for each locale/size,
+  and include overflowing control text and parent bounds in failure messages.
+- Bounded near-miss bonuses and overloaded police fines to the actual crossing
+  window, preventing delayed rewards when the player changes lanes after a hazard
+  has passed. Added contracts for close passes, late passes, and collisions.
+- Normalized Daily Run pacing and scoring inputs across profiles: live balance
+  overrides and career upgrades are ignored, onboarding and personal ghosts are
+  suppressed, and account-gated police chases are omitted from the challenge.
+- Added a migrated regular-run counter so playing Daily Run never skips the
+  first-session tutorial for a brand-new profile; existing save progress stays
+  intact through schema 14.
+- Removed per-frame active-array copies from entity movement and collision
+  checks while preserving oldest-first collision processing and safe pooling.
+- Paused shared music and sound effects with the game, and restore audio on
+  resume, app backgrounding, or leaving the gameplay scene.
+- Made the live driving dock responsive below 412 px and added width contracts
+  for small and standard portrait phones so controls stay on-screen. The pause
+  panel now follows the same width limits.
+- Lifted the player's vehicle slightly to give its silhouette clearer space
+  from the power-up row and bottom driving dock on compact screens.
+- These changes are included in the signed version 1.0.16 / code 17 test
+  candidate. Bundle validation passed; physical phone QA remains before
+  production rollout.
 
 ## Unreleased - Online State And Daily Run Reliability (September 28, 2026)
 
