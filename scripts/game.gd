@@ -107,6 +107,7 @@ var _ghost_data: Dictionary = {}     # ghost being raced (events/end/score/name)
 var _ghost_node: Node2D = null
 var _ghost_idx: int = 0
 var _ghost_beaten: bool = false
+var _run_seed: int = 0
 var _was_continued: bool = false
 
 # ── Boss moment: traffic police chase ────────────────────────────
@@ -258,9 +259,11 @@ func _ready() -> void:
 	_fx_rng.randomize()
 	_daily_run_active = GameState.is_daily_route_challenge_active()
 	if _daily_run_active:
-		_rng.seed = int(GameState.daily_route_challenge.get("traffic_seed", 1))
+		_run_seed = int(GameState.daily_route_challenge.get("traffic_seed", 1))
+		_rng.seed = _run_seed
 	else:
 		_rng.randomize()
+		_run_seed = int(_rng.seed) & GhostDataLib.MAX_SEED
 	view_size = get_viewport_rect().size
 	_compute_lanes()
 
@@ -397,13 +400,9 @@ func _ready() -> void:
 	entity_layer.add_child(kituo)
 
 	# Ghost racing is revealed after the first few independent runs.
-	if daily_run_ghost_allowed(_daily_run_active, completed_runs,
-		bool(SaveSystem.get_value("ghost_on", true))):
-		var rival: Variant = SaveSystem.get_value("ghost_rival", null)
-		var own: Variant = SaveSystem.get_value("ghost_best", null)
-		var g: Dictionary = GhostDataLib.sanitize(rival)
-		if g.is_empty():
-			g = GhostDataLib.sanitize(own)
+	var ghost_enabled: bool = bool(SaveSystem.get_value("ghost_on", true))
+	if ghost_enabled and (_daily_run_active or daily_run_ghost_allowed(false, completed_runs, true)):
+		var g := _get_compatible_replay()
 		if not g.is_empty():
 			_ghost_data = g
 			_ghost_node = _GhostBus.new()
@@ -1486,8 +1485,9 @@ func _process(delta: float) -> void:
 		var g_end: float = float(_ghost_data.get("end", 0.0))
 		if elapsed >= g_end and not _ghost_beaten:
 			_ghost_beaten = true
-			bonus_score += 150
-			_spawn_float_label(LocaleManager.t("GHOST_BEATEN"),
+			var rival_message: String = "DAILY_RIVAL_PASSED" if _daily_run_active else "GHOST_BEATEN"
+			bonus_score += replay_pass_bonus(_daily_run_active)
+			_spawn_float_label(LocaleManager.t(rival_message),
 				_ghost_node.position, Color("#2ecc71"))
 			AudioManager.play_sfx("powerup")
 			var tw := _ghost_node.create_tween()
@@ -1688,6 +1688,44 @@ static func daily_run_ghost_allowed(daily_run: bool, completed_runs: int,
 		ghost_enabled: bool) -> bool:
 	return not daily_run and completed_runs >= 5 and ghost_enabled
 
+static func replay_pass_bonus(daily_run: bool) -> int:
+	return 0 if daily_run else 150
+
+func _get_compatible_replay() -> Dictionary:
+	var candidates: Array = []
+	if _daily_run_active:
+		candidates.append(SaveSystem.get_value("ghost_rival", null))
+		candidates.append(SaveSystem.get_value("daily_replay_best", null))
+	else:
+		candidates.append(SaveSystem.get_value("ghost_rival", null))
+		candidates.append(SaveSystem.get_value("ghost_best", null))
+	for candidate in candidates:
+		var replay: Dictionary = GhostDataLib.sanitize(candidate)
+		if replay.is_empty():
+			continue
+		if _daily_run_active:
+			if GhostDataLib.matches_daily_challenge(replay, GameState.daily_route_challenge):
+				return replay
+			continue
+		if not String(replay.get("challenge_id", "")).is_empty():
+			continue
+		var replay_route: String = String(replay.get("route", ""))
+		if replay_route.is_empty() or replay_route == String(current_route.id):
+			return replay
+	return {}
+
+func _make_replay_clip(score: int) -> Dictionary:
+	return GhostDataLib.sanitize({
+		"events": _ghost_events,
+		"end": elapsed,
+		"score": score,
+		"name": "MIMI",
+		"route": String(current_route.id),
+		"vehicle_id": String(current_vehicle.get("id", "classic_blue")),
+		"challenge_id": String(GameState.daily_route_challenge.get("id", "")) if _daily_run_active else "",
+		"traffic_seed": _run_seed,
+	})
+
 static func daily_run_chases_allowed(daily_run: bool, completed_runs: int) -> bool:
 	return not daily_run and completed_runs >= 6
 
@@ -1814,6 +1852,8 @@ func _on_near_miss(world_pos: Vector2, obstacle_type: String = "") -> void:
 	if _route_moment_id == "boda_watch" and obstacle_type == "bodaboda":
 		_complete_route_moment()
 	elif _route_moment_id == "truck_line" and obstacle_type == "truck":
+		_complete_route_moment()
+	elif _route_moment_id == "highland_pass" and obstacle_type == "truck":
 		_complete_route_moment()
 	elif _route_moment_id == "checkpoint_clear" and obstacle_type == "police" \
 	and _overload_excess() == 0:
@@ -1998,6 +2038,8 @@ func _start_route_moment() -> void:
 		"boda_watch":
 			_route_moment_target_type = "bodaboda"
 		"truck_line":
+			_route_moment_target_type = "truck"
+		"highland_pass":
 			_route_moment_target_type = "truck"
 		"checkpoint_clear":
 			_route_moment_target_type = "police"
@@ -2588,17 +2630,19 @@ func _end_run() -> void:
 		"tutorial_stage": tutorial_stage,
 		"daily_route": GameState.is_daily_route_challenge_active(),
 	})
-	# Save ghost of best fresh (non-continued) run
-	if not _was_continued and not _daily_run_active:
-		var score_now: int = _current_score()
-		var best: Variant = SaveSystem.get_value("ghost_best", null)
-		if typeof(best) != TYPE_DICTIONARY or score_now > int((best as Dictionary).get("score", 0)):
-			SaveSystem.set_value("ghost_best", {
-				"events": _ghost_events,
-				"end": elapsed,
-				"score": score_now,
-				"name": "MIMI",
-			})
+	# Store a compact replay clip for sharing and deterministic same-day rivals.
+	if not _was_continued:
+		var replay := _make_replay_clip(_current_score())
+		SaveSystem.set_value("latest_replay", replay)
+		if _daily_run_active:
+			var prior_daily: Dictionary = GhostDataLib.sanitize(SaveSystem.get_value("daily_replay_best", {}))
+			if not GhostDataLib.matches_daily_challenge(prior_daily, GameState.daily_route_challenge) \
+				or int(replay.get("score", 0)) > int(prior_daily.get("score", 0)):
+				SaveSystem.set_value("daily_replay_best", replay)
+		else:
+			var best: Variant = SaveSystem.get_value("ghost_best", null)
+			if typeof(best) != TYPE_DICTIONARY or int(replay.get("score", 0)) > int((best as Dictionary).get("score", 0)):
+				SaveSystem.set_value("ghost_best", replay)
 	GameState.record_run(_current_score(), coins, passengers, distance, _run_near_misses, {
 		"dropoffs": dropoffs,
 		"fares": fares_earned,

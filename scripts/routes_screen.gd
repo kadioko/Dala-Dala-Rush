@@ -73,12 +73,13 @@ func _build_rows() -> void:
 func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SELECT_ROUTE")
 	_back_btn.text = LocaleManager.t("BACK")
-	_coin_label.text = "🪙 %d   |   %s: %d   |   %s: %d/18" % [
+	_coin_label.text = "🪙 %d   |   %s: %d   |   %s: %d/%d" % [
 		int(SaveSystem.get_value("total_coins", 0)),
 		LocaleManager.t("GOALS_DONE"),
 		int(SaveSystem.get_value("route_goals_completed", 0)),
 		LocaleManager.t("ROUTE_MASTERY"),
 		_total_mastery_stars(),
+		Routes.LIST.size() * 3,
 	]
 	_mastery_hint.text = LocaleManager.t("MASTERY_RULES")
 	for entry in _row_buttons:

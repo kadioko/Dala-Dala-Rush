@@ -4,6 +4,7 @@ extends Control
 const UIFactory := preload("res://ui/ui_factory.gd")
 const RouteContracts := preload("res://data/route_contracts.gd")
 const Vehicles := preload("res://data/vehicles.gd")
+const GhostDataLib := preload("res://data/ghost_data.gd")
 
 var _title_lbl: Label
 var _record_lbl: Label
@@ -31,6 +32,7 @@ var _play_btn: Button
 var _menu_btn: Button
 var _lb_btn: Button
 var _share_btn: Button
+var _replay_btn: Button
 var _continue_btn: Button
 var _double_btn: Button
 var _ad_msg_lbl: Label
@@ -268,6 +270,9 @@ func _ready() -> void:
 	_share_btn = UIFactory.make_button("", false)
 	_share_btn.pressed.connect(_on_share)
 	v.add_child(_share_btn)
+	_replay_btn = UIFactory.make_button("", false)
+	_replay_btn.pressed.connect(_on_copy_replay)
+	v.add_child(_replay_btn)
 	# Keep the final action comfortably above the fixed results banner after the
 	# player scrolls to the bottom on short portrait screens.
 	v.add_child(_spacer(18))
@@ -355,6 +360,8 @@ func _refresh(_l := "") -> void:
 	_menu_btn.text  = LocaleManager.t("MAIN_MENU")
 	_lb_btn.text    = LocaleManager.t("LEADERBOARD")
 	_share_btn.text = LocaleManager.t("SHARE_SCORE")
+	_replay_btn.text = LocaleManager.t("REPLAY_CLIP_COPY")
+	_replay_btn.disabled = GhostDataLib.encode(SaveSystem.get_value("latest_replay", {})).is_empty()
 	_continue_btn.text = LocaleManager.t("CONTINUE_AD")
 	_double_btn.text = LocaleManager.t("DOUBLE_COINS_VALUE").replace("{n}", str(GameState.last_coins))
 	if _ad_row.visible and not _reward_in_progress:
@@ -637,6 +644,15 @@ func _on_share() -> void:
 	else:
 		DisplayServer.clipboard_set(text)
 		_ad_msg_lbl.text = LocaleManager.t("SHARE_COPIED")
+
+func _on_copy_replay() -> void:
+	var code: String = GhostDataLib.encode(SaveSystem.get_value("latest_replay", {}))
+	if code.is_empty():
+		_ad_msg_lbl.text = LocaleManager.t("REPLAY_CLIP_MISSING")
+		return
+	DisplayServer.clipboard_set(code)
+	_ad_msg_lbl.visible = true
+	_ad_msg_lbl.text = LocaleManager.t("REPLAY_CLIP_COPIED")
 
 # ══════════════════════ Inner draw node ═══════════════════════════
 

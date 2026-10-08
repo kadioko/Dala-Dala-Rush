@@ -7,6 +7,7 @@ const MissionsData := preload("res://data/missions.gd")
 var _title: Label
 var _back_btn: Button
 var _season_lbl: Label
+var _season_chapter_lbl: Label
 var _season_bar: ProgressBar
 var _list: VBoxContainer
 
@@ -35,6 +36,9 @@ func _ready() -> void:
 	season_panel.add_child(sv)
 	_season_lbl = UIFactory.make_label("", 19, UIFactory.COL_ACCENT)
 	sv.add_child(_season_lbl)
+	_season_chapter_lbl = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
+	_season_chapter_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sv.add_child(_season_chapter_lbl)
 	_season_bar = ProgressBar.new()
 	_season_bar.min_value = 0.0
 	_season_bar.max_value = 1.0
@@ -64,6 +68,10 @@ func _refresh(_l := "") -> void:
 		MissionsData.XP_PER_LEVEL,
 	]
 	_season_bar.value = MissionsData.season_progress()
+	var chapter: Dictionary = MissionsData.season_chapter()
+	_season_chapter_lbl.text = LocaleManager.t("SEASON_CHAPTER_PROGRESS") \
+		.replace("{chapter}", LocaleManager.t(String(chapter.get("name_key", "SEASON_CHAPTER_NEXT")))) \
+		.replace("{level}", str(MissionsData.next_season_milestone()))
 
 	for c in _list.get_children():
 		c.queue_free()

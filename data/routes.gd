@@ -10,6 +10,7 @@ const CONDITION_IDS := ["day", "dusk", "night", "rain"]
 const LIST: Array = [
 	{
 		"id": "kariakoo",
+		"city_pack": "dar",
 		"name_key": "ROUTE_KARIAKOO",
 		"difficulty": 1.0,
 		"spawn_interval_mult": 1.24,
@@ -43,6 +44,7 @@ const LIST: Array = [
 	},
 	{
 		"id": "mwenge",
+		"city_pack": "dar",
 		"name_key": "ROUTE_MWENGE",
 		"unlock_goals": 1,
 		"unlock_price": 150,
@@ -77,6 +79,7 @@ const LIST: Array = [
 	},
 	{
 		"id": "mbezi",
+		"city_pack": "dar",
 		"name_key": "ROUTE_MBEZI",
 		"unlock_goals": 3,
 		"unlock_price": 350,
@@ -111,6 +114,7 @@ const LIST: Array = [
 	},
 	{
 		"id": "posta",
+		"city_pack": "dar",
 		"name_key": "ROUTE_POSTA",
 		"unlock_goals": 5,
 		"unlock_price": 600,
@@ -145,6 +149,7 @@ const LIST: Array = [
 	},
 	{
 		"id": "kigamboni",
+		"city_pack": "dar",
 		"name_key": "ROUTE_KIGAMBONI",
 		"unlock_goals": 8,
 		"unlock_price": 900,
@@ -180,6 +185,7 @@ const LIST: Array = [
 	},
 	{
 		"id": "ubungo",
+		"city_pack": "dar",
 		"name_key": "ROUTE_UBUNGO",
 		"unlock_goals": 12,
 		"unlock_price": 1400,
@@ -210,6 +216,42 @@ const LIST: Array = [
 		"collectible_weights": {
 			"coin": 50, "passenger": 15, "fuel": 10, "shield": 7,
 			"magnet": 5, "speed_boost": 3, "slow": 10,
+		},
+	},
+	{
+		"id": "arusha",
+		"city_pack": "arusha",
+		"name_key": "ROUTE_ARUSHA",
+		"unlock_goals": 18,
+		"unlock_price": 1800,
+		"difficulty": 1.24,
+		"spawn_interval_mult": 1.08,
+		"passenger_interval_mult": 1.04,
+		"kituo_gap_mult": 1.14,
+		"fuel_drain_route_mult": 0.92,
+		"rush_hour_chance": 0.20,
+		"condition_weights": {"day": 48, "dusk": 25, "night": 16, "rain": 11},
+		"flavor_key": "ROUTE_ARUSHA_D",
+		"goal_key": "GOAL_ARUSHA",
+		"goal_type": "distance",
+		"goal_target": 1600,
+		"goal_reward": 70,
+		"mastery_scores": [800, 1600, 2500],
+		"mastery_rewards": [20, 30, 55],
+		"signature_id": "highland_pass",
+		"signature_key": "ROUTE_MOMENT_CLOCKTOWER_RUN",
+		"signature_title_key": "MOMENT_CLOCKTOWER_RUN",
+		"signature_action_key": "MOMENT_ACTION_CLOCKTOWER_RUN",
+		"sky": Color("#9bd3ae"),
+		"road": Color("#343a40"),
+		"obstacle_weights": {
+			"bodaboda": 12, "bajaji": 8, "car": 16, "pothole": 8, "cone": 8,
+			"police": 7, "barrier": 8, "truck": 12, "pedestrian": 6, "tire": 5,
+			"mbuzi": 8,
+		},
+		"collectible_weights": {
+			"coin": 53, "passenger": 19, "fuel": 10, "shield": 5,
+			"magnet": 4, "speed_boost": 5, "slow": 4,
 		},
 	},
 ]

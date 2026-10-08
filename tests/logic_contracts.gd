@@ -3,8 +3,10 @@ extends Node
 ## godot --headless --path . res://tests/logic_contracts.tscn
 
 const RoutesData := preload("res://data/routes.gd")
+const CityPacksData := preload("res://data/city_packs.gd")
 const VehiclesData := preload("res://data/vehicles.gd")
 const MissionsData := preload("res://data/missions.gd")
+const SeasonTracksData := preload("res://data/season_tracks.gd")
 const GhostDataLib := preload("res://data/ghost_data.gd")
 const SaveScript := preload("res://autoload/save_system.gd")
 const LocaleScript := preload("res://autoload/locale_manager.gd")
@@ -30,7 +32,7 @@ const COLLECTIBLE_IDS := [
 ]
 const GOAL_TYPES := ["score", "coins", "distance", "near_misses", "passengers"]
 const ROUTE_SIGNATURE_IDS := [
-	"fare_rush", "boda_watch", "truck_line", "checkpoint_clear", "fuel_scout", "jam_breaker",
+	"fare_rush", "boda_watch", "truck_line", "checkpoint_clear", "fuel_scout", "jam_breaker", "highland_pass",
 ]
 const MISSION_TYPES := [
 	"coins", "dropoffs", "near_misses", "passengers", "distance",
@@ -294,6 +296,15 @@ func _check_routes() -> void:
 		_check_weights(id, route.get("obstacle_weights", {}), OBSTACLE_IDS)
 		_check_weights(id, route.get("collectible_weights", {}), COLLECTIBLE_IDS)
 	_check(ids.has("kariakoo"), "Starter route kariakoo must exist")
+	_check(ids.has("arusha"), "Arusha city pack must add its route to the route catalog")
+	_check(CityPacksData.route_ids().size() == ids.size()
+		and CityPacksData.get_by_id("arusha").get("status", "") == "live",
+		"City pack catalog must account for every playable route")
+	var arusha: Dictionary = RoutesData.get_by_id("arusha")
+	_check(String(arusha.get("city_pack", "")) == "arusha"
+		and String(arusha.get("signature_id", "")) == "highland_pass"
+		and float(arusha.get("fuel_drain_route_mult", 1.0)) < 1.0,
+		"Arusha needs a distinct highland route identity and long-run fuel profile")
 	var kigamboni: Dictionary = RoutesData.get_by_id("kigamboni")
 	_check(RoutesData.pick_condition(kigamboni, 0.99) == "rain",
 		"Kigamboni's high weather roll must select its rain profile")
@@ -359,6 +370,14 @@ func _check_missions() -> void:
 	_check(MissionsData.ACTIVE_COUNT > 0 \
 		and MissionsData.ACTIVE_COUNT <= MissionsData.TEMPLATES.size(),
 		"Mission active count must fit the template pool")
+	_check(String(SeasonTracksData.chapter_for_level(1).get("name_key", "")) == "SEASON_CHAPTER_DAR"
+		and String(SeasonTracksData.chapter_for_level(5).get("name_key", "")) == "SEASON_CHAPTER_ARUSHA",
+		"Season chapters should progress from Dar routes to the Arusha pack")
+	_check(SeasonTracksData.milestone_reward(4) == 75
+		and SeasonTracksData.milestone_reward(8) == 100
+		and SeasonTracksData.next_milestone(8) == 12
+		and SeasonTracksData.next_milestone(16) == 20,
+		"Season bonus milestones must be finite, visible, and continue safely")
 
 func _check_achievements() -> void:
 	var ids: Dictionary = {}
@@ -375,11 +394,29 @@ func _check_ghost_validation() -> void:
 		"end": 8.0,
 		"score": 500,
 		"name": "ABC",
+		"route": "arusha",
+		"vehicle_id": "classic_blue",
+		"challenge_id": "route_daily_2026-10-08",
+		"traffic_seed": 12345,
 	}
 	_check(not GhostDataLib.sanitize(valid).is_empty(), "Valid ghost was rejected")
 	var encoded := GhostDataLib.encode(valid)
 	_check(not encoded.is_empty(), "Valid ghost could not be encoded")
-	_check(not GhostDataLib.decode(encoded).is_empty(), "Ghost round-trip failed")
+	var decoded := GhostDataLib.decode(encoded)
+	_check(not decoded.is_empty() and String(decoded.get("route", "")) == "arusha"
+		and int(decoded.get("traffic_seed", 0)) == 12345,
+		"Replay clip metadata did not survive code round-trip")
+	var challenge := {
+		"id": "route_daily_2026-10-08", "route_id": "arusha",
+		"vehicle_id": "classic_blue", "traffic_seed": 12345,
+	}
+	_check(GhostDataLib.matches_daily_challenge(decoded, challenge),
+		"A replay from the same daily rules should qualify as a rival")
+	challenge["traffic_seed"] = 12346
+	_check(not GhostDataLib.matches_daily_challenge(decoded, challenge),
+		"A replay from different traffic seed must not qualify for a Daily Run")
+	_check(GhostDataLib.sanitize({"events": [[0.0, 1]], "end": 8.0, "route": "not_a_route"}).is_empty(),
+		"Replay clip with an unknown route was accepted")
 	_check(GhostDataLib.sanitize({"events": [[0.0, 4]], "end": 8.0}).is_empty(),
 		"Out-of-range ghost lane was accepted")
 	_check(GhostDataLib.sanitize({"events": [[3.0, 1], [2.0, 1]], "end": 8.0}).is_empty(),
@@ -516,7 +553,7 @@ func _check_save_normalization() -> void:
 	save_node.data["online_installation_id"] = 42
 	save_node.data["online_sync_token"] = []
 	save_node.call("_normalize_core_data")
-	_check(int(save_node.data.schema_version) == 14, "Old save schema was not migrated")
+	_check(int(save_node.data.schema_version) == 16, "Old save schema was not migrated")
 	_check(int(save_node.data.regular_runs) == 5,
 		"Legacy runs must migrate as regular runs to preserve experienced-player status")
 	_check(int(save_node.data.total_coins) == 0, "Negative saved coins were not clamped")
@@ -582,7 +619,7 @@ func _check_save_normalization() -> void:
 		legacy.data.erase("regular_runs")
 		legacy.data["total_coins"] = 23
 		legacy.call("_normalize_core_data")
-		_check(int(legacy.data.schema_version) == 14
+		_check(int(legacy.data.schema_version) == 16
 			and int(legacy.data.regular_runs) == old_schema + 10
 			and int(legacy.data.total_coins) == 23,
 			"Legacy schema %d migration must preserve runs and currency" % old_schema)
@@ -702,6 +739,9 @@ func _check_daily_route_challenge() -> void:
 	_check(not GameScript.daily_run_ghost_allowed(true, 20, true)
 		and GameScript.daily_run_ghost_allowed(false, 20, true),
 		"Account-specific ghosts must not alter Daily Run scores")
+	_check(GameScript.replay_pass_bonus(true) == 0
+		and GameScript.replay_pass_bonus(false) == 150,
+		"Rival replays must not change comparable Daily Run scores")
 	_check(not GameScript.daily_run_chases_allowed(true, 0)
 		and not GameScript.daily_run_chases_allowed(true, 20)
 		and GameScript.daily_run_chases_allowed(false, 6)

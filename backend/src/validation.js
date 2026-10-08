@@ -1,5 +1,5 @@
 export const ROUTE_IDS = new Set([
-  "kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo",
+  "kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo", "arusha",
 ]);
 const BLOCKED_DISPLAY_NAME_ROLES = new Set([
 	"admin", "administrator", "developer", "moderator", "official", "owner", "staff", "support", "system",

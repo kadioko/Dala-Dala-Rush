@@ -9,6 +9,28 @@ their separate in-app consents; complete phone QA and Play declarations before
 broad rollout. This is a historical implementation log; release readiness is
 tracked in `ROADMAP.md`.
 
+## Unreleased - Arusha Pack, Shareable Replays, And Season Chapters (October 8, 2026)
+
+- Added Arusha as a seventh route in its own city pack, with a dedicated
+  highland visual treatment, route tuning, goal, contract copy, horn tone, and
+  Highland Pass signature moment. The six-route Daily Run rotation is
+  intentionally unchanged.
+- Replay clips now include route, selected vehicle, run seed, and Daily Run
+  challenge identity. Daily rivals require an exact challenge/date, route,
+  starter-vehicle, and traffic-seed match. Daily rival passes add no score.
+  Clips are casual local comparisons, not proof against score tampering.
+- Added non-expiring Dar/Arusha season chapters and one-time coin milestones
+  at levels 4, 8, 12, and each fourth level thereafter. No new currency or
+  paid/expiring pass was added.
+- Save schema advances to 16 with repairable defaults for Arusha best score,
+  saved replay clips, and per-challenge replay best.
+- Backend route allowlist and migration `008_arusha_route_pack.sql` are added.
+  Railway is not linked from this checkout, so migration 008 is not deployed;
+  do not use Arusha World standings until deployment is confirmed.
+- The updated code has not been exported to an AAB. Build a higher version
+  code and complete the new route/replay/season entries in `DEVICE_QA.md` before
+  production rollout.
+
 ## Unreleased - Live Event Banner Refresh (October 8, 2026)
 
 - Added a remote-config update signal so the main-menu event banner refreshes

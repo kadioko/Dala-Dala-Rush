@@ -81,12 +81,35 @@ the result values below before changing `docs/remote-config.json`.
 | Posta | | | | | | | Clean Checkpoint | Controlled driving should be rewarded. |
 | Kigamboni | | | | | | | Fuel Scout | Rain/fuel pressure must remain fair. |
 | Ubungo | | | | | | | Jam Breaker | Dense traffic must remain escapable. |
+| Arusha | | | | | | | Highland Pass | Highland scenery, truck pass, goal, and local identity must read clearly. |
 
 For each route, trigger its signature event twice in each language. Note whether
 the title, action, target, and timeout/success feedback are understandable. Do
 not increase route rewards based on a few runs; correlate phone observations
 with consented Railway events after the client and backend allowlists are both
 deployed.
+
+## Arusha, Replays, And Season Chapters
+
+- [ ] On the new higher-version AAB, unlock and play Arusha in Swahili and
+  English; check route name, goal, Highland Pass cue/target, road dressing,
+  horn, and route contract text at the phone's native resolution.
+- [ ] Confirm Arusha remains unavailable in the Daily Run rotation until its
+  route profile and server support are deliberately added to the equal-rules
+  challenge catalog.
+- [ ] Copy a replay clip and import it on a second phone. Confirm a regular
+  replay only appears on the matching route and does not alter saved scores.
+- [ ] For Daily Run, compare challenge date, route, starter vehicle, and
+  traffic seed before showing a rival. A mismatched replay must be rejected;
+  passing a daily rival must not award score.
+- [ ] Copy/import behavior works in both locales and offline. Malformed codes
+  fail with a readable message and do not crash the screen.
+- [ ] Verify season chapter name, next milestone, and coin bonus at levels 4,
+  8, 12, and 16. Cross multiple levels in one reward and confirm each
+  intermediate milestone pays exactly once.
+- [ ] Arusha's World board is not ready until Railway migration
+  `008_arusha_route_pack.sql` is deployed; local route/replay play can be
+  tested without enabling Arusha leaderboard submission.
 
 ## Ads, Saves, and Resume
 

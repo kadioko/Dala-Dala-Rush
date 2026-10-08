@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS cloud_saves (
 CREATE TABLE IF NOT EXISTS leaderboard_scores (
   id BIGSERIAL PRIMARY KEY,
   installation_id UUID NOT NULL REFERENCES installations(id) ON DELETE CASCADE,
-  route_id TEXT NOT NULL CHECK (route_id IN ('kariakoo', 'mwenge', 'mbezi', 'posta', 'kigamboni', 'ubungo')),
+  route_id TEXT NOT NULL CHECK (route_id IN ('kariakoo', 'mwenge', 'mbezi', 'posta', 'kigamboni', 'ubungo', 'arusha')),
   score INTEGER NOT NULL CHECK (score >= 0 AND score <= 2000000),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS leaderboard_scores_route_score_idx
 
 CREATE TABLE IF NOT EXISTS meaningful_runs (
   installation_id UUID PRIMARY KEY REFERENCES installations(id) ON DELETE CASCADE,
-  route_id TEXT NOT NULL CHECK (route_id IN ('kariakoo', 'mwenge', 'mbezi', 'posta', 'kigamboni', 'ubungo')),
+  route_id TEXT NOT NULL CHECK (route_id IN ('kariakoo', 'mwenge', 'mbezi', 'posta', 'kigamboni', 'ubungo', 'arusha')),
   distance INTEGER NOT NULL CHECK (distance >= 0),
   duration_seconds INTEGER NOT NULL CHECK (duration_seconds >= 0),
   qualified_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

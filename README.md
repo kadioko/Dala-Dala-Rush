@@ -38,18 +38,22 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   that intensifies with speed.
 
 ### Progression & retention
-- **6 routes** with unique traffic, goals, and unlock gates (goal progress
+- **7 routes across Dar and Arusha city packs** with unique traffic, goals, and unlock gates (goal progress
   or coin purchase), each with a favorable signature moment: fare rush,
-  boda watch, truck line, clean checkpoint, fuel scout, or jam breaker.
+  boda watch, truck line, clean checkpoint, fuel scout, jam breaker, or
+  Arusha's Highland Pass.
 - **8 vehicles** with perks + permanent **bus upgrades** (engine / brakes /
   sound system, 3 levels each).
 - **Livery editor**: body/accent colors, patterns (stripe/flames/checker),
   slogans ("MUNGU ATUBARIKI", "SIMBA DAMU"…), WhatsApp share.
 - **Career ranks**: Konda → Mfalme wa Barabara with rank-up rewards.
-- **Missions** (3 rotating) + **season XP track** with level rewards.
+- **Missions** (3 rotating) + **persistent season chapters** and level/milestone
+  rewards. Chapters do not expire; no premium pass or extra currency exists.
 - **Daily challenge** + **login streak** with a 7-day reward calendar.
 - **Ghost racing**: race your best run's ghost; share/import **ghost codes**
-  via clipboard/WhatsApp — competitive play with zero servers.
+  via clipboard/WhatsApp — competitive play with zero servers. Daily rivals
+  must match the date, route, starter vehicle, and traffic seed; daily passes
+  give no extra score. Clips are friendly comparisons, not verified score proof.
 - **Leaderboards**: set a real driver name once, view route-specific personal
   bests offline, then optionally join Friends and World boards. Friend codes
   last 24 hours; online scores are never reward-bearing and remain labelled
@@ -160,7 +164,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 │   └── remote_config.gd   #   hosted-JSON tuning w/ local cache
 │   └── online_service.gd  #   consent-gated Railway cloud/referral/leaderboard seam
 ├── data/                  # Pure data catalogs
-│   ├── routes.gd          #   6 routes: weights, goals, unlock gates
+│   ├── routes.gd          #   7 routes: weights, goals, unlock gates
 │   ├── vehicles.gd        #   8 vehicles with perks
 │   ├── consumables.gd     #   one-run shop items
 │   ├── missions.gd        #   mission templates + season track
@@ -190,6 +194,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 |-----|--------------|
 | `docs/ROADMAP.md` | Current status, release priorities, and remaining work |
 | `docs/UPGRADES.md` | Changelog of implemented systems + balancing notes |
+| `docs/SACCO_CREWS_DESIGN.md` | Privacy-first design and release gates for future crews |
+| `docs/DEVICE_QA.md` | Physical phone QA worksheet, including Arusha/replay/season checks |
 | `docs/CONTENT_GUIDE.md` | How to add routes/vehicles/obstacles/missions/etc. |
 | `docs/ANDROID_EXPORT.md` | Export setup + on-device QA checklist |
 | `docs/ANDROID_RELEASE_BUILD.md` | Signed AAB build, verification, and upload runbook |

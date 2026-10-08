@@ -847,7 +847,15 @@ func _on_import_ghost() -> void:
 		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
 		return
 	SaveSystem.set_value("ghost_rival", parsed)
-	_ghost_msg.text = LocaleManager.t("GHOST_RIVAL_SET").replace("{n}", str(int((parsed as Dictionary).get("score", 0))))
+	var replay: Dictionary = parsed as Dictionary
+	if not String(replay.get("challenge_id", "")).is_empty():
+		_ghost_msg.text = LocaleManager.t("GHOST_DAILY_SET")
+	elif not String(replay.get("route", "")).is_empty() \
+			and String(replay.route) != _current_route_id():
+		_ghost_msg.text = LocaleManager.t("GHOST_ROUTE_SET").replace("{route}",
+			LocaleManager.t(String(Routes.get_by_id(String(replay.route)).get("name_key", "ROUTE_KARIAKOO"))))
+	else:
+		_ghost_msg.text = LocaleManager.t("GHOST_RIVAL_SET").replace("{n}", str(int(replay.get("score", 0))))
 	AudioManager.play_sfx("powerup")
 
 func _on_back() -> void:

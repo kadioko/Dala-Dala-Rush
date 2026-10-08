@@ -27,6 +27,10 @@ const CONTRACTS := {
 		{"id": "u_horn", "key": "CONTRACT_HORN", "type": "horn_uses", "target": 3, "reward": 40},
 		{"id": "u_boost", "key": "CONTRACT_BOOSTS", "type": "boosts", "target": 1, "reward": 36},
 	],
+	"arusha": [
+		{"id": "a_distance", "key": "CONTRACT_DISTANCE", "type": "distance", "target": 800, "reward": 38},
+		{"id": "a_passengers", "key": "CONTRACT_PASSENGERS", "type": "passengers", "target": 5, "reward": 34},
+	],
 }
 
 static func today_key() -> String:

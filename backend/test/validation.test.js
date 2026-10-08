@@ -4,6 +4,7 @@ import { boundedInteger, isUuid, jsonByteLength, validDisplayName, validRoute, v
 
 test("validates routes and bounded integers", () => {
   assert.equal(validRoute("kariakoo"), true);
+  assert.equal(validRoute("arusha"), true);
   assert.equal(validRoute("unknown"), false);
   assert.equal(boundedInteger(25, 0, 30), true);
   assert.equal(boundedInteger(25.5, 0, 30), false);

@@ -121,8 +121,29 @@ func _draw_route_side(x0: float, sw: float, h: float) -> void:
 			"posta":     _draw_office_block(x0, sw, y)
 			"kigamboni": _draw_coastal(x0, sw, y)
 			"ubungo":    _draw_overpass(x0, sw, y)
+			"arusha":    _draw_mountain_market(x0, sw, y)
 			_:           _draw_residential(x0, sw, y)
 		y += MID_PERIOD
+
+func _draw_mountain_market(x0: float, sw: float, y: float) -> void:
+	var width: float = minf(sw - 8.0, 48.0)
+	var wall := Color("#e6d8ad") if int(y / MID_PERIOD) % 2 == 0 else Color("#b9c9a8")
+	draw_rect(Rect2(Vector2(x0 + 7, y + 36), Vector2(width, 74)), wall)
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x0 + 3, y + 38), Vector2(x0 + width * 0.5 + 7, y + 21),
+		Vector2(x0 + width + 11, y + 38),
+	]), Color("#a5473e"))
+	draw_rect(Rect2(Vector2(x0 + 14, y + 49), Vector2(12, 14)), Color("#41616b"))
+	draw_rect(Rect2(Vector2(x0 + 31, y + 49), Vector2(12, 14)), Color("#41616b"))
+	draw_rect(Rect2(Vector2(x0 + 21, y + 79), Vector2(13, 31)), Color("#76563d"))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x0, y + 136), Vector2(x0 + sw * 0.52, y + 78),
+		Vector2(x0 + sw, y + 136),
+	]), Color("#486e56"))
+	draw_colored_polygon(PackedVector2Array([
+		Vector2(x0 + sw * 0.38, y + 136), Vector2(x0 + sw * 0.82, y + 95),
+		Vector2(x0 + sw, y + 136),
+	]), Color("#66865d"))
 
 # ── Route-specific side decorations ──────────────────────────────
 
@@ -248,6 +269,7 @@ func _route_accent() -> Color:
 		"posta": return Color("#3498db")
 		"kigamboni": return Color("#00a8a8")
 		"ubungo": return Color("#e67e22")
+		"arusha": return Color("#71945e")
 	return Color("#1f8fff")
 
 func _draw_tree(base: Vector2, scale_factor: float) -> void:

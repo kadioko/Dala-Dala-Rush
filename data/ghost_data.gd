@@ -8,6 +8,8 @@ const MAX_EVENTS := 2048
 const MIN_DURATION := 5.0
 const MAX_DURATION := 21600.0
 const MAX_SCORE := 1000000000
+const ROUTE_IDS := ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo", "arusha"]
+const MAX_SEED := 2147483647
 
 static func sanitize(value: Variant) -> Dictionary:
 	if typeof(value) != TYPE_DICTIONARY:
@@ -58,12 +60,41 @@ static func sanitize(value: Variant) -> Dictionary:
 		.strip_edges().to_upper().substr(0, 8)
 	if player_name.is_empty():
 		player_name = "RIVAL"
+	var route_id := String(source.get("route", "")).strip_edges().to_lower()
+	if not route_id.is_empty() and route_id not in ROUTE_IDS:
+		return {}
+	var vehicle_id := String(source.get("vehicle_id", "")).strip_edges().to_lower()
+	if vehicle_id.length() > 32 or not vehicle_id.is_valid_identifier() and not vehicle_id.is_empty():
+		return {}
+	var challenge_id := String(source.get("challenge_id", "")).strip_edges()
+	if challenge_id.length() > 40 or (not challenge_id.is_empty() and not challenge_id.begins_with("route_daily_")):
+		return {}
+	var traffic_seed_value: Variant = source.get("traffic_seed", 0)
+	if typeof(traffic_seed_value) not in [TYPE_INT, TYPE_FLOAT]:
+		return {}
+	var traffic_seed: int = int(traffic_seed_value)
+	if traffic_seed < 0 or traffic_seed > MAX_SEED:
+		return {}
 	return {
+		"version": 2,
 		"events": clean_events,
 		"end": end_time,
 		"score": score,
 		"name": player_name,
+		"route": route_id,
+		"vehicle_id": vehicle_id,
+		"challenge_id": challenge_id,
+		"traffic_seed": traffic_seed,
 	}
+
+static func matches_daily_challenge(value: Variant, challenge: Dictionary) -> bool:
+	var clean := sanitize(value)
+	if clean.is_empty() or challenge.is_empty():
+		return false
+	return String(clean.get("challenge_id", "")) == String(challenge.get("id", "")) \
+		and String(clean.get("route", "")) == String(challenge.get("route_id", "")) \
+		and String(clean.get("vehicle_id", "")) == String(challenge.get("vehicle_id", "")) \
+		and int(clean.get("traffic_seed", -1)) == int(challenge.get("traffic_seed", -2))
 
 static func encode(value: Variant) -> String:
 	var clean := sanitize(value)

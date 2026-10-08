@@ -13,7 +13,7 @@ var _batch_depth: int = 0
 var _batch_dirty: bool = false
 
 const DEFAULTS := {
-	"schema_version": 14,
+	"schema_version": 16,
 	"best_score": 0,
 	"best_reputation": 0,
 	"total_coins": 0,
@@ -39,6 +39,7 @@ const DEFAULTS := {
 	"best_posta": 0,
 	"best_kigamboni": 0,
 	"best_ubungo": 0,
+	"best_arusha": 0,
 	# Achievements (array of unlocked id strings)
 	"achievements": [],
 	"route_goals_completed": 0,
@@ -71,6 +72,8 @@ const DEFAULTS := {
 	# submit time after the player has explicitly opted in.
 	"pending_leaderboard_submissions": [],
 	"leaderboard_cache": {},
+	"latest_replay": {},
+	"daily_replay_best": {},
 	"online_telemetry_opt_in": false,
 	# Offline referral handshake. Codes are random game identifiers, not PII.
 	"referral_invite_code": "",
@@ -156,7 +159,7 @@ func _normalize_core_data() -> void:
 		"analytics_last_open_unix", "analytics_session_count",
 		"online_cloud_revision", "leaderboard_upload_score", "leaderboard_upload_updated_at",
 		"best_kariakoo", "best_mwenge", "best_mbezi", "best_posta",
-		"best_kigamboni", "best_ubungo",
+		"best_kigamboni", "best_ubungo", "best_arusha",
 	]
 	for key in non_negative_ints:
 		data[key] = maxi(0, int(data.get(key, DEFAULTS.get(key, 0))))
@@ -249,6 +252,8 @@ func _normalize_leaderboard() -> void:
 			player_name = normalize_leaderboard_name(String(name_value))
 		var route_value: Variant = row.get("route", "kariakoo")
 		var route_id := String(route_value) if typeof(route_value) == TYPE_STRING else "kariakoo"
+		if not _is_known_route_id(route_id):
+			continue
 		clean.append({
 			"name": player_name,
 			"score": score,
@@ -278,7 +283,7 @@ func _normalize_pending_leaderboard_submissions() -> void:
 	for route_id_value in best_by_route.keys():
 		clean.append({"route": String(route_id_value), "score": int(best_by_route[route_id_value])})
 	clean.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.score) > int(b.score))
-	data["pending_leaderboard_submissions"] = clean.slice(0, 6)
+	data["pending_leaderboard_submissions"] = clean.slice(0, 7)
 
 func _normalize_leaderboard_cache() -> void:
 	var clean: Dictionary = {}
@@ -298,7 +303,7 @@ func _normalize_leaderboard_cache() -> void:
 	data["leaderboard_cache"] = clean
 
 func _is_known_route_id(route_id: String) -> bool:
-	return route_id in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"]
+	return route_id in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo", "arusha"]
 
 func _normalize_route_mastery() -> void:
 	var clean: Dictionary = {}

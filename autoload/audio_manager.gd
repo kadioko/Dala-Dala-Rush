@@ -88,6 +88,7 @@ func play_route_horn(route_id: String) -> void:
 		"posta": pitch = 0.98
 		"kigamboni": pitch = 0.91
 		"ubungo": pitch = 1.04
+		"arusha": pitch = 0.96
 	_play_sfx("horn", pitch)
 
 func _play_sfx(key: String, pitch: float) -> void:

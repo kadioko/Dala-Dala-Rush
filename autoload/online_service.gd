@@ -144,7 +144,7 @@ func leaderboard_submission_wait_seconds() -> int:
 	return maxi(0, _submission_retry_after_unix - int(Time.get_unix_time_from_system()))
 
 func queue_existing_route_personal_bests() -> void:
-	for route_id in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"]:
+	for route_id in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo", "arusha"]:
 		var score: int = SaveSystem.get_route_best(route_id)
 		if score > 0:
 			SaveSystem.queue_leaderboard_submission(route_id, score)

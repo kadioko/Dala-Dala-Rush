@@ -23,12 +23,19 @@ extracts the forced-lane reachability rule into a test contract, bounds remote
 config requests, and prepares shared PostgreSQL rate limits. These changes are
 source-only and are not present in the previously exported code 15 bundle.
 
+The October 8, 2026 expansion pass adds Arusha as the first route in a second
+city pack, copyable run replay clips, exact-metadata matching for Daily Run
+rivals, and persistent season chapters/milestone rewards. These are source
+changes after code 17 and require a higher-version AAB for phone testing.
+Migration `008_arusha_route_pack.sql` is committed with the client/backend
+route allowlist but has not been deployed to Railway from this checkout.
+
 ## Status by Area
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Core driving loop | **Wave 23 QA** | Vituo passenger loop, overload risk/reward, horn, fuel, Driving Flow, near-miss, boost, police chases, a three-run non-modal first-session flow, and a distinct job profile plus favorable signature moment per route. Needs phone play-balancing. |
-| Progression | **Wave 25 QA** | Route unlock gates, Driver Reputation, three-star Route Mastery, compact daily Route Contracts, career ranks, bus upgrades, missions + season, daily challenge, login streak, achievements, consumables. Vehicle prices and beginner route pace were reduced conservatively. |
+| Core driving loop | **Wave 23 QA** | Vituo passenger loop, overload risk/reward, horn, fuel, Driving Flow, near-miss, boost, police chases, a three-run non-modal first-session flow, and distinct route jobs/signature moments. Arusha adds a highland route profile. Needs phone play-balancing. |
+| Progression | **Wave 35 local** | Route unlock gates, Driver Reputation, three-star Route Mastery, compact daily Route Contracts, career ranks, bus upgrades, missions, persistent city-themed season chapters/milestone rewards, daily challenge, login streak, achievements, consumables. New Arusha and season changes need phone validation. |
 | Social/competitive | **Reporting/blocking deployed; phone QA pending** | Public World standings can be read; posting and Friends are opt-in. Fixed-reason name reports, friend blocking, and report-rate limits are deployed. Moderation is still a manual review queue. Two-phone QA remains. Scores remain unverified. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
@@ -151,10 +158,32 @@ source-only and are not present in the previously exported code 15 bundle.
 - Current local gates pass: Godot 4.7.1 parse, logic contracts, UI bounds, and
   12 backend tests. Headless UI checks do not capture screenshots.
 
+## Wave 35 - New Route Pack, Replay Clips, And Season Chapters (Local Source)
+
+- Added Arusha as the first route in a separate city pack. It has its own
+  highland road dressing, route goal, traffic/economy profile, contracts, horn
+  tone, and Highland Pass signature event. The original six remain the only
+  routes in the shared Daily Run rotation until challenge fairness is retested.
+- Added route-aware shareable replay clips with vehicle, route, traffic seed,
+  score, and optional daily challenge identity. Daily rivals are accepted only
+  when route, starter vehicle, challenge date, and traffic seed all match.
+  Daily rival passes award no extra score; online scores are still unverified.
+- Added persistent Dar/Arusha season chapters and coin milestones to the
+  existing season XP progression. No expiry, paid pass, or new currency was
+  introduced.
+- Added backend route validation and migration `008_arusha_route_pack.sql` for
+  leaderboard and report route constraints. Source and tests are local until
+  pushed; Railway is not linked in this checkout, so migration 008 is not
+  deployed. Do not use Arusha's online board until the migration is applied.
+- SACCO crews are not shipped. Their privacy, membership, moderation, and
+  service design is captured in `docs/SACCO_CREWS_DESIGN.md`; implementation
+  waits for reliable two-phone competition QA and an authenticated moderation
+  path.
+
 ## Still Required Before Calling The Remaining Work Complete
 
 - Physical QA on the Samsung A21s and a second Android phone: both languages,
-  all six routes, real touch, warnings, fuel, ad callbacks, resume, saves,
+  all seven routes, real touch, warnings, fuel, ad callbacks, resume, saves,
   brightness/contrast, and a long-run performance/thermal check. No device was
   connected during this pass.
 - Tune route fuel, traffic, passenger cadence, and economy only after recording
@@ -175,10 +204,12 @@ source-only and are not present in the previously exported code 15 bundle.
   included.
 - Validate old saves on a device upgraded from a real prior release. In-memory
   schema fixtures pass, but are not a substitute for a real profile backup.
-- Long-horizon items remain deferred: distinct new city packs, reproducible
-  rival runs, fully server-settled referrals, SACCO crews, replay clips, and
-  sustained seasonal content. Build these only after core retention and
-  reliability evidence supports them.
+- Still deferred: more city packs beyond Arusha (such as Mwanza and Zanzibar),
+  server-verified reproducible rival scores, fully server-settled referrals,
+  SACCO crews, replay GIF/video export, and a maintained calendar of seasonal
+  events. Local replay clips, seeded Daily Run rival matching, and persistent
+  season chapters now exist but need device validation and do not constitute
+  server score verification or a content production pipeline.
 
 ## Milestone A — Production Update QA And Balancing
 
@@ -221,7 +252,7 @@ source-only and are not present in the previously exported code 15 bundle.
 - Completed: exported the signed code 14 AAB with responsive compact-menu
   stacking for narrow portrait widths; its SHA-256 is recorded in
   `ANDROID_RELEASE_BUILD.md`.
-- Play 20+ runs across all six routes and both languages.
+- Play 20+ runs across all seven routes and both languages.
 - Tune through remote config first: global/route spawn rate, fuel drain, coin
   multiplier, speed ramp, and kituo cadence. Keep fares and police fines in a
   versioned build until their behavior has been tested.
@@ -289,15 +320,18 @@ source-only and are not present in the previously exported code 15 bundle.
 - Complete two-phone cloud-save/phone-transfer QA, update Play declarations,
   then explicitly enable the optional cloud-save pilot. See
   `docs/RAILWAY_BACKEND.md`.
-- SACCO crews (team competitions) — needs a tiny backend.
+- SACCO crews (team competitions) — see `docs/SACCO_CREWS_DESIGN.md`; API,
+  moderation operations, consent UX, and two-phone QA remain unimplemented.
 - Replace manual referral confirmations with verified install attribution and
   server-side settlement; keep the current codes as a migration/fallback path.
-- New cities as route packs: Mwanza, Arusha, Zanzibar; Kigamboni ferry segment.
+- New city packs beyond Arusha: Mwanza, Zanzibar; Kigamboni ferry segment.
 - Rival daladala racing you to the kituo (chase system can be extended).
-- Replay GIF export for TikTok (ghost timeline is already recorded; needs a GIF encoder plugin).
+- Replay GIF/video export for social platforms (replay codes and local ghost
+  playback exist; media rendering/export is not implemented).
 - Season pass premium track (season XP system already in).
 - Expand seasonal events only after real completion and economy evidence; the
-  bilingual event banner and daily-reward multiplier are now implemented.
+  event banner, daily-reward multiplier, and non-expiring chapter milestones
+  exist, but there is no recurring content calendar/authoring pipeline.
 - Traffic personality lines and licensed recorded horn/radio audio after
   performance and audio-mix tests on target phones.
 

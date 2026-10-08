@@ -22,6 +22,7 @@ const TEMPLATES: Array = [
 
 const ACTIVE_COUNT := 3
 const XP_PER_LEVEL := 120
+const SeasonTracksData := preload("res://data/season_tracks.gd")
 
 # ─── Active mission state ─────────────────────────────────────────
 
@@ -92,8 +93,18 @@ static func add_season_xp(amount: int) -> void:
 	SaveSystem.set_value("season_xp", season_xp() + amount)
 	var after := season_level()
 	if after > before:
-		SaveSystem.add_coins(30 * after)
+		for level in range(before + 1, after + 1):
+			SaveSystem.add_coins(30 * level)
+			var milestone_coins: int = SeasonTracksData.milestone_reward(level)
+			if milestone_coins > 0:
+				SaveSystem.add_coins(milestone_coins)
 	SaveSystem.end_batch()
+
+static func season_chapter() -> Dictionary:
+	return SeasonTracksData.chapter_for_level(season_level())
+
+static func next_season_milestone() -> int:
+	return SeasonTracksData.next_milestone(season_level())
 
 static func describe(t: Dictionary) -> String:
 	return LocaleManager.t(String(t.key)).replace("{n}", str(int(t.target)))
