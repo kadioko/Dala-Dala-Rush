@@ -204,6 +204,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/MONETIZATION.md` | IAP, carrier billing (TZ), season pass plan |
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |
 | `docs/RAILWAY_BACKEND.md` | Railway/PostgreSQL deployment and safety runbook |
+| `docs/SCORE_VERIFICATION.md` | Current score-trust limits and authoritative replay-validation plan |
+| `docs/RELEASE_NOTES_1.0.17.md` | Bilingual production update notes for version 1.0.17 / code 18 |
 | `docs/RELEASE_NOTES_1.0.14.md` | Bilingual release notes for code 15 |
 | `docs/RELEASE_NOTES_1.0.13.md` | Historical production notes for code 14 |
 | `docs/SPRITES.md` | Sprite filenames/sizes for the art pass |

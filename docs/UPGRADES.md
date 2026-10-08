@@ -1,7 +1,7 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
 Google Play production is active. The latest locally verified signed test
-candidate is version 1.0.16 (code 17), built with Godot 4.7.1 / API 36.
+candidate is version 1.0.17 (code 18), built with Godot 4.7.1 / API 36.
 Physical-device and Play testing remain outstanding; do not treat this
 candidate as approved for production rollout.
 Cloud sync, online leaderboards, and Gameplay Insights are enabled only after
@@ -9,7 +9,7 @@ their separate in-app consents; complete phone QA and Play declarations before
 broad rollout. This is a historical implementation log; release readiness is
 tracked in `ROADMAP.md`.
 
-## Unreleased - Arusha Pack, Shareable Replays, And Season Chapters (October 8, 2026)
+## Version 1.0.17 / Code 18 - Arusha Pack, Replays, And Season Chapters
 
 - Added Arusha as a seventh route in its own city pack, with a dedicated
   highland visual treatment, route tuning, goal, contract copy, horn tone, and
@@ -24,12 +24,24 @@ tracked in `ROADMAP.md`.
   paid/expiring pass was added.
 - Save schema advances to 16 with repairable defaults for Arusha best score,
   saved replay clips, and per-challenge replay best.
-- Backend route allowlist and migration `008_arusha_route_pack.sql` are added.
-  Railway is not linked from this checkout, so migration 008 is not deployed;
-  do not use Arusha World standings until deployment is confirmed.
-- The updated code has not been exported to an AAB. Build a higher version
-  code and complete the new route/replay/season entries in `DEVICE_QA.md` before
-  production rollout.
+- Backend route allowlist and migration `008_arusha_route_pack.sql` are
+  deployed. Arusha's public board returns a valid unverified response.
+- The signed code 18 AAB is built and manifest-verified. Complete the new
+  route/replay/season entries in `DEVICE_QA.md` before rollout.
+
+## Backend - Moderation Console And World Board Audit (October 8, 2026)
+
+- Added a token-protected Railway moderation page with open/reviewed reports,
+  dismissal, reversible profile hiding/restoration, and no-index/CSP protections.
+- Hidden profiles are omitted from World and Friends queries; moderation state
+  is automatically cleared after the existing 90-day retention window.
+- Deployed migration `009_moderation_console.sql` and configured the unique
+  `MODERATION_ADMIN_TOKEN` in Railway.
+- Live checks confirmed the admin page serves, Arusha's World endpoint returns
+  HTTP 200, and all public scores remain explicitly unverified.
+- Server-side run verification is not implemented. Client totals remain
+  forgeable and visibly unverified; the threat model and replay-validation
+  design are in `docs/SCORE_VERIFICATION.md`.
 
 ## Unreleased - Live Event Banner Refresh (October 8, 2026)
 

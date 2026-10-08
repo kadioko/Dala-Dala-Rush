@@ -20,9 +20,9 @@ Play production-track updates. Store-listing work and Play Console declarations 
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
 | Current production release | Version 1.0.13, code 14 |
-| Last exported candidate | Version 1.0.16, code 17 |
-| Artifact status | Signed candidate built and bundle-validated from current source. A21s/second-phone QA and Play processing remain before rollout. |
-| Artifact path | `exports/android/DalaDalaRushTZ-production-v16.aab` |
+| Last exported candidate | Version 1.0.17, code 18 |
+| Artifact status | Signed AAB and manifest verified; A21s/second-phone QA and Play processing remain before rollout. |
+| Artifact path | `exports/android/DalaDalaRushTZ-1.0.17-code18.aab` |
 | Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
@@ -60,8 +60,8 @@ signing configuration.
 The current release candidate is exported from the Android AAB preset with:
 
 ```text
-Version name: 1.0.16
-Version code: 17
+Version name: 1.0.17
+Version code: 18
 ```
 
 The code must be greater than every active artifact in every Play track,
@@ -128,7 +128,7 @@ Project > Export > Android AAB Release > Export Project
 The current test candidate is:
 
 ```text
-exports/android/DalaDalaRushTZ-production-v16.aab
+exports/android/DalaDalaRushTZ-1.0.17-code18.aab
 ```
 
 Equivalent command-line export:
@@ -137,7 +137,7 @@ Equivalent command-line export:
 $godot = 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe'
 & $godot --headless --path '.' `
   --export-release 'Android AAB Release' `
-  'exports/android/DalaDalaRushTZ-production-v16.aab'
+  'exports/android/DalaDalaRushTZ-1.0.17-code18.aab'
 ```
 
 Do not interrupt the process. A successful command must return exit code 0 and
@@ -163,7 +163,7 @@ physical-device QA or Play Console review has passed.
 Set the artifact path once:
 
 ```powershell
-$aab = 'exports/android/DalaDalaRushTZ-production-v16.aab'
+$aab = 'exports/android/DalaDalaRushTZ-1.0.17-code18.aab'
 ```
 
 Confirm it exists, record its size, and create a checksum:
@@ -208,8 +208,8 @@ AdMob metadata, and the Advertising ID permission:
 .\tools\verify_android_release.ps1 `
   -BundlePath $aab `
   -BundletoolJar 'C:\path\to\bundletool-all.jar' `
-  -ExpectedVersionName '1.0.16' `
-  -ExpectedVersionCode 17 `
+  -ExpectedVersionName '1.0.17' `
+  -ExpectedVersionCode 18 `
   -ExpectedTargetSdk 36
 ```
 
@@ -260,6 +260,18 @@ physical-device, consent, or Play pre-launch checks below.
 - This is a test candidate, not a phone-validated production rollout. Install
   through the intended Play testing track and complete `DEVICE_QA.md` first.
 
+### Code 18 Test Candidate
+
+- Artifact: `exports/android/DalaDalaRushTZ-1.0.17-code18.aab`
+- Size: `61,588,452` bytes.
+- SHA-256: `75CA74E9FC1F374FBDDEDC0FB530520AB02E31130F08FBB0C1CC0BEA38D4EC8B`.
+- `jarsigner` reports `jar verified`; bundle structure and bundletool manifest
+  checks pass.
+- Manifest confirms version `1.0.17`, code `18`, minimum API `24`, target API
+  `36`, both ARM architectures, AdMob application metadata, and AD_ID permission.
+- This is an upload candidate only. A21s/second-phone validation and Play
+  processing remain outstanding.
+
 ## 6. Install Through Play Testing
 
 An AAB is not installed directly like an APK. Upload it to the intended Play
@@ -295,11 +307,11 @@ Use the complete device matrix in `ANDROID_EXPORT.md`.
 ## 7. Upload Checklist
 
 - [ ] Upload the newly verified versioned AAB to the intended Play track.
-- [ ] Confirm Play Console reads version code 17 and target API 36.
+- [ ] Confirm Play Console reads version code 18 and target API 36.
 - [ ] Confirm the Advertising ID warning is absent for the new artifact.
 - [ ] Review native-code debug-symbol and deobfuscation notices. These are
   warnings unless obfuscation is enabled, but record the decision.
-- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.16.md`.
+- [ ] Add finalized localized notes from `RELEASE_NOTES_1.0.17.md`.
 - [ ] Recheck Ads, Data safety, target audience, content rating, app access,
   financial, health, and government declarations.
 - [ ] Confirm the public privacy URL opens:

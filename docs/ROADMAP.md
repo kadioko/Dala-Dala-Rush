@@ -1,15 +1,13 @@
 # Dala Dala Rush TZ - Product Roadmap
 
 Updated October 8, 2026. Google Play production is active. Signed AAB
-`1.0.16` / code `17` (API 36) is built and bundle-validated from current source
-as a test candidate; A21s and second-phone QA plus Play testing remain. The
-candidate includes compact-menu, daily-run, collision-envelope, projected
-warning, lane-planner, and opt-in fuel/route-event telemetry changes. It is not
-approved for production rollout until device QA passes.
-The public World leaderboard read endpoint is enabled in source and live; the
-current server board is empty until opted-in players submit scores. Score
-submission and Friends remain opt-in, and scores are unverified. Broader
-promotion still needs two-phone QA and Play declaration review.
+`1.0.17` / code `18` (API 36) is built and manifest-verified as an upload
+candidate; A21s/second-phone QA and Play processing remain. It includes the
+Arusha route pack, local replay clips, reproducible Daily Run rival matching,
+and season chapters, along with earlier mobile fairness and menu updates.
+Production migrations `008` and `009` are deployed; seven World route reads,
+including Arusha, return valid unverified responses. Scores remain opt-in,
+unverified, and reward-free. Two-phone QA and Play declaration review remain.
 
 The September 28-30 source pass fixes telemetry timestamp rejection, Daily Run
 randomness leaks, missing route personal bests, account-deletion state,
@@ -26,9 +24,8 @@ source-only and are not present in the previously exported code 15 bundle.
 The October 8, 2026 expansion pass adds Arusha as the first route in a second
 city pack, copyable run replay clips, exact-metadata matching for Daily Run
 rivals, and persistent season chapters/milestone rewards. These are source
-changes after code 17 and require a higher-version AAB for phone testing.
-Migration `008_arusha_route_pack.sql` is committed with the client/backend
-route allowlist but has not been deployed to Railway from this checkout.
+changes after code 17 and are included in the code 18 AAB. Railway migrations
+008 and 009 have been applied by the production pre-deploy runner.
 
 ## Status by Area
 
@@ -36,12 +33,12 @@ route allowlist but has not been deployed to Railway from this checkout.
 |------|--------|-------|
 | Core driving loop | **Wave 23 QA** | Vituo passenger loop, overload risk/reward, horn, fuel, Driving Flow, near-miss, boost, police chases, a three-run non-modal first-session flow, and distinct route jobs/signature moments. Arusha adds a highland route profile. Needs phone play-balancing. |
 | Progression | **Wave 35 local** | Route unlock gates, Driver Reputation, three-star Route Mastery, compact daily Route Contracts, career ranks, bus upgrades, missions, persistent city-themed season chapters/milestone rewards, daily challenge, login streak, achievements, consumables. New Arusha and season changes need phone validation. |
-| Social/competitive | **Reporting/blocking deployed; phone QA pending** | Public World standings can be read; posting and Friends are opt-in. Fixed-reason name reports, friend blocking, and report-rate limits are deployed. Moderation is still a manual review queue. Two-phone QA remains. Scores remain unverified. |
+| Social/competitive | **World and moderation API deployed** | Seven route boards return valid responses. Posting and Friends are opt-in; moderation console is token-protected. Two-phone QA remains. Scores stay unverified pending authoritative replay validation. |
 | Visual identity | **Procedural pass done** | Improved code-drawn vehicles, roads, hazards, collectibles, HUD icons, intro, and How to Play ship without external gameplay PNGs. Optional sprite overrides remain available. Store graphics exist as drafts. |
 | Audio | **Functional, recordings optional** | Procedural music/SFX and improved horn work. File override hooks and Swahili voice triggers are ready; licensed recordings remain a polish task. |
-| Android readiness | **Code 17 test candidate built** | Version 1.0.16 / code 17 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
+| Android readiness | **Code 18 test candidate built** | Version 1.0.17 / code 18 is a signed API 36 AAB with both ARM ABIs. Play processing, Play pre-launch reporting, and phone QA remain required before rollout. |
 | Monetization | **AdMob integrated** | Production IDs and Poing Studios bridge are wired for rewarded/interstitial/banner. Real-device test-ad and consent validation remain. Play Billing is deferred. |
-| Live ops | **Railway safety and retention deployed** | Shared PostgreSQL-backed HMAC limits, 90-day telemetry/report cleanup, and leaderboard report/block APIs are deployed. Useful reports still require consented event volume; there is no live dashboard. |
+| Live ops | **Railway safety and moderation deployed** | Shared PostgreSQL-backed HMAC limits, 90-day telemetry/report cleanup, leaderboard report/block APIs, and token-protected moderation console are deployed. Gameplay Insights still has no live dashboard. |
 | QA/testing | **Local release gates pass; device QA pending** | Godot parse/contracts, UI bounds, and backend tests pass locally. A pinned Godot 4.7.1 GitHub Actions workflow now runs these gates. Physical phone QA, keyboard/banner/native safe-area checks remain manual. |
 | Store launch | **Production active** | Monitor Play reports and staged rollout health, ship only higher version codes, and use physical-device evidence before expanding optional online services. |
 
@@ -179,6 +176,22 @@ route allowlist but has not been deployed to Railway from this checkout.
   service design is captured in `docs/SACCO_CREWS_DESIGN.md`; implementation
   waits for reliable two-phone competition QA and an authenticated moderation
   path.
+
+## Wave 36 - Moderation Operations And Score-Trust Boundaries (Backend Deployed)
+
+- Added a no-index `/admin` operator page with a token-protected report queue,
+  dismiss, reversible profile hiding/restoration, and report-status views.
+- Added and deployed migration `009_moderation_console.sql` and configured a
+  unique Railway `MODERATION_ADMIN_TOKEN`; the admin interface is not part of
+  the game client.
+- Public World and Friends queries now exclude hidden profiles. Scores remain
+  stored for the report-retention window and are still unverified.
+- Added `docs/SCORE_VERIFICATION.md` with the threat model and an authoritative
+  replay-validation design. No client summary or replay checksum is mislabeled
+  as proof; verified rankings remain future work.
+- Local tests cover admin authorization, report listing, hide/restore, and the
+  public World filter. Production deployment and Arusha route reads were
+  confirmed; two-phone/report-workflow QA remains.
 
 ## Still Required Before Calling The Remaining Work Complete
 

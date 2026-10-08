@@ -12,16 +12,19 @@ test("telemetry retention removes expired events in bounded 90-day batches", asy
         return { rowCount: 2, rows: [{ id: 1 }, { id: 2 }] };
       }
       if (sql.includes("DELETE FROM leaderboard_reports")) return { rowCount: 1 };
+      if (sql.includes("UPDATE leaderboard_profiles SET moderation_status = 'active'")) return { rowCount: 0 };
       throw new Error(`Unexpected SQL in retention test: ${sql}`);
     },
   };
   const deleted = await purgeExpiredTelemetry(pool);
   assert.equal(deleted, 2);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   assert.deepEqual(calls[0].params, [90, 1000]);
   assert.deepEqual(calls[1].params, [90, 1000]);
   assert.match(calls[0].sql, /received_at < NOW\(\)/);
   assert.match(calls[0].sql, /LIMIT \$2/);
+  assert.deepEqual(calls[2].params, [90]);
+  assert.match(calls[2].sql, /moderated_at < NOW\(\)/);
 });
 
 test("telemetry endpoint accepts whole seconds and rejects fractional timestamps", async () => {

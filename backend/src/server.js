@@ -44,6 +44,12 @@ export async function purgeExpiredTelemetry(pool) {
 		 )`,
 		[TELEMETRY_RETENTION_DAYS, TELEMETRY_PURGE_BATCH_SIZE],
 	);
+	await pool.query(
+		`UPDATE leaderboard_profiles SET moderation_status = 'active', moderated_at = NULL
+		 WHERE moderation_status = 'hidden'
+		 AND moderated_at < NOW() - ($1 * INTERVAL '1 day')`,
+		[TELEMETRY_RETENTION_DAYS],
+	);
 	return deleted;
 }
 
@@ -92,6 +98,14 @@ function tokenHash(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+function adminTokenMatches(candidate) {
+	const expected = String(process.env.MODERATION_ADMIN_TOKEN || "");
+	if (expected.length < 32 || candidate.length > 256) return false;
+	const expectedHash = crypto.createHash("sha256").update(expected).digest();
+	const candidateHash = crypto.createHash("sha256").update(candidate).digest();
+	return crypto.timingSafeEqual(expectedHash, candidateHash);
+}
+
 function newInviteCode() {
 	return crypto.randomBytes(9).toString("base64url").toUpperCase();
 }
@@ -129,6 +143,157 @@ export function createApp(pool) {
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "96kb" }));
+	const requireModerator = (req, res, next) => {
+		res.set("Cache-Control", "no-store");
+		if (String(process.env.MODERATION_ADMIN_TOKEN || "").length < 32) {
+			return problem(res, 503, "moderation_not_configured");
+		}
+		if (!adminTokenMatches(String(req.get("X-Admin-Token") || ""))) {
+			return problem(res, 401, "moderator_unauthorized");
+		}
+		return next();
+	};
+	app.get("/admin", (_req, res) => {
+		res.set("Cache-Control", "no-store");
+		res.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+		return res.sendFile(fileURLToPath(new URL("../admin/index.html", import.meta.url)));
+	});
+	app.get("/admin.css", (_req, res) => {
+		res.set("Cache-Control", "no-cache");
+		return res.sendFile(fileURLToPath(new URL("../admin/admin.css", import.meta.url)));
+	});
+	app.get("/admin.js", (_req, res) => {
+		res.set("Cache-Control", "no-cache");
+		return res.sendFile(fileURLToPath(new URL("../admin/admin.js", import.meta.url)));
+	});
+	app.get("/v1/admin/reports", requireModerator, async (req, res) => {
+		const filter = String(req.query.status || "open");
+		if (!['open', 'reviewed', 'all'].includes(filter)) return problem(res, 400, "invalid_status");
+		try {
+			const result = await pool.query(
+				`SELECT report.id, report.reported_installation_id AS target_id,
+					report.reported_name, report.reason, report.route_id, report.created_at,
+					report.review_status, report.review_action, report.reviewed_at,
+					COUNT(*) OVER (PARTITION BY report.reported_installation_id) AS target_report_count
+				 FROM leaderboard_reports AS report
+				 WHERE ($1 = 'all' OR ($1 = 'open' AND report.review_status = 'open')
+					OR ($1 = 'reviewed' AND report.review_status <> 'open'))
+				 ORDER BY (report.review_status = 'open') DESC, report.created_at DESC LIMIT 200`,
+				[filter],
+			);
+			return res.json({ reports: result.rows.map((row) => ({
+				reportId: Number(row.id), targetId: row.target_id,
+				displayName: row.reported_name, reason: row.reason, routeId: row.route_id,
+				createdAt: row.created_at, status: row.review_status,
+				action: row.review_action, reviewedAt: row.reviewed_at,
+				reportCount: Number(row.target_report_count || 1),
+			})) });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
+	app.get("/v1/admin/profiles/hidden", requireModerator, async (_req, res) => {
+		try {
+			const result = await pool.query(
+				`SELECT installation_id AS target_id, display_name, moderated_at
+				 FROM leaderboard_profiles WHERE moderation_status = 'hidden'
+				 ORDER BY moderated_at DESC NULLS LAST LIMIT 200`,
+			);
+			return res.json({ profiles: result.rows.map((row) => ({
+				targetId: row.target_id, displayName: row.display_name, moderatedAt: row.moderated_at,
+			})) });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
+	app.post("/v1/admin/reports/:reportId/resolve", requireModerator, async (req, res) => {
+		const reportId = Number(req.params.reportId);
+		const action = String(req.body?.action || "");
+		if (!Number.isSafeInteger(reportId) || reportId < 1
+			|| !["dismiss", "hide_profile"].includes(action)) {
+			return problem(res, 400, "invalid_moderation_action");
+		}
+		let client;
+		let transactionStarted = false;
+		try {
+			client = await pool.connect();
+			await client.query("BEGIN");
+			transactionStarted = true;
+			const selected = await client.query(
+				"SELECT reported_installation_id, review_status FROM leaderboard_reports WHERE id = $1 FOR UPDATE",
+				[reportId],
+			);
+			if (selected.rowCount !== 1) {
+				await client.query("ROLLBACK");
+				transactionStarted = false;
+				return problem(res, 404, "report_not_found");
+			}
+			const targetId = selected.rows[0].reported_installation_id;
+			if (selected.rows[0].review_status !== "open") {
+				await client.query("ROLLBACK");
+				transactionStarted = false;
+				return problem(res, 409, "report_already_reviewed");
+			}
+			if (action === "hide_profile") {
+				if (!targetId) {
+					await client.query("ROLLBACK");
+					transactionStarted = false;
+					return problem(res, 409, "report_target_deleted");
+				}
+				const hidden = await client.query(
+					"UPDATE leaderboard_profiles SET moderation_status = 'hidden', moderated_at = NOW() WHERE installation_id = $1",
+					[targetId],
+				);
+				if (hidden.rowCount !== 1) {
+					await client.query("ROLLBACK");
+					transactionStarted = false;
+					return problem(res, 409, "report_target_deleted");
+				}
+				await client.query(
+					`UPDATE leaderboard_reports SET review_status = 'actioned', review_action = 'profile_hidden', reviewed_at = NOW()
+					 WHERE reported_installation_id = $1 AND review_status = 'open'`,
+					[targetId],
+				);
+			} else {
+				await client.query(
+					`UPDATE leaderboard_reports SET review_status = 'dismissed', review_action = 'dismissed', reviewed_at = NOW()
+					 WHERE id = $1 AND review_status = 'open'`,
+					[reportId],
+				);
+			}
+			await client.query("COMMIT");
+			transactionStarted = false;
+			return res.json({ resolved: true, action });
+		} catch {
+			if (client != null && transactionStarted) await client.query("ROLLBACK");
+			return problem(res, 503, "database_unavailable");
+		} finally {
+			if (client != null) client.release();
+		}
+	});
+	app.post("/v1/admin/profiles/:targetId/restore", requireModerator, async (req, res) => {
+		const targetId = String(req.params.targetId || "");
+		if (!isUuid(targetId)) return problem(res, 400, "invalid_profile");
+		try {
+			const result = await pool.query(
+				`WITH restored_profile AS (
+					UPDATE leaderboard_profiles SET moderation_status = 'active', moderated_at = NULL
+					WHERE installation_id = $1 AND moderation_status = 'hidden'
+					RETURNING installation_id, display_name
+				), refreshed_reports AS (
+					UPDATE leaderboard_reports SET review_action = 'profile_restored', reviewed_at = NOW()
+					WHERE reported_installation_id = $1 AND review_status = 'actioned'
+					AND review_action = 'profile_hidden'
+					RETURNING id
+				)
+				SELECT display_name FROM restored_profile`,
+				[targetId],
+			);
+			return res.json({ restored: result.rowCount === 1 });
+		} catch {
+			return problem(res, 503, "database_unavailable");
+		}
+	});
 	const limitInstallations = fixedWindowRateLimit(pool, {
 		windowMs: 60 * 60 * 1000, max: 20, key: (req) => req.ip, scope: "installations", error: "registration_rate_limited",
 	});
@@ -303,13 +468,15 @@ export function createApp(pool) {
 		const displayName = String(req.body?.displayName || "").trim();
 		if (!validDisplayName(displayName)) return problem(res, 400, "invalid_display_name");
 		try {
-			await pool.query(
+			const profile = await pool.query(
 				`INSERT INTO leaderboard_profiles (installation_id, display_name)
 				 VALUES ($1, $2)
 				 ON CONFLICT (installation_id) DO UPDATE SET display_name = EXCLUDED.display_name,
-				 updated_at = NOW()`,
+				 updated_at = NOW() WHERE leaderboard_profiles.moderation_status = 'active'
+				 RETURNING display_name`,
 				[req.installationId, displayName],
 			);
+			if (profile.rowCount !== 1) return problem(res, 403, "profile_hidden");
 			return res.json({ displayName });
 		} catch {
 			return problem(res, 503, "database_unavailable");
@@ -348,13 +515,15 @@ export function createApp(pool) {
 		if (!validDisplayName(displayName)) return problem(res, 400, "invalid_display_name");
 		if (!validRoute(routeId) || !boundedInteger(score, 0, MAX_SCORE)) return problem(res, 400, "invalid_score");
     try {
-			await pool.query(
+			const profile = await pool.query(
 				`INSERT INTO leaderboard_profiles (installation_id, display_name)
 				 VALUES ($1, $2)
 				 ON CONFLICT (installation_id) DO UPDATE SET display_name = EXCLUDED.display_name,
-				 updated_at = NOW()`,
+				 updated_at = NOW() WHERE leaderboard_profiles.moderation_status = 'active'
+				 RETURNING display_name`,
 				[req.installationId, displayName],
 			);
+			if (profile.rowCount !== 1) return problem(res, 403, "profile_hidden");
 		const scoreResult = await pool.query(
 			`INSERT INTO leaderboard_scores (installation_id, route_id, score)
 			 VALUES ($1, $2, $3)
@@ -380,7 +549,7 @@ export function createApp(pool) {
            FROM leaderboard_scores AS score
            INNER JOIN leaderboard_profiles AS profile
              ON profile.installation_id = score.installation_id
-           WHERE score.route_id = $1
+           WHERE score.route_id = $1 AND profile.moderation_status = 'active'
            ORDER BY score.installation_id, score.score DESC, score.created_at ASC
          )
 		 SELECT best_scores.score, best_scores.created_at, profile.display_name, profile.report_token
@@ -435,7 +604,7 @@ export function createApp(pool) {
 				`SELECT profile.installation_id, profile.display_name
 				 FROM leaderboard_profiles AS profile
 				 INNER JOIN leaderboard_scores AS score ON score.installation_id = profile.installation_id
-				 WHERE profile.report_token = $1 AND score.route_id = $2`,
+				 WHERE profile.report_token = $1 AND profile.moderation_status = 'active' AND score.route_id = $2`,
 				[reportRef, routeId],
 			);
 			if (target.rowCount !== 1) return problem(res, 404, "report_target_not_found");
@@ -522,7 +691,8 @@ export function createApp(pool) {
 				INNER JOIN leaderboard_profiles AS profile ON profile.installation_id =
 					CASE WHEN friendship.first_installation_id = $1
 					THEN friendship.second_installation_id ELSE friendship.first_installation_id END
-				WHERE friendship.first_installation_id = $1 OR friendship.second_installation_id = $1
+				WHERE (friendship.first_installation_id = $1 OR friendship.second_installation_id = $1)
+				AND profile.moderation_status = 'active'
 				ORDER BY profile.display_name ASC LIMIT 100`,
 				[req.installationId],
 			);
@@ -641,6 +811,7 @@ export function createApp(pool) {
 					profile.display_name, profile.report_token
 				FROM best_scores INNER JOIN leaderboard_profiles AS profile
 					ON profile.installation_id = best_scores.installation_id
+				WHERE profile.moderation_status = 'active'
 				ORDER BY best_scores.score DESC, best_scores.created_at ASC LIMIT 25`,
 				[req.installationId, req.params.routeId],
 			);

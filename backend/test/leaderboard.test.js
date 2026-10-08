@@ -43,7 +43,10 @@ function leaderboardPool() {
 				scores.set(key, score);
 				return { rowCount: 1, rows: [{ score }] };
 			}
-			if (sql.includes("WITH best_scores")) return { rowCount: 0, rows: [] };
+			if (sql.includes("WITH best_scores")) {
+				assert.match(sql, /moderation_status = 'active'/);
+				return { rowCount: 0, rows: [] };
+			}
 			throw new Error(`Unexpected SQL in test: ${sql}`);
 		},
 	};
@@ -120,13 +123,16 @@ test("public world standings reads have a per-IP burst limit", async () => {
 	const pool = {
 		async query(sql, params = []) {
 			if (sql.includes("INSERT INTO api_rate_limits")) {
-				const key = `${params[0]}:${params[1]}:${params[2]}`;
+				const key = `${params[0]}:${params[1]}`;
 				const count = Math.min((rateLimits.get(key) || 0) + 1, Number(params[4]));
 				rateLimits.set(key, count);
 				return { rowCount: 1, rows: [{ request_count: count }] };
 			}
 			if (sql.startsWith("DELETE FROM api_rate_limits")) return { rowCount: 0, rows: [] };
-			if (sql.includes("WITH best_scores")) return { rowCount: 0, rows: [] };
+			if (sql.includes("WITH best_scores")) {
+				assert.match(sql, /moderation_status = 'active'/);
+				return { rowCount: 0, rows: [] };
+			}
 			throw new Error(`Unexpected SQL in test: ${sql}`);
 		},
 	};
@@ -150,7 +156,7 @@ test("leaderboard reports use opaque public references and accept one report per
 	const pool = {
 		async query(sql, params = []) {
 			if (sql.includes("INSERT INTO api_rate_limits")) {
-				const key = `${params[0]}:${params[1]}:${params[2]}`;
+				const key = `${params[0]}:${params[1]}`;
 				const count = Math.min((limits.get(key) || 0) + 1, Number(params[4]));
 				limits.set(key, count);
 				return { rowCount: 1, rows: [{ request_count: count }] };
@@ -186,6 +192,102 @@ test("leaderboard reports use opaque public references and accept one report per
 		});
 		assert.equal(invalid.status, 400);
 	});
+});
+
+test("moderation console requires a configured secret and lists reports only to its operator", async () => {
+	const previousToken = process.env.MODERATION_ADMIN_TOKEN;
+	const adminToken = "moderation-test-token-".padEnd(40, "x");
+	process.env.MODERATION_ADMIN_TOKEN = adminToken;
+	const pool = {
+		async query(sql) {
+			assert.match(sql, /FROM leaderboard_reports/);
+			return { rowCount: 1, rows: [{
+				id: 7, target_id: "b47ac10b-58cc-4372-a567-0e02b2c3d479",
+				reported_name: "Konda Juma", reason: "impersonation", route_id: "kariakoo",
+				created_at: "2026-10-08T00:00:00Z", review_status: "open",
+				review_action: null, reviewed_at: null, target_report_count: 2,
+			}] };
+		},
+	};
+	try {
+		await withServer(pool, async (base) => {
+			const page = await fetch(`${base}/admin`);
+			assert.equal(page.status, 200);
+			assert.match(page.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+			assert.match(await page.text(), /Leaderboard moderation/);
+			assert.equal((await fetch(`${base}/admin.css`)).status, 200);
+			assert.equal((await fetch(`${base}/admin.js`)).status, 200);
+
+			delete process.env.MODERATION_ADMIN_TOKEN;
+			const denied = await fetch(`${base}/v1/admin/reports`);
+			assert.equal(denied.status, 503);
+			process.env.MODERATION_ADMIN_TOKEN = adminToken;
+			const wrong = await fetch(`${base}/v1/admin/reports`, {
+				headers: { "X-Admin-Token": "wrong" },
+			});
+			assert.equal(wrong.status, 401);
+			const response = await fetch(`${base}/v1/admin/reports`, {
+				headers: { "X-Admin-Token": adminToken },
+			});
+			assert.equal(response.status, 200);
+			const result = await response.json();
+			assert.equal(result.reports[0].displayName, "Konda Juma");
+			assert.equal(result.reports[0].reportCount, 2);
+		});
+	} finally {
+		if (previousToken === undefined) delete process.env.MODERATION_ADMIN_TOKEN;
+		else process.env.MODERATION_ADMIN_TOKEN = previousToken;
+	}
+});
+
+test("moderation can dismiss a report or hide and restore a public profile", async () => {
+	const previousToken = process.env.MODERATION_ADMIN_TOKEN;
+	const adminToken = "moderation-test-token-".padEnd(40, "x");
+	const targetId = "b47ac10b-58cc-4372-a567-0e02b2c3d479";
+	process.env.MODERATION_ADMIN_TOKEN = adminToken;
+	const statements = [];
+	const pool = {
+		async query(sql) {
+			statements.push(sql);
+			if (sql.includes("WITH restored_profile")) return { rowCount: 1, rows: [{ display_name: "Konda Juma" }] };
+			throw new Error(`Unexpected query: ${sql}`);
+		},
+		async connect() {
+			return {
+				async query(sql) {
+					statements.push(sql);
+					if (sql.startsWith("SELECT reported_installation_id")) {
+						return { rowCount: 1, rows: [{ reported_installation_id: targetId, review_status: "open" }] };
+					}
+				return { rowCount: 1, rows: [] };
+				},
+				release() {},
+			};
+		},
+	};
+	try {
+		await withServer(pool, async (base) => {
+			const response = await fetch(`${base}/v1/admin/reports/8/resolve`, {
+				method: "POST",
+				headers: { "X-Admin-Token": adminToken, "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "hide_profile" }),
+			});
+			assert.equal(response.status, 200);
+			assert.deepEqual(await response.json(), { resolved: true, action: "hide_profile" });
+			assert.ok(statements.includes("BEGIN"));
+			assert.ok(statements.some((sql) => sql.includes("moderation_status = 'hidden'")));
+			assert.ok(statements.includes("COMMIT"));
+
+			const restored = await fetch(`${base}/v1/admin/profiles/${targetId}/restore`, {
+				method: "POST", headers: { "X-Admin-Token": adminToken },
+			});
+			assert.deepEqual(await restored.json(), { restored: true });
+			assert.ok(statements.some((sql) => sql.includes("WITH restored_profile")));
+		});
+	} finally {
+		if (previousToken === undefined) delete process.env.MODERATION_ADMIN_TOKEN;
+		else process.env.MODERATION_ADMIN_TOKEN = previousToken;
+	}
 });
 
 test("blocking a friend severs the link and supports unblocking", async () => {

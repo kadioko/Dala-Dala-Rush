@@ -3,13 +3,11 @@
 The repository now contains a small Node 20 / Express / PostgreSQL service in
 `backend/`. It is intentionally separate from the Godot game: the game remains
 fully playable offline. The Railway service is deployed and the current client
-release switch is on. As of October 1, 2026, production has migrations through
-`006_shared_rate_limits.sql`, and the matching API code uses shared PostgreSQL
-rate-limit counters. Public World standings can be viewed without an account;
-posting a name/score and using Friends still require explicit in-game consent.
-Scores remain unverified and have no rewards. Complete the device and Play
-declaration checks below before expanding promotion or adding reward-bearing
-competition.
+release switch is on. As confirmed October 8, 2026, production has migrations
+through `009_moderation_console.sql`. Public World standings can be viewed without an account; posting a
+name/score and using Friends require explicit in-game consent. Scores remain
+unverified and have no rewards. Complete the device and Play declaration checks
+before expanding promotion or adding reward-bearing competition.
 
 ## What It Provides
 
@@ -36,9 +34,38 @@ competition.
 
 The backend does not automatically award coins. Keep the existing offline
 referral flow as the live system until device QA, privacy review, and a stronger
-attestation strategy are complete. A client-reported run can still be forged;
-Play Integrity or equivalent server-side proof is required before referrals or
-leaderboards become reward-bearing or competitive.
+attestation strategy are complete. The endpoint validates a score's route,
+integer bounds, public name, consented installation, rate limit, and best-score
+upsert, but does not replay or independently verify the run. A modified client
+can still forge a plausible score; Play Integrity alone would not prove the
+gameplay result. Public scores must remain labelled unverified and reward-free.
+
+## Moderation Console
+
+The service includes a private operator page at `/admin` and token-protected
+moderation endpoints. It lists fixed-reason reports, supports dismissal, hides
+a reported profile from World/Friends without deleting score records, and allows
+restoration after review. The public app cannot call these admin endpoints.
+
+Operator access:
+
+1. A unique random `MODERATION_ADMIN_TOKEN` is configured on the production
+   Railway service. Its operator copy is stored outside the repository. Rotate
+   it in Railway and update the operator copy if it is lost or exposed.
+2. Open `https://dala-dala-api-production.up.railway.app/admin`, enter the
+   token, and review over HTTPS.
+   The page keeps the secret only in the current browser tab's `sessionStorage`
+   and sends it in `X-Admin-Token`, never in a URL.
+3. Use **Hide profile** only when warranted: all open reports for that profile
+   are actioned and its display name disappears from World/Friends. **Restore
+   profile** reverses the visibility decision. Dismiss closes a report without
+   hiding the profile.
+4. Rotate the token in Railway and clear browser tabs if it is exposed. This is
+   a single shared operator secret, not multi-user identity or a substitute for
+   a staffed moderation policy.
+
+The console does not prove score legitimacy or provide an appeal/chat system.
+Report records continue to follow the existing 90-day deletion policy.
 
 The limiter uses a keyed HMAC of the endpoint subject. A stable random
 `RATE_LIMIT_HASH_KEY` is configured in Railway and shared by replicas. The
@@ -116,6 +143,11 @@ X-Sync-Token: server-issued device token
 | `GET/POST /v1/cloud-save` | Read/write the filtered cloud snapshot. Newer revision wins. |
 | `POST /v1/leaderboards/unverified` | Submit a non-reward-bearing score. |
 | `GET /v1/leaderboards/unverified/:routeId` | Read the top 25 named best scores for a route. |
+| `GET /admin` | Private moderation operator page. |
+| `GET /v1/admin/reports?status=open` | Token-protected report queue (`open`, `reviewed`, or `all`). |
+| `POST /v1/admin/reports/:reportId/resolve` | Token-protected `dismiss` or `hide_profile` decision. |
+| `GET /v1/admin/profiles/hidden` | Token-protected list of hidden public profiles. |
+| `POST /v1/admin/profiles/:targetId/restore` | Restore a hidden profile. |
 | `PUT /v1/leaderboard-profile` | Save an opted-in driver's public display name. |
 | `DELETE /v1/leaderboard-profile` | Leave public competition and remove that profile, scores, friend links, and friend codes. |
 | `POST /v1/leaderboards/friends/invite` | Create a one-use friend code valid for 24 hours. |
@@ -140,14 +172,23 @@ invalidating the old phone's server access.
 
 ## Remaining Production Checks
 
-- Migrations through `006` and shared HMAC rate limits were deployed on
-  October 1, 2026. The deployment log confirms `npm run migrate` completed
-  before the API started; `/health` and the public World endpoint both returned
-  HTTP 200 afterward.
+- Migrations through `009` were deployed on October 8, 2026. Railway logs
+  confirmed the migration runner completed; `/health` and Arusha's public World
+  endpoint returned HTTP 200 with a valid unverified response. The Dar and
+  Arusha boards may be empty until players opt in and submit scores.
 - Railway's production pre-deploy command is now `npm run migrate`. Keep it
   enabled for future schema changes.
 - Shared request limits are abuse friction, not anti-cheat. Scores remain
   forgeable and must stay labelled unverified and reward-free.
+- Migration `008_arusha_route_pack.sql` expands the accepted route IDs;
+  migration `009_moderation_console.sql` adds report-review and visibility
+  state. Both were applied by the production pre-deploy migration runner.
+- The protected console is deployed and `MODERATION_ADMIN_TOKEN` is configured.
+  Smoke-test authenticated list, dismiss, hide, and restore with a disposable
+  report/profile before relying on moderation operations.
+- The public World route endpoint does not require a player account; posting
+  a name/score does require opt-in. A successful empty `scores` array means
+  there are no opted-in scores for that route, not that World is disabled.
 - Recheck the Privacy Policy and Play Data Safety form against the exact
   deployed behavior, including public visibility after a player opts in.
 - Test World refresh/cache, opt-in submission, friend linking/removal,
