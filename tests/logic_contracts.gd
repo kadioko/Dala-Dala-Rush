@@ -397,6 +397,7 @@ func _check_ghost_validation() -> void:
 		"route": "arusha",
 		"vehicle_id": "classic_blue",
 		"challenge_id": "route_daily_2026-10-08",
+		"rules_version": DailyRouteChallengeData.RULES_VERSION,
 		"traffic_seed": 12345,
 	}
 	_check(not GhostDataLib.sanitize(valid).is_empty(), "Valid ghost was rejected")
@@ -409,9 +410,14 @@ func _check_ghost_validation() -> void:
 	var challenge := {
 		"id": "route_daily_2026-10-08", "route_id": "arusha",
 		"vehicle_id": "classic_blue", "traffic_seed": 12345,
+		"rules_version": DailyRouteChallengeData.RULES_VERSION,
 	}
 	_check(GhostDataLib.matches_daily_challenge(decoded, challenge),
 		"A replay from the same daily rules should qualify as a rival")
+	challenge["rules_version"] = DailyRouteChallengeData.RULES_VERSION + 1
+	_check(not GhostDataLib.matches_daily_challenge(decoded, challenge),
+		"A different gameplay-rules version must not qualify as a Daily Run rival")
+	challenge["rules_version"] = DailyRouteChallengeData.RULES_VERSION
 	challenge["traffic_seed"] = 12346
 	_check(not GhostDataLib.matches_daily_challenge(decoded, challenge),
 		"A replay from different traffic seed must not qualify for a Daily Run")
@@ -553,7 +559,7 @@ func _check_save_normalization() -> void:
 	save_node.data["online_installation_id"] = 42
 	save_node.data["online_sync_token"] = []
 	save_node.call("_normalize_core_data")
-	_check(int(save_node.data.schema_version) == 16, "Old save schema was not migrated")
+	_check(int(save_node.data.schema_version) == int(SaveScript.DEFAULTS.schema_version), "Old save schema was not migrated")
 	_check(int(save_node.data.regular_runs) == 5,
 		"Legacy runs must migrate as regular runs to preserve experienced-player status")
 	_check(int(save_node.data.total_coins) == 0, "Negative saved coins were not clamped")
@@ -619,7 +625,7 @@ func _check_save_normalization() -> void:
 		legacy.data.erase("regular_runs")
 		legacy.data["total_coins"] = 23
 		legacy.call("_normalize_core_data")
-		_check(int(legacy.data.schema_version) == 16
+		_check(int(legacy.data.schema_version) == int(SaveScript.DEFAULTS.schema_version)
 			and int(legacy.data.regular_runs) == old_schema + 10
 			and int(legacy.data.total_coins) == 23,
 			"Legacy schema %d migration must preserve runs and currency" % old_schema)

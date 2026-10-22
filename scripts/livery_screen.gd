@@ -21,21 +21,25 @@ func _ready() -> void:
 	_vehicle = Vehicles.get_by_id(GameState.selected_vehicle_id)
 	_livery = LiveryLib.get_livery(_vehicle)
 
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 20
+	scroll.offset_right = -20
+	scroll.offset_top = 28 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	scroll.offset_bottom = -16 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	var root := VBoxContainer.new()
-	root.anchor_right = 1.0
-	root.anchor_bottom = 1.0
-	root.offset_left = 20
-	root.offset_right = -20
-	root.offset_top = 28 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
-	root.offset_bottom = -16 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 10)
-	add_child(root)
+	scroll.add_child(root)
 
 	_title = UIFactory.make_title("", 28)
 	root.add_child(_title)
 
 	# ── Live preview ─────────────────────────────────────────────
 	_preview = _BusPreview.new()
+	_preview.vehicle_id = String(_vehicle.id)
 	_preview.livery = _livery
 	_preview.custom_minimum_size = Vector2(0, 190)
 	_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -52,9 +56,8 @@ func _ready() -> void:
 		_apply()))
 
 	# ── Patterns ─────────────────────────────────────────────────
-	var prow := HBoxContainer.new()
+	var prow := UIFactory.make_action_row(110.0)
 	prow.add_theme_constant_override("separation", 6)
-	prow.alignment = BoxContainer.ALIGNMENT_CENTER
 	root.add_child(prow)
 	for p in LiveryLib.PATTERNS:
 		var pb := UIFactory.make_button("", false)
@@ -106,9 +109,10 @@ func _ready() -> void:
 	_refresh()
 
 func _swatch_row(palette: Array, on_pick: Callable) -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var row := GridContainer.new()
+	row.columns = maxi(1, floori((get_viewport_rect().size.x - 40.0 + 8.0) / 52.0))
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 8)
 	for c in palette:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(44, 44)
@@ -171,6 +175,7 @@ func _on_back() -> void:
 
 class _BusPreview extends Control:
 	var livery: Dictionary = {}
+	var vehicle_id: String = ""
 	func _draw() -> void:
 		# Road backdrop
 		draw_rect(Rect2(Vector2.ZERO, size), Color("#3d3d3d"))
@@ -187,4 +192,4 @@ class _BusPreview extends Control:
 			Color(String(livery.get("body", "1f8fff"))),
 			Color(String(livery.get("accent", "ffd23f"))),
 			String(livery.get("pattern", "none")),
-			String(livery.get("slogan", "")))
+			String(livery.get("slogan", "")), vehicle_id)

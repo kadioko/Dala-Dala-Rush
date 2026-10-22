@@ -71,9 +71,9 @@ func _build_rows() -> void:
 		hb.add_theme_constant_override("separation", 10)
 		_list_box.add_child(hb)
 
-		var preview := ColorRect.new()
-		preview.custom_minimum_size = Vector2(64, 64)
-		preview.color = v.body
+		var preview := _VehiclePreview.new()
+		preview.custom_minimum_size = Vector2(62, 100)
+		preview.vehicle = v
 		hb.add_child(preview)
 
 		var btn := UIFactory.make_button("", v.id == GameState.selected_vehicle_id)
@@ -85,6 +85,17 @@ func _build_rows() -> void:
 		hb.add_child(btn)
 
 		_entries.append({"btn": btn, "veh": v})
+
+class _VehiclePreview extends Control:
+	var vehicle: Dictionary = {}
+	func _draw() -> void:
+		if vehicle.is_empty():
+			return
+		var livery: Dictionary = LiveryLib.get_livery(vehicle)
+		var bus_size := Vector2(50, 78)
+		LiveryLib.draw_bus(self, (size - bus_size) * 0.5, bus_size,
+			Color(String(livery.body)), Color(String(livery.accent)),
+			String(livery.pattern), String(livery.slogan), String(vehicle.id))
 
 func _refresh(_l := "") -> void:
 	_title.text = LocaleManager.t("SELECT_VEHICLE")

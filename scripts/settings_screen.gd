@@ -34,24 +34,31 @@ var _cloud_pending_enable: bool = false
 var _cloud_notice_key: String = ""
 var _cloud_notice_text: String = ""
 var _telemetry_pending_enable: bool = false
+var _skip_tutorial_btn: Button
+var _ad_privacy_btn: Button
+var _battery_label: Label
+var _battery_btn: CheckButton
+var _perf_btn: Button
+var _perf_status: Label
+var _perf_notice_key: String = ""
 
 func _ready() -> void:
 	UIFactory.paint_background(self)
 
 	var scroll := ScrollContainer.new()
-	scroll.anchor_left = 0.5
+	scroll.anchor_left = 0.0
 	scroll.anchor_top = 0.0
-	scroll.anchor_right = 0.5
+	scroll.anchor_right = 1.0
 	scroll.anchor_bottom = 1.0
-	scroll.offset_left = -205
-	scroll.offset_right = 205
+	scroll.offset_left = 20
+	scroll.offset_right = -20
 	scroll.offset_top = 28 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
 	scroll.offset_bottom = -20 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 
 	var v := VBoxContainer.new()
-	v.custom_minimum_size = Vector2(410, 0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 8)
 	scroll.add_child(v)
@@ -83,6 +90,27 @@ func _ready() -> void:
 	_effects_btn = _make_switch()
 	_effects_btn.toggled.connect(_toggle_effects)
 	v.add_child(_make_setting_row(_effects_label, _effects_btn))
+	_battery_label = _make_setting_label()
+	_battery_btn = _make_switch()
+	_battery_btn.toggled.connect(func(enabled: bool):
+		SaveSystem.set_value("battery_saver", enabled)
+		Engine.max_fps = 30 if enabled else 60
+		_refresh())
+	v.add_child(_make_setting_row(_battery_label, _battery_btn))
+	if OS.is_debug_build():
+		_perf_btn = UIFactory.make_button("", false)
+		_perf_btn.pressed.connect(func():
+			if PerformanceRecorder.active:
+				PerformanceRecorder.stop_capture()
+			else:
+				PerformanceRecorder.start_capture()
+			_refresh())
+		v.add_child(_perf_btn)
+		_perf_status = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
+		v.add_child(_perf_status)
+		PerformanceRecorder.capture_finished.connect(func(_path: String, error: Error):
+			_perf_notice_key = "PERF_SAVED" if error == OK else "SAVE_ERROR"
+			_refresh())
 
 	_cloud_label = _make_setting_label()
 	_cloud_btn = _make_switch()
@@ -102,7 +130,7 @@ func _ready() -> void:
 	_cloud_status.custom_minimum_size = Vector2(0, 36)
 	v.add_child(_cloud_status)
 
-	var cloud_actions := HBoxContainer.new()
+	var cloud_actions := UIFactory.make_action_row()
 	cloud_actions.add_theme_constant_override("separation", 8)
 	v.add_child(cloud_actions)
 	_cloud_backup_btn = UIFactory.make_button("", false)
@@ -120,7 +148,7 @@ func _ready() -> void:
 	UIFactory.tint_button(_cloud_delete_btn, UIFactory.COL_DANGER)
 	_cloud_delete_btn.pressed.connect(_confirm_cloud_delete)
 	v.add_child(_cloud_delete_btn)
-	var transfer_actions := HBoxContainer.new()
+	var transfer_actions := UIFactory.make_action_row()
 	transfer_actions.add_theme_constant_override("separation", 8)
 	v.add_child(transfer_actions)
 	_cloud_transfer_out_btn = UIFactory.make_button("", false)
@@ -138,7 +166,7 @@ func _ready() -> void:
 	_lang_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	v.add_child(_lang_label)
 
-	var lang_row := HBoxContainer.new()
+	var lang_row := UIFactory.make_action_row(120.0)
 	lang_row.add_theme_constant_override("separation", 8)
 	lang_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(lang_row)
@@ -159,14 +187,27 @@ func _ready() -> void:
 	_privacy_btn.custom_minimum_size = Vector2(0, 52)
 	_privacy_btn.pressed.connect(_open_privacy_policy)
 	v.add_child(_privacy_btn)
+	_ad_privacy_btn = UIFactory.make_button("", false)
+	_ad_privacy_btn.pressed.connect(AdService.show_privacy_options)
+	v.add_child(_ad_privacy_btn)
+	AdService.privacy_options_changed.connect(func(_required: bool): _refresh())
 
 	_back_btn = UIFactory.make_button("", false)
 	_back_btn.custom_minimum_size = Vector2(0, 56)
 	_back_btn.pressed.connect(_on_back)
 	v.add_child(_back_btn)
+	_skip_tutorial_btn = UIFactory.make_button("", false)
+	_skip_tutorial_btn.pressed.connect(func():
+		_show_confirm("TUTORIAL_SKIP", "TUTORIAL_SKIP_CONFIRM", "TUTORIAL_SKIP", func():
+			GameState.skip_tutorials()
+			_refresh())
+	)
+	v.add_child(_skip_tutorial_btn)
 
 	LocaleManager.locale_changed.connect(_refresh)
 	OnlineService.request_finished.connect(_on_online_request_finished)
+	SaveSystem.save_failed.connect(func(_error: Error):
+		_refresh())
 	_refresh()
 
 func _make_setting_label() -> Label:
@@ -195,6 +236,16 @@ func _make_setting_row(label: Label, button: CheckButton) -> HBoxContainer:
 	return row
 
 func _refresh(_locale: String = "") -> void:
+	if is_instance_valid(_perf_btn):
+		_perf_btn.text = LocaleManager.t("PERF_STOP" if PerformanceRecorder.active else "PERF_START")
+		_perf_status.text = LocaleManager.t(_perf_notice_key) if not _perf_notice_key.is_empty() else ""
+		_perf_status.visible = not _perf_notice_key.is_empty()
+	_ad_privacy_btn.text = LocaleManager.t("AD_PRIVACY_OPTIONS")
+	_ad_privacy_btn.visible = AdService.privacy_options_required()
+	_battery_label.text = LocaleManager.t("BATTERY_SAVER")
+	_refresh_switch(_battery_btn, bool(SaveSystem.get_value("battery_saver", false)))
+	_skip_tutorial_btn.text = LocaleManager.t("TUTORIAL_SKIP")
+	_skip_tutorial_btn.visible = int(SaveSystem.get_value("first_session_stage", 0)) < 3
 	_title.text = LocaleManager.t("SETTINGS")
 	_music_label.text = LocaleManager.t("MUSIC")
 	_sfx_label.text = LocaleManager.t("SFX")
@@ -246,7 +297,9 @@ func _refresh(_locale: String = "") -> void:
 	_en_btn.modulate.a = 1.0 if LocaleManager.current_locale == "en" else 0.62
 	_privacy_btn.text = LocaleManager.t("PRIVACY_POLICY")
 	_back_btn.text = LocaleManager.t("BACK")
-	if not _cloud_notice_text.is_empty():
+	if SaveSystem.last_save_error != OK:
+		_cloud_status.text = LocaleManager.t("SAVE_ERROR")
+	elif not _cloud_notice_text.is_empty():
 		_cloud_status.text = _cloud_notice_text
 	elif not _cloud_notice_key.is_empty():
 		_cloud_status.text = LocaleManager.t(_cloud_notice_key)
@@ -364,6 +417,7 @@ func _show_transfer_claim_dialog() -> void:
 	var dialog := ConfirmationDialog.new()
 	dialog.title = LocaleManager.t("CLOUD_MOVE_IN_TITLE")
 	dialog.dialog_text = LocaleManager.t("CLOUD_MOVE_IN_BODY")
+	dialog.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialog.ok_button_text = LocaleManager.t("CLOUD_MOVE_IN")
 	dialog.cancel_button_text = LocaleManager.t("CANCEL")
 	var code_field := LineEdit.new()
@@ -380,13 +434,14 @@ func _show_transfer_claim_dialog() -> void:
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog)
-	dialog.popup_centered(Vector2i(430, 0))
+	dialog.popup_centered(Vector2i(mini(430, int(get_viewport_rect().size.x) - 24), 0))
 	code_field.grab_focus()
 
 func _show_confirm(title_key: String, body_key: String, action_key: String, callback: Callable) -> void:
 	var dialog := ConfirmationDialog.new()
 	dialog.title = LocaleManager.t(title_key)
 	dialog.dialog_text = LocaleManager.t(body_key)
+	dialog.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialog.ok_button_text = LocaleManager.t(action_key)
 	dialog.cancel_button_text = LocaleManager.t("CANCEL")
 	dialog.confirmed.connect(func():
@@ -398,7 +453,7 @@ func _show_confirm(title_key: String, body_key: String, action_key: String, call
 		_refresh()
 	)
 	add_child(dialog)
-	dialog.popup_centered(Vector2i(430, 0))
+	dialog.popup_centered(Vector2i(mini(430, int(get_viewport_rect().size.x) - 24), 0))
 
 func _on_online_request_finished(operation: String, success: bool, payload: Dictionary) -> void:
 	if operation == "registration":
@@ -428,6 +483,10 @@ func _on_online_request_finished(operation: String, success: bool, payload: Dict
 		_refresh()
 		return
 	if operation == "transfer_claim":
+		_cloud_notice_key = "CLOUD_WORKING" if success else "CLOUD_ERROR"
+		_refresh()
+		return
+	if operation == "transfer_ack":
 		if success and OnlineService.has_identity():
 			SaveSystem.set_value("cloud_sync_opt_in", true)
 			_cloud_notice_key = "CLOUD_MOVE_DONE"
@@ -451,6 +510,14 @@ func _on_online_request_finished(operation: String, success: bool, payload: Dict
 			_cloud_notice_key = "CLOUD_RESTORED"
 		else:
 			_cloud_notice_key = "CLOUD_ERROR"
+	if operation == "cloud_upload" and not success:
+		if payload.get("error") == "stale_revision" and payload.has("currentRevision"):
+			_show_confirm("CLOUD_CONFLICT_TITLE", "CLOUD_CONFLICT_BODY", "CLOUD_KEEP_PHONE", func():
+				_cloud_notice_key = "CLOUD_WORKING"
+				_refresh()
+				OnlineService.resolve_cloud_conflict())
+		elif payload.get("error") == "save_failed":
+			_cloud_notice_key = "SAVE_ERROR"
 	elif operation == "account_delete":
 		_cloud_pending_enable = false
 		_cloud_notice_key = "CLOUD_DELETED" if success else "CLOUD_ERROR"

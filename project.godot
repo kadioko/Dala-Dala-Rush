@@ -34,6 +34,7 @@ AnalyticsService="*res://autoload/analytics_service.gd"
 RemoteConfig="*res://autoload/remote_config.gd"
 OnlineService="*res://autoload/online_service.gd"
 IapService="*res://autoload/iap_service.gd"
+PerformanceRecorder="*res://autoload/performance_recorder.gd"
 
 [display]
 
@@ -44,7 +45,7 @@ window/handheld/orientation=1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/admob/plugin.cfg")
+enabled=PackedStringArray("res://addons/admob/plugin.cfg", "res://addons/dala_consent/plugin.cfg")
 
 [input]
 

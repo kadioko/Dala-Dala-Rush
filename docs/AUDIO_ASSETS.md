@@ -1,10 +1,11 @@
 # Audio Assets
 
-Last verified: August 19, 2026.
+Last verified: October 22, 2026. Rights ledger: `audio/SOURCES.md`.
 
-No custom audio files are currently present in `res://audio/`; the game ships
-working procedural music and sound fallbacks. To use recorded sounds, drop files
-into `res://audio/` with these exact names — they are picked up automatically
+Five synthetic Swahili placeholder WAV clips are now in `res://audio/`, approved
+by the owner. They are not human recordings; provenance and exact lines are in
+`audio/SOURCES.md`. SFX/music still use procedural fallbacks. Put cleared
+recordings in `res://audio/` with these exact names; they are picked up automatically
 (`.ogg` preferred, `.wav` and `.mp3` also work). Anything missing keeps its
 procedural fallback.
 
@@ -25,19 +26,19 @@ procedural fallback.
 - Music loop: 30–60 s, must loop seamlessly (set loop in Godot's import dock or it's set automatically for music.ogg).
 - Keep total audio under ~3 MB for low-end phones.
 
-## Swahili voice lines (already wired — just add files)
+## Swahili Voice Lines
 
 Short shouted conductor (mpiga debe) lines add huge character. The trigger
-points are already in the code; these keys are **file-only** (completely
-silent until the recording exists — no placeholder beep):
+points are already in the code; the **file-only** keys below now load short
+synthetic WAV placeholders instead of remaining silent:
 
 | File | Trigger | Line |
 |---|---|---|
-| `audio/voice_twende.ogg` | Countdown "GO" | "Twende!" |
-| `audio/voice_mwisho.ogg` | Crash / game over | "Mwisho! Mwisho!" |
-| `audio/voice_mafuta.ogg` | Fuel drops below low threshold | "Mafuta!" |
-| `audio/voice_kituo.ogg` | Bus stop approaching | "Kituo! Shusha!" |
-| `audio/voice_karibu.ogg` | (spare hook — wire where you like) | "Karibu!" |
+| `audio/voice_twende.wav` | Countdown "GO" | "Twende, twende!" |
+| `audio/voice_mwisho.wav` | Crash / game over | "Mwisho, mwisho!" |
+| `audio/voice_mafuta.wav` | Fuel drops below low threshold | "Mafuta!" |
+| `audio/voice_kituo.wav` | Bus stop approaching | "Kituo! Shusha!" |
+| `audio/voice_karibu.wav` | Spare hook | "Karibu, abiria!" |
 
 The on-screen Swahili launch cue is also `TWENDE!`; keep the recording and
 localized text synchronized.

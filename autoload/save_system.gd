@@ -1,4 +1,5 @@
 extends Node
+signal save_failed(error: Error)
 ## Persists all player data to user://save.json.
 
 const SAVE_PATH := "user://save.json"
@@ -11,9 +12,29 @@ const DISCOVERY_KEYS: Array[String] = [
 var data: Dictionary = {}
 var _batch_depth: int = 0
 var _batch_dirty: bool = false
+var last_save_error: Error = OK
+var recovery_read_only: bool = false
+const MAX_SAVE_BYTES := 1048576
 
 const DEFAULTS := {
-	"schema_version": 16,
+	"schema_version": 18,
+	"online_pending_transfer": {},
+	"active_run_id": "",
+	"last_reward_receipt": {},
+	"battery_saver": false,
+	"tutorial_started": false,
+	"online_pending_cloud_upload": {},
+	"missions_active": [],
+	"missions_next": 0,
+	"missions_completed": 0,
+	"season_xp": 0,
+	"career_rank": 0,
+	"upg_engine": 0,
+	"upg_brakes": 0,
+	"upg_sound": 0,
+	"ghost_best": {},
+	"ghost_rival": {},
+	"ghost_on": true,
 	"best_score": 0,
 	"best_reputation": 0,
 	"total_coins": 0,
@@ -105,11 +126,19 @@ const DEFAULTS := {
 func _ready() -> void:
 	load_data()
 
+var storage_path: String = SAVE_PATH
+var backup_storage_path: String = BACKUP_PATH
+
 func load_data() -> void:
 	data = DEFAULTS.duplicate(true)
+	recovery_read_only = false
 	# Try the main save, fall back to the backup if missing/corrupt.
-	if not _load_from(SAVE_PATH):
-		if _load_from(BACKUP_PATH):
+	if not _load_from(storage_path):
+		if recovery_read_only:
+			return
+		if FileAccess.file_exists(storage_path):
+			_quarantine(storage_path)
+		if _load_from(backup_storage_path):
 			push_warning("Save: main file corrupt or missing — restored from backup.")
 			# Restore the primary immediately without rotating the corrupt file over
 			# the known-good backup. The next ordinary save may rotate normally.
@@ -122,10 +151,18 @@ func _load_from(path: String) -> bool:
 	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
 		return false
+	if f.get_length() > MAX_SAVE_BYTES:
+		f.close()
+		return false
 	var text := f.get_as_text()
 	f.close()
 	var parsed: Variant = JSON.parse_string(text)
 	if typeof(parsed) != TYPE_DICTIONARY:
+		return false
+	if not valid_envelope(parsed):
+		return false
+	if int(parsed.get("schema_version", 1)) > int(DEFAULTS.schema_version):
+		recovery_read_only = true
 		return false
 	for k in parsed.keys():
 		var key := String(k)
@@ -146,6 +183,83 @@ func _is_compatible_value(default_value: Variant, loaded_value: Variant) -> bool
 		return true
 	return expected_type == loaded_type
 
+static func valid_envelope(value: Variant) -> bool:
+	if value is not Dictionary or value.is_empty():
+		return false
+	var schema: Variant = value.get("schema_version", 1)
+	if typeof(schema) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(schema)) \
+	or float(schema) < 1.0 or float(schema) != floorf(float(schema)):
+		return false
+	for key in ["total_coins", "best_score", "total_runs"]:
+		var number: Variant = value.get(key)
+		if typeof(number) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(number)) and float(number) >= 0:
+			return true
+	return false
+
+func _quarantine(path: String) -> void:
+	var quarantined := path + ".corrupt." + str(int(Time.get_unix_time_from_system()))
+	if not FileAccess.file_exists(quarantined):
+		var error: Error = DirAccess.copy_absolute(path, quarantined)
+		if error != OK:
+			push_warning("Could not preserve damaged save: " + error_string(error))
+
+func _normalize_nested_data() -> void:
+	var missions: Array = []
+	var seen: Array = []
+	for candidate in data.get("missions_active", []):
+		if candidate is not Dictionary or candidate.get("tid") is not String:
+			continue
+		var known: bool = false
+		for template in preload("res://data/missions.gd").TEMPLATES:
+			if template.id == candidate.tid:
+				known = true
+		var progress: Variant = candidate.get("progress")
+		if known and candidate.tid not in seen and typeof(progress) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(progress)):
+			missions.append({"tid": candidate.tid, "progress": clampi(int(progress), 0, 10000000)})
+			seen.append(candidate.tid)
+		if missions.size() == 3:
+			break
+	data["missions_active"] = missions
+	for key in ["ghost_best", "ghost_rival", "latest_replay", "daily_replay_best"]:
+		data[key] = preload("res://data/ghost_data.gd").sanitize(data.get(key))
+	for vehicle in preload("res://data/vehicles.gd").LIST:
+		var key: String = "livery_" + String(vehicle.id)
+		if data.has(key):
+			data[key] = LiveryLib.sanitize(data[key])
+	if not preload("res://data/operation_ids.gd").is_valid(data.get("active_run_id")):
+		data["active_run_id"] = ""
+	data["last_reward_receipt"] = clean_reward_receipt(data.get("last_reward_receipt"))
+
+func clean_reward_receipt(value: Variant) -> Dictionary:
+	if value is not Dictionary or not preload("res://data/operation_ids.gd").is_valid(value.get("run_ref")):
+		return {}
+	var clean: Dictionary = {"run_ref": value.run_ref, "components": {}, "total": 0,
+		"segments": [], "choice": "", "summary": {}, "finalized": value.get("finalized") == true}
+	var parts: Variant = value.get("components")
+	if parts is Dictionary:
+		for key in ["pickups", "fares", "other", "fines", "route_goal", "missions", "season", "mastery", "daily", "contract", "ads"]:
+			var amount: Variant = parts.get(key, 0)
+			if typeof(amount) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(amount)):
+				clean.components[key] = clampi(int(amount), -1000000000, 0) if key == "fines" else clampi(int(amount), 0, 1000000000)
+				clean.total += clean.components[key]
+	if value.get("segments") is Array:
+		for segment in value.segments:
+			if segment in ["initial", "continued"] and segment not in clean.segments: clean.segments.append(segment)
+	if value.get("choice") in ["continue", "double_coins"]: clean.choice = value.choice
+	var summary: Variant = value.get("summary")
+	if summary is Dictionary and summary.get("route") is String and _is_known_route_id(summary.route):
+		var valid: bool = true
+		for key in ["score", "distance", "elapsed"]:
+			var number: Variant = summary.get(key)
+			valid = valid and typeof(number) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(number)) and float(number) >= 0.0 and float(number) <= 1000000000.0
+		if valid:
+			var reason: String = String(summary.get("end_reason", "unknown")) if summary.get("end_reason") is String else "unknown"
+			if reason not in ["unknown", "fuel", "car", "bodaboda", "bajaji", "truck", "police", "cone", "barrier", "pothole", "tire", "pedestrian", "mbuzi"]: reason = "unknown"
+			clean.summary = {"route": summary.route, "score": int(summary.score), "distance": float(summary.distance), "elapsed": float(summary.elapsed),
+				"goal_met": summary.get("goal_met") == true, "continued": summary.get("continued") == true,
+				"end_reason": reason}
+	return clean
+
 func _normalize_core_data() -> void:
 	if not data.has("regular_runs"):
 		data["regular_runs"] = int(data.get("total_runs", 0))
@@ -163,6 +277,10 @@ func _normalize_core_data() -> void:
 	]
 	for key in non_negative_ints:
 		data[key] = maxi(0, int(data.get(key, DEFAULTS.get(key, 0))))
+	for key in ["missions_next", "missions_completed", "season_xp", "career_rank"]:
+		data[key] = maxi(0, int(data.get(key, 0)))
+	for key in ["upg_engine", "upg_brakes", "upg_sound"]:
+		data[key] = clampi(int(data.get(key, 0)), 0, 3)
 	data["total_distance_ever"] = maxf(0.0, float(data.get("total_distance_ever", 0.0)))
 	_normalize_online_identity()
 	data["leaderboard_display_name"] = normalize_leaderboard_name(
@@ -172,7 +290,7 @@ func _normalize_core_data() -> void:
 	data["online_telemetry_opt_in"] = bool(data.get("online_telemetry_opt_in", false))
 	var upload_status: String = String(data.get("leaderboard_upload_status", ""))
 	data["leaderboard_upload_status"] = upload_status if upload_status in [
-		"pending", "retry", "rate_limited", "invalid_name", "submitted", "superseded",
+		"pending", "retry", "rate_limited", "invalid_name", "submitted", "superseded", "profile_hidden",
 	] else ""
 	var upload_route: String = String(data.get("leaderboard_upload_route", ""))
 	data["leaderboard_upload_route"] = upload_route if _is_known_route_id(upload_route) else ""
@@ -199,6 +317,7 @@ func _normalize_core_data() -> void:
 	_normalize_leaderboard_cache()
 	_normalize_route_mastery()
 	_normalize_route_contract_claims()
+	_normalize_nested_data()
 
 func _normalized_string_array(value: Variant, required_value: String = "") -> Array[String]:
 	var result: Array[String] = []
@@ -343,16 +462,17 @@ func _normalize_online_identity() -> void:
 		if typeof(sync_token) == TYPE_STRING and String(sync_token).length() <= 128 else ""
 
 func save(rotate_backup: bool = true) -> bool:
-	# Rotate the last good save to .bak before overwriting,
-	# so a crash mid-write can never lose everything.
-	if rotate_backup and FileAccess.file_exists(SAVE_PATH):
-		DirAccess.copy_absolute(SAVE_PATH, BACKUP_PATH)
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f == null:
-		push_warning("Save: cannot open file for writing.")
+	_batch_dirty = true
+	if recovery_read_only:
+		last_save_error = ERR_UNAVAILABLE
+		save_failed.emit(last_save_error)
 		return false
-	f.store_string(JSON.stringify(data))
-	f.close()
+	last_save_error = preload("res://scripts/atomic_json.gd").write(
+		storage_path, data, backup_storage_path if rotate_backup else "")
+	if last_save_error != OK:
+		push_warning("Save failed: " + error_string(last_save_error))
+		save_failed.emit(last_save_error)
+		return false
 	_batch_dirty = false
 	return true
 
@@ -582,6 +702,7 @@ func clear_online_account() -> void:
 		"pending_leaderboard_submissions", "leaderboard_cache",
 		"leaderboard_upload_status", "leaderboard_upload_route",
 		"leaderboard_upload_score", "leaderboard_upload_updated_at",
+		"online_pending_cloud_upload", "online_pending_transfer",
 	]:
 		var default_value: Variant = DEFAULTS[key]
 		data[key] = default_value.duplicate(true) if default_value is Array or default_value is Dictionary else default_value
@@ -627,7 +748,7 @@ func clear_submitted_leaderboard_score(route_id: String, submitted_score: int, a
 
 func set_leaderboard_upload_status(status: String, route_id: String = "", score: int = 0,
 		persist: bool = true) -> void:
-	if status not in ["", "pending", "retry", "rate_limited", "invalid_name", "submitted", "superseded"]:
+	if status not in ["", "pending", "retry", "rate_limited", "invalid_name", "submitted", "superseded", "profile_hidden"]:
 		return
 	data["leaderboard_upload_status"] = status
 	data["leaderboard_upload_route"] = route_id if _is_known_route_id(route_id) else ""

@@ -11,6 +11,13 @@ const MAX_SCORE := 1000000000
 const ROUTE_IDS := ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo", "arusha"]
 const MAX_SEED := 2147483647
 
+static func record_event(events: Array, time: float, lane: int) -> bool:
+	var truncated: bool = events.size() >= MAX_EVENTS
+	if truncated:
+		events.pop_front()
+	events.append([time, lane])
+	return truncated
+
 static func sanitize(value: Variant) -> Dictionary:
 	if typeof(value) != TYPE_DICTIONARY:
 		return {}
@@ -53,6 +60,10 @@ static func sanitize(value: Variant) -> Dictionary:
 		clean_events.append([0.0, 1])
 
 	var score_value: Variant = source.get("score", 0)
+	var window_value: Variant = source.get("window_start", 0.0)
+	if typeof(window_value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(window_value)) \
+	or float(window_value) < 0.0 or float(window_value) > end_time:
+		return {}
 	if typeof(score_value) not in [TYPE_INT, TYPE_FLOAT]:
 		return {}
 	var score := clampi(int(score_value), 0, MAX_SCORE)
@@ -75,8 +86,14 @@ static func sanitize(value: Variant) -> Dictionary:
 	var traffic_seed: int = int(traffic_seed_value)
 	if traffic_seed < 0 or traffic_seed > MAX_SEED:
 		return {}
+	var rules_value: Variant = source.get("rules_version", 0)
+	if typeof(rules_value) not in [TYPE_INT, TYPE_FLOAT] or float(rules_value) != floorf(float(rules_value)) \
+	or float(rules_value) < 0.0 or float(rules_value) > 1000000.0:
+		return {}
 	return {
-		"version": 2,
+		"version": 3,
+		"window_start": float(window_value),
+		"rules_version": int(rules_value),
 		"events": clean_events,
 		"end": end_time,
 		"score": score,
@@ -91,7 +108,11 @@ static func matches_daily_challenge(value: Variant, challenge: Dictionary) -> bo
 	var clean := sanitize(value)
 	if clean.is_empty() or challenge.is_empty():
 		return false
-	return String(clean.get("challenge_id", "")) == String(challenge.get("id", "")) \
+	if float(clean.get("window_start", 0.0)) > 0.0:
+		return false
+	return int(clean.get("rules_version", 0)) > 0 \
+		and int(clean.rules_version) == int(challenge.get("rules_version", -1)) \
+		and String(clean.get("challenge_id", "")) == String(challenge.get("id", "")) \
 		and String(clean.get("route", "")) == String(challenge.get("route_id", "")) \
 		and String(clean.get("vehicle_id", "")) == String(challenge.get("vehicle_id", "")) \
 		and int(clean.get("traffic_seed", -1)) == int(challenge.get("traffic_seed", -2))

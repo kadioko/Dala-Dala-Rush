@@ -5,6 +5,7 @@ extends Node
 var haptics_on: bool = true
 
 func _ready() -> void:
+	Engine.max_fps = 30 if bool(SaveSystem.get_value("battery_saver", false)) else 60
 	haptics_on = bool(SaveSystem.get_value("haptics_on", true))
 
 func set_haptics_on(on: bool) -> void:

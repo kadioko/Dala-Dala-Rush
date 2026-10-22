@@ -1,10 +1,11 @@
 class_name DailyRouteChallenge
-## A deterministic, offline daily run. Every player receives the same route,
-## starter vehicle, traffic seed, and gameplay rules for a given UTC date.
+## An offline daily shared setup: route, starter vehicle, seed and rules.
+## Traffic remains adaptive to steering; this is not an identical course.
 ## Scores remain unverified until a future server-side run validator exists.
 
 const ROUTE_IDS: Array[String] = ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"]
 const STARTER_VEHICLE_ID := "classic_blue"
+const RULES_VERSION := 2
 
 static func today_key() -> String:
 	return Time.get_date_string_from_system(true)
@@ -21,4 +22,5 @@ static func current() -> Dictionary:
 		"vehicle_id": STARTER_VEHICLE_ID,
 		"traffic_seed": seed_value,
 		"revives_allowed": false,
+		"rules_version": RULES_VERSION,
 	}

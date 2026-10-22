@@ -29,9 +29,23 @@ static func get_livery(vehicle: Dictionary) -> Dictionary:
 	}
 	var saved: Variant = SaveSystem.get_value("livery_" + String(vehicle.get("id", "")), null)
 	if typeof(saved) == TYPE_DICTIONARY:
-		for k in saved.keys():
-			defaults[k] = saved[k]
+		defaults.merge(sanitize(saved), true)
 	return defaults
+
+static func sanitize(value: Variant) -> Dictionary:
+	var clean: Dictionary = {}
+	if value is not Dictionary:
+		return clean
+	for key in ["body", "accent"]:
+		var color_value: Variant = value.get(key)
+		if color_value is String and color_value.length() in [6, 8] \
+		and color_value.is_valid_hex_number(false):
+			clean[key] = color_value
+	if value.get("pattern") in PATTERNS:
+		clean["pattern"] = value.pattern
+	if value.get("slogan") is String:
+		clean["slogan"] = value.slogan.replace("\n", " ").replace("\r", " ").substr(0, 24)
+	return clean
 
 static func save_livery(vehicle_id: String, livery: Dictionary) -> void:
 	SaveSystem.set_value("livery_" + vehicle_id, livery)
@@ -39,7 +53,7 @@ static func save_livery(vehicle_id: String, livery: Dictionary) -> void:
 ## Draws a complete daladala (body, livery pattern, windows, wheels,
 ## headlights, slogan) onto any CanvasItem. `s` is the full bus size.
 static func draw_bus(ci: CanvasItem, top_left: Vector2, s: Vector2,
-		body: Color, accent: Color, pattern: String, slogan: String) -> void:
+		body: Color, accent: Color, pattern: String, slogan: String, vehicle_id: String = "") -> void:
 	# Ground shadow and chamfered minibus shell create a readable top-down profile.
 	ci.draw_rect(Rect2(top_left + Vector2(4, 7), s - Vector2(2, 3)),
 		Color(0.02, 0.03, 0.04, 0.30), true)
@@ -121,6 +135,26 @@ static func draw_bus(ci: CanvasItem, top_left: Vector2, s: Vector2,
 	ci.draw_rect(Rect2(Vector2(top_left.x + 9, top_left.y + s.y - 4), Vector2(12, 5)), Color("#e74c3c"), true)
 	ci.draw_rect(Rect2(Vector2(top_left.x + s.x - 21, top_left.y + s.y - 4), Vector2(12, 5)), Color("#e74c3c"), true)
 	ci.draw_rect(Rect2(Vector2(top_left.x + s.x * 0.30, top_left.y + s.y - 2), Vector2(s.x * 0.40, 4)), Color("#d7dbdd"), true)
+	# Keep the collision envelope consistent; distinctive roof/shell details stay
+	# within it rather than disguising a larger hitbox as a small vehicle.
+	match vehicle_id:
+		"vip", "night_bus":
+			ci.draw_rect(Rect2(top_left + Vector2(s.x * 0.28, s.y * 0.78), Vector2(s.x * 0.44, s.y * 0.12)), accent, true)
+			ci.draw_rect(Rect2(top_left + Vector2(s.x * 0.32, s.y * 0.80), Vector2(s.x * 0.36, s.y * 0.08)), Color("#25313b"), true)
+		"old_school":
+			ci.draw_rect(Rect2(top_left + Vector2(s.x * 0.18, 3), Vector2(s.x * 0.64, s.y * 0.16)), Color("#d0d5d8"), false, 2.0)
+			for slat in range(4):
+				var x: float = top_left.x + s.x * (0.25 + 0.16 * slat)
+				ci.draw_line(Vector2(x, top_left.y + 3), Vector2(x, top_left.y + s.y * 0.16), accent, 2.0)
+		"mwendokasi_red", "simba_express":
+			ci.draw_colored_polygon(PackedVector2Array([top_left + Vector2(s.x * 0.20, 4),
+				top_left + Vector2(s.x * 0.50, 14), top_left + Vector2(s.x * 0.80, 4)]), Color.WHITE)
+		"bongo_flava":
+			for speaker in [0.25, 0.75]:
+				ci.draw_circle(top_left + Vector2(s.x * speaker, s.y * 0.86), s.x * 0.1, Color("#17212b"))
+				ci.draw_circle(top_left + Vector2(s.x * speaker, s.y * 0.86), s.x * 0.05, accent)
+		"kariakoo_yellow":
+			ci.draw_rect(Rect2(top_left + Vector2(3, s.y * 0.74), Vector2(s.x - 6, s.y * 0.09)), accent, true)
 
 	# Slogan on the rear (bottom of the bus, facing the camera)
 	if slogan != "":

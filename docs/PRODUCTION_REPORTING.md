@@ -1,5 +1,13 @@
 # Production Gameplay Report
 
+October 18 follow-up requires migrations 010-012 and the updated client.
+New completed-run reports use `run_settled`, emitted after Results choices
+and keyed by a logical run UUID. Revives emit separate `run_segment_end`
+markers with the same `run_ref`. Do not count segments as completed runs or
+combine legacy `run_end` totals without a separate version/cohort analysis.
+Settlement after a killed Results screen is retried at the next launch.
+This does not cover abandoned in-progress runs or replace crash reporting.
+
 Use these read-only PostgreSQL queries in Railway after a player has opted in
 to Gameplay Insights. They query only the allowlisted aggregate events already
 accepted by `/v1/telemetry`; they do not expose player names, codes, or save data.
@@ -33,7 +41,7 @@ SELECT route_id,
        round(avg((properties->>'coins')::numeric), 1) AS avg_coins,
        round(avg((properties->>'goal_met')::boolean::int), 3) AS goal_rate
 FROM telemetry_events
-WHERE event_name = 'run_end'
+WHERE event_name = 'run_settled'
   AND received_at >= now() - interval '30 days'
 GROUP BY route_id, properties->>'end_reason'
 ORDER BY route_id, runs DESC;
@@ -56,10 +64,18 @@ GROUP BY 1
 ORDER BY 1;
 ```
 
-The current event is emitted only after a lesson run ends. It does not measure
-every tutorial step or identify the exact point where a player leaves. Keep
-the metric labelled “completed lesson runs”; instrument finer steps only when
-the consent copy and data-safety disclosure are reviewed.
+Starting with the unreleased October 18 source, `tutorial_stage_finished` is
+emitted only after both lesson steps, while `tutorial_stage_started`,
+`tutorial_step_completed` and `tutorial_attempt_finished` distinguish attempts
+from completion. Older app builds still emit the earlier run-end marker; do
+not combine versions and describe the result as a clean completion funnel.
+New rewarded-ad request/load/failure/earned events are also consent-gated.
+Publish the amended privacy notice before distributing the expanded event set.
+
+Migration 010 gives new-client events stable UUIDs and deduplicates ingestion
+inside a transaction. Retries of legacy events without IDs can still count
+twice. Server acceptance acknowledges delivery, not independent verification
+of gameplay or ad reward legitimacy. Use the existing 90-day retention policy.
 
 ## Coin Pace And First Vehicle Unlock
 
@@ -72,7 +88,7 @@ SELECT route_id,
        round(avg((properties->>'coins')::numeric
          / NULLIF((properties->>'elapsed')::numeric / 60.0, 0)), 1) AS coins_per_minute
 FROM telemetry_events
-WHERE event_name = 'run_end'
+WHERE event_name = 'run_settled'
   AND NULLIF(properties->>'elapsed', '') IS NOT NULL
   AND received_at >= now() - interval '30 days'
 GROUP BY route_id

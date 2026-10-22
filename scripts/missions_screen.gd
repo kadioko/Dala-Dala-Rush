@@ -14,15 +14,18 @@ var _list: VBoxContainer
 func _ready() -> void:
 	UIFactory.paint_background(self)
 
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.offset_left = 24
+	scroll.offset_right = -24
+	scroll.offset_top = 40 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
+	scroll.offset_bottom = -24 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
 	var root := VBoxContainer.new()
-	root.anchor_right = 1.0
-	root.anchor_bottom = 1.0
-	root.offset_left = 24
-	root.offset_right = -24
-	root.offset_top = 40 + UIFactory.safe_top_inset(get_viewport_rect().size.y)
-	root.offset_bottom = -24 - UIFactory.safe_bottom_inset(get_viewport_rect().size.y)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.add_theme_constant_override("separation", 14)
-	add_child(root)
+	scroll.add_child(root)
 
 	_title = UIFactory.make_title("", 32)
 	root.add_child(_title)

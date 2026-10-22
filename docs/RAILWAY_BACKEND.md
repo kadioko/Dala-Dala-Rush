@@ -1,6 +1,46 @@
 # Railway Backend Runbook
 
-The repository now contains a small Node 20 / Express / PostgreSQL service in
+## October 22 Deployment
+
+Migrations **010-012 and their backend are deployed**. The migration ledger,
+six required columns and three indexes were checked on production. HTTPS
+checks passed for all seven public boards, repeated cloud operations and the
+v2 acknowledged transfer flow; temporary test data was deleted. A private
+41,646-byte logical backup was saved outside the repository and inspected with
+`pg_restore --list` before deployment. Managed volume snapshots were unavailable
+on the current workspace plan. Phone QA is deferred by the owner, not passed.
+
+Runtime is pinned to Node 22, matching CI; see [Node's support list](https://nodejs.org/en/about/previous-releases).
+Railway warns that legacy `railway.toml` config remains supported only until
+December 1, 2026; migrate to Railway IaC as a separate operational follow-up.
+
+## Recovery Implementation
+
+The follow-up adds `011_acknowledged_transfers.sql` (pending claim/acknowledgement)
+and `012_rank_and_run_reporting.sql` (typed event schema, logical run dedup,
+nearby-rank index). These were deployed on October 22.
+New receiving clients use `/v2/account/claim-transfer` and
+`/v2/account/acknowledge-transfer`; old receiving clients get 426 rather than
+the unsafe credential-rotation flow. Claim leaves the source token valid;
+acknowledgement rotates it only after durable local credential storage. The
+server stores credential hashes, not plaintext recovery secrets. Own/nearby
+ranks use authenticated `/v1/leaderboards/nearby/:routeId`; public top-25 reads
+remain unchanged. See `TRUST_UPDATE.md` for ordering and acceptance.
+
+October 18 source adds `010_service_recovery.sql`: cloud operation IDs,
+installation-level moderation/leave state and unique telemetry event IDs.
+Deploy it through `npm run migrate` in the existing Railway pre-deploy phase
+before distributing the updated client. Migrations now have a checksum ledger,
+an advisory lock and per-file transactions. Never edit already-applied SQL;
+add the next migration instead. Legacy cloud clients/events remain supported;
+only event-ID-bearing uploads can be deduplicated.
+
+Real PostgreSQL tests run in GitHub Actions. Locally run
+`tools/test_postgres.ps1` from the repository root with Docker; it creates an
+isolated disposable database. Never use production credentials for tests.
+The operational deployment and phone gates are in `RECOVERY_UPDATE.md`.
+
+The repository now contains a small Node 22 / Express / PostgreSQL service in
 `backend/`. It is intentionally separate from the Godot game: the game remains
 fully playable offline. The Railway service is deployed and the current client
 release switch is on. As confirmed October 8, 2026, production has migrations
@@ -160,7 +200,10 @@ X-Sync-Token: server-issued device token
 | `POST /v1/referrals/invites` | Create a server-issued invite code. |
 | `POST /v1/referrals/activate` | Link an eligible invitee to an invite, with duplicate/self guards. |
 | `POST /v1/account/transfer-code` | Create a one-time, 15-minute phone-move code. |
-| `POST /v1/account/claim-transfer` | Rotate cloud access to a new phone using that code. |
+| `POST /v1/account/claim-transfer` | Legacy receiving clients return 426 and must update. |
+| `POST /v2/account/claim-transfer` | Retry-safe pending claim; keeps source authorized. |
+| `POST /v2/account/acknowledge-transfer` | Acknowledge durable receiver credential, rotate access, retry safely. |
+| `GET /v1/leaderboards/nearby/:routeId` | Authenticated own rank plus up to seven nearby ranks. |
 
 Cloud sync intentionally excludes local leaderboard names, all referral codes,
 analytics history, pending leaderboard uploads, cached standings, and the sync

@@ -1,5 +1,56 @@
 # Dala Dala Rush TZ - Upgrade Notes (Changelog)
 
+## Version 1.0.18 / Code 19 - Trust And Recovery Candidate
+
+- Deploy backend migrations 010-012, migration-ledger checks and retry-safe
+  transfer/cloud operations; verify all seven public World route reads.
+- Align production with Node 22 used in hosted CI.
+- Add five small synthetic Swahili conductor placeholders with a provenance
+  ledger and import/size contracts; no human recording or cloned voice.
+- Include the consent, save recovery, actual-button buffering, Results receipt,
+  nearby-rank, replay and battery improvements listed below.
+- Physical two-phone QA is explicitly deferred, not passed. Artifact/hosted
+  evidence and bilingual Play notes are in `releases/1.0.18.md`.
+
+## Unreleased - Consent, Trust And Competition (October 18, 2026)
+
+- Native UMP 4 consent/update/privacy-options bridge; every Android ad request
+  is gated, and callbacks from an old consent session cannot restore stale ads.
+- Durable acknowledged phone transfer with retry-safe claim/acknowledgement;
+  source access is revoked only after the new phone has saved its credential.
+- Schema 18 structural save checks, damaged-file quarantine, real backup
+  recovery, nested mission/livery/replay sanitization and future-schema safety.
+- Real rapid HUD-button buffering; replay blobs excluded from cloud backup;
+  other players' blocks survive a target leaving/rejoining rankings.
+- Results locks navigation during rewards and records one wallet-reconciled
+  receipt; crash coaching/unlock progress sit near Play Again.
+- Own/nearby online ranks beyond top 25, bounded partial replay windows,
+  typed telemetry and one logical completed-run marker across a revive.
+- Daily copy accurately describes shared setup with adaptive traffic.
+- Vehicle roof details, roadside event pictograms, 30 FPS Battery Saver,
+  local debug frame reports and rendered CI screenshot artifacts.
+- Full local source gate passed with 28 real-PostgreSQL backend tests;
+  60 primary/156 secondary rendered captures and 288 secondary layout cases.
+- Source only. Deployment 010-012, privacy publication, new AAB, native phone
+  acceptance and licensed/original voice recordings remain; see `TRUST_UPDATE.md`.
+
+## Unreleased - Responsive Menus And Recovery (October 18, 2026)
+
+- Responsive wrapped menus, stacked action grids and bounded splash/Settings;
+  Garage bus previews and Results primary actions above expandable details.
+- Bounded ad retries, resume recovery and live reward availability on Results.
+- Durable idempotent cloud uploads, explicit conflict resolution, and correct
+  career/livery restoration. New backend migration 010 is not deployed yet.
+- Tutorial stages require completed steps; an explicit skip is available.
+- Moderation survives same-installation rejoining; Daily rivals check rules 2.
+- Save schema 17, checked atomic writes, deduplicated transactional telemetry.
+- Physics-tick steering with a one-turn buffer, pause safety, swept collision
+  checks before cleanup and crossed bus-stop service windows.
+- Every scene now has automated portrait bounds coverage. Real PostgreSQL
+  recovery/migration tests run in CI; AAB checks pin package/upload certificate.
+- These are source-only changes after code 18. Full evidence and remaining
+  device/deployment gates are in `RECOVERY_UPDATE.md`.
+
 Google Play production is active. The latest locally verified signed test
 candidate is version 1.0.17 (code 18), built with Godot 4.7.1 / API 36.
 Physical-device and Play testing remain outstanding; do not treat this

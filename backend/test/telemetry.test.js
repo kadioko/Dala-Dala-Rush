@@ -13,12 +13,13 @@ test("telemetry retention removes expired events in bounded 90-day batches", asy
       }
       if (sql.includes("DELETE FROM leaderboard_reports")) return { rowCount: 1 };
       if (sql.includes("UPDATE leaderboard_profiles SET moderation_status = 'active'")) return { rowCount: 0 };
+      if (sql.includes("UPDATE installations SET leaderboard_hidden_until")) return { rowCount: 0 };
       throw new Error(`Unexpected SQL in retention test: ${sql}`);
     },
   };
   const deleted = await purgeExpiredTelemetry(pool);
   assert.equal(deleted, 2);
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.deepEqual(calls[0].params, [90, 1000]);
   assert.deepEqual(calls[1].params, [90, 1000]);
   assert.match(calls[0].sql, /received_at < NOW\(\)/);
@@ -30,7 +31,9 @@ test("telemetry retention removes expired events in bounded 90-day batches", asy
 test("telemetry endpoint accepts whole seconds and rejects fractional timestamps", async () => {
   const inserts = [];
   const pool = {
+    async connect() { return { query: this.query.bind(this), release() {} }; },
     async query(sql, params) {
+      if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql)) return { rowCount: 0 };
       if (sql.startsWith("UPDATE installations")) return { rowCount: 1 };
       if (sql.includes("INSERT INTO telemetry_events")) {
         inserts.push(params);

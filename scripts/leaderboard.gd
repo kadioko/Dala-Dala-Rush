@@ -37,6 +37,8 @@ var _upload_status: Label
 var _tab := TAB_PERSONAL
 var _route_index := 0
 var _remote_scores: Array = []
+var _own_rank: Dictionary = {}
+var _nearby_scores: Array = []
 var _friend_code := ""
 var _joining_online := false
 var _request_serial: int = 0
@@ -303,6 +305,8 @@ func _refresh_upload_status(pending: int) -> void:
 				_upload_status.text = LocaleManager.t("LEADERBOARD_UPLOAD_RATE_LIMITED")
 			"invalid_name":
 				_upload_status.text = LocaleManager.t("LEADERBOARD_UPLOAD_NAME_INVALID")
+			"profile_hidden":
+				_upload_status.text = LocaleManager.t("BOARD_PROFILE_HIDDEN")
 			_:
 				_upload_status.text = LocaleManager.t("LEADERBOARD_PENDING").replace("{n}", str(pending))
 		return
@@ -317,6 +321,8 @@ func _refresh_upload_status(pending: int) -> void:
 			_upload_status.text = LocaleManager.t("LEADERBOARD_UPLOAD_RATE_LIMITED")
 		"invalid_name":
 			_upload_status.text = LocaleManager.t("LEADERBOARD_UPLOAD_NAME_INVALID")
+		"profile_hidden":
+			_upload_status.text = LocaleManager.t("BOARD_PROFILE_HIDDEN")
 		_:
 			_upload_status.text = ""
 
@@ -336,6 +342,13 @@ func _refresh_tab_style(button: Button, tab_id: String) -> void:
 func _refresh_rows() -> void:
 	for child in _rows.get_children():
 		child.queue_free()
+	if _tab == TAB_WORLD and not _own_rank.is_empty():
+		_rows.add_child(UIFactory.make_label(LocaleManager.t("BOARD_YOUR_RANK").replace("{rank}", str(int(_own_rank.rank))), 18, UIFactory.COL_ACCENT))
+		if int(_own_rank.rank) > 25:
+			_rows.add_child(UIFactory.make_label(LocaleManager.t("BOARD_NEARBY"), 16, UIFactory.COL_PRIMARY))
+			for entry in _nearby_scores:
+				_add_score_row(int(entry.rank), entry)
+			_add_world_target(_nearby_scores)
 	var scores: Array = []
 	if _tab == TAB_PERSONAL:
 		scores = SaveSystem.get_personal_route_scores(_current_route_id())
@@ -343,9 +356,11 @@ func _refresh_rows() -> void:
 		scores = _remote_scores
 	if _tab == TAB_FRIENDS and not scores.is_empty():
 		_add_friend_target(scores)
-	elif _tab == TAB_WORLD and not scores.is_empty():
+	elif _tab == TAB_WORLD and not scores.is_empty() and (_own_rank.is_empty() or int(_own_rank.rank) <= 25):
 		_add_world_target(scores)
 	if scores.is_empty():
+		if _tab == TAB_WORLD and not _own_rank.is_empty():
+			return
 		var empty_key := "NO_SCORES_YET"
 		if _tab != TAB_PERSONAL and _remote_state == "loading" and _cached_status.is_empty():
 			empty_key = "LEADERBOARD_LOADING"
@@ -389,6 +404,7 @@ static func points_to_overtake(own_score: int, rival_score: int) -> int:
 
 func _add_world_target(scores: Array) -> void:
 	var your_score: int = SaveSystem.get_route_best(_current_route_id())
+	if not _own_rank.is_empty(): your_score = int(_own_rank.score)
 	var rival: Dictionary = {}
 	for value in scores:
 		if value is not Dictionary:
@@ -461,6 +477,8 @@ func _refresh_remote_scores() -> void:
 	_request_remote_scores()
 
 func _request_remote_scores() -> void:
+	_own_rank = {}
+	_nearby_scores = []
 	if not OnlineService.is_enabled():
 		return
 	OnlineService.retry_pending_leaderboard_submissions()
@@ -703,6 +721,14 @@ func _confirm_leave_online() -> void:
 	dialog.popup_centered(Vector2i(dialog_width_for_viewport(get_viewport_rect().size.x, 440), 0))
 
 func _on_online_request_finished(operation: String, success: bool, payload: Dictionary) -> void:
+	if operation == "leaderboard_nearby":
+		if success and _tab == TAB_WORLD and SaveSystem.is_online_leaderboard_opted_in() \
+		and int(payload.get("request_id", -1)) == _active_request_id \
+		and payload.get("route_id") == _current_route_id():
+			_own_rank = payload.own if payload.get("own") is Dictionary else {}
+			_nearby_scores = payload.get("nearby", [])
+			_refresh_rows()
+		return
 	if operation == "registration":
 		if success and _joining_online and OnlineService.has_identity():
 			OnlineService.update_leaderboard_profile(SaveSystem.get_leaderboard_display_name())
@@ -761,6 +787,8 @@ func _on_online_request_finished(operation: String, success: bool, payload: Dict
 				)
 			elif failure_reason == "invalid_display_name":
 				failure_key = "LEADERBOARD_UPLOAD_NAME_INVALID"
+			elif failure_reason == "profile_hidden":
+				failure_key = "BOARD_PROFILE_HIDDEN"
 			_upload_status.text = LocaleManager.t(failure_key)
 		return
 	if operation == "leaderboard_friend_list":
@@ -845,6 +873,13 @@ func _on_import_ghost() -> void:
 	var parsed := GhostDataLib.decode(DisplayServer.clipboard_get())
 	if parsed.is_empty():
 		_ghost_msg.text = LocaleManager.t("GHOST_BAD_CODE")
+		return
+	if float(parsed.get("window_start", 0.0)) > 0.0:
+		_ghost_msg.text = LocaleManager.t("REPLAY_PARTIAL")
+		return
+	if not String(parsed.get("challenge_id", "")).is_empty() \
+	and int(parsed.get("rules_version", 0)) != preload("res://data/daily_route_challenge.gd").RULES_VERSION:
+		_ghost_msg.text = LocaleManager.t("RIVAL_RULES_MISMATCH")
 		return
 	SaveSystem.set_value("ghost_rival", parsed)
 	var replay: Dictionary = parsed as Dictionary

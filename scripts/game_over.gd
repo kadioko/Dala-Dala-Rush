@@ -50,7 +50,11 @@ var _pending_nav_path: String = ""
 var _interstitial_in_progress: bool = false
 var _reward_in_progress: bool = false
 var _navigation_in_progress: bool = false
-var _ad_row: HBoxContainer
+var _ad_row: GridContainer
+var _details_button: Button
+var _reward_placement: String = ""
+var _reward_run_id: String = ""
+var _receipt_label: Label
 
 const END_TIP_KEYS := {
 	"bodaboda": "RUN_TIP_BODABODA",
@@ -192,6 +196,8 @@ func _ready() -> void:
 	_progression_lbl = UIFactory.make_label("", 16, UIFactory.COL_PRIMARY)
 	_progression_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_progression_lbl)
+	_receipt_label = UIFactory.make_label("", 15, UIFactory.COL_TEXT)
+	v.add_child(_receipt_label)
 
 	# Completed missions banner
 	for t in GameState.last_missions_completed:
@@ -214,7 +220,7 @@ func _ready() -> void:
 		var enter_lbl := UIFactory.make_label(LocaleManager.t("ENTER_NAME"), 15, UIFactory.COL_ACCENT)
 		lb_vb.add_child(enter_lbl)
 
-		var hb := HBoxContainer.new()
+		var hb := UIFactory.make_action_row(170.0)
 		hb.add_theme_constant_override("separation", 8)
 		lb_vb.add_child(hb)
 
@@ -237,7 +243,7 @@ func _ready() -> void:
 	_ad_msg_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(_ad_msg_lbl)
 
-	_ad_row = HBoxContainer.new()
+	_ad_row = UIFactory.make_action_row()
 	_ad_row.add_theme_constant_override("separation", 8)
 	_ad_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_child(_ad_row)
@@ -278,13 +284,37 @@ func _ready() -> void:
 	v.add_child(_spacer(18))
 
 	AdService.rewarded_result.connect(_on_rewarded_result)
+	AdService.rewarded_availability_changed.connect(_on_rewarded_availability_changed)
 	AdService.interstitial_closed.connect(_on_interstitial_closed)
 	AdService.show_banner(self, AdService.PLACEMENT_BANNER_RESULTS)
 	_refresh_reward_actions()
+	AdService.ensure_ads_loaded()
+	_arrange_results(v)
 
 	LocaleManager.locale_changed.connect(_refresh)
 	_refresh()
 	set_process(true)
+
+func _arrange_results(content: VBoxContainer) -> void:
+	var primary: Array = [_title_lbl, _record_lbl, _route_record_lbl,
+		_score_lbl, _coins_lbl, _play_btn, _coach_body_lbl, _progression_lbl,
+		_ad_msg_lbl, _ad_row, _menu_btn]
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 10)
+	for control in primary:
+		if control.get_parent() != content:
+			control.reparent(content)
+	for child in content.get_children():
+		if child not in primary:
+			child.reparent(details)
+	for index in range(primary.size()):
+		content.move_child(primary[index], index)
+	_details_button = UIFactory.make_button(LocaleManager.t("RUN_DETAILS"), false)
+	_details_button.pressed.connect(func(): details.visible = not details.visible)
+	content.add_child(_details_button)
+	content.add_child(details)
+	details.visible = false
 
 func _exit_tree() -> void:
 	AdService.hide_banner()
@@ -322,6 +352,15 @@ func _update_stats_labels() -> void:
 		_coins_lbl.text += " (+%d)" % GameState.last_bonus_coins
 	if GameState.last_mastery_bonus_coins > 0:
 		_coins_lbl.text += " (+%d)" % GameState.last_mastery_bonus_coins
+	var receipt: Dictionary = GameState.reward_receipt()
+	if not receipt.is_empty():
+		_coins_lbl.text = "%s: %d" % [LocaleManager.t("EARNED_TOTAL"), int(receipt.get("total", 0))]
+		var lines: Array[String] = []
+		for key in ["pickups", "fares", "other", "fines", "route_goal", "missions", "season", "mastery", "daily", "contract", "ads"]:
+			var amount: int = int(receipt.get("components", {}).get(key, 0))
+			if amount != 0:
+				lines.append("%s: %+d" % [LocaleManager.t("RECEIPT_" + key.to_upper()), amount])
+		_receipt_label.text = "\n".join(lines)
 	_pass_lbl.text  = "%s: %d   |   %s: %d (+%d 🪙)" % [
 		LocaleManager.t("PASSENGERS"), int(_anim_pass),
 		LocaleManager.t("DROPOFFS"), GameState.last_dropoffs, GameState.last_fares,
@@ -337,6 +376,8 @@ func _update_stats_labels() -> void:
 	_best_lbl.text  = "%s: %d"    % [LocaleManager.t("BEST"),       int(SaveSystem.get_value("best_score", 0))]
 
 func _refresh(_l := "") -> void:
+	if is_instance_valid(_details_button):
+		_details_button.text = LocaleManager.t("RUN_DETAILS")
 	_title_lbl.text = LocaleManager.t("GAME_OVER")
 	_record_lbl.text = LocaleManager.t("NEW_RECORD")
 	_route_record_lbl.text = LocaleManager.t("ROUTE_RECORD")
@@ -471,6 +512,10 @@ func _refresh_reward_actions() -> void:
 	_ad_row.visible = _continue_btn.visible or _double_btn.visible
 	_ad_msg_lbl.visible = _ad_row.visible
 
+func _on_rewarded_availability_changed(_available: bool) -> void:
+	if not _reward_in_progress and not _navigation_in_progress:
+		_refresh_reward_actions()
+
 func _calc_stars() -> int:
 	var sc: int = GameState.last_score
 	if sc >= 2000: return 3
@@ -523,9 +568,8 @@ func _pulse_label(lbl: Label) -> void:
 		return
 	var tw := lbl.create_tween()
 	tw.set_loops(6)
-	tw.tween_property(lbl, "scale", Vector2(1.12, 1.12), 0.22)
-	tw.tween_property(lbl, "scale", Vector2(1.0,  1.0),  0.22)
-	lbl.pivot_offset = lbl.size * 0.5
+	tw.tween_property(lbl, "modulate:a", 0.55, 0.22)
+	tw.tween_property(lbl, "modulate:a", 1.0, 0.22)
 
 # ─── Navigation ───────────────────────────────────────────────────
 
@@ -560,12 +604,11 @@ func _on_view_leaderboard() -> void:
 	_go_after_optional_interstitial("res://scenes/leaderboard.tscn")
 
 func _go_after_optional_interstitial(path: String) -> void:
-	if _navigation_in_progress:
+	if _navigation_in_progress or _reward_in_progress:
 		return
+	GameState.finalize_run()
 	_navigation_in_progress = true
-	_play_btn.disabled = true
-	_menu_btn.disabled = true
-	_lb_btn.disabled = true
+	_set_navigation_locked(true)
 	AdService.note_completed_run()
 	if AdService.is_interstitial_available() and AdService.consume_pending_interstitial():
 		_pending_nav_path = path
@@ -576,8 +619,8 @@ func _go_after_optional_interstitial(path: String) -> void:
 		return
 	TransitionManager.go_to(path)
 
-func _on_interstitial_closed(_placement: String) -> void:
-	if not _interstitial_in_progress:
+func _on_interstitial_closed(placement: String) -> void:
+	if not _interstitial_in_progress or placement != AdService.PLACEMENT_INTERSTITIAL_RUN_END:
 		return
 	var path := _pending_nav_path
 	_pending_nav_path = ""
@@ -588,12 +631,13 @@ func _on_interstitial_closed(_placement: String) -> void:
 
 func _on_continue_ad() -> void:
 	AudioManager.play_sfx("click")
-	if _reward_in_progress or GameState.continue_used or not GameState.can_claim_rewarded_choice():
+	if _navigation_in_progress or _reward_in_progress or GameState.continue_used or not GameState.can_claim_rewarded_choice():
 		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
 	_reward_in_progress = true
+	_begin_reward(AdService.PLACEMENT_CONTINUE)
 	_continue_btn.disabled = true
 	_double_btn.disabled = true
 	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
@@ -601,21 +645,24 @@ func _on_continue_ad() -> void:
 
 func _on_double_coins_ad() -> void:
 	AudioManager.play_sfx("click")
-	if _reward_in_progress or GameState.last_coins <= 0 or not GameState.can_claim_rewarded_choice():
+	if _navigation_in_progress or _reward_in_progress or GameState.last_coins <= 0 or not GameState.can_claim_rewarded_choice():
 		return
 	if not AdService.is_rewarded_available():
 		_ad_msg_lbl.text = LocaleManager.t("ADS_SOON")
 		return
 	_reward_in_progress = true
+	_begin_reward(AdService.PLACEMENT_DOUBLE_COINS)
 	_double_btn.disabled = true
 	_continue_btn.disabled = true
 	_ad_msg_lbl.text = LocaleManager.t("AD_LOADING")
 	AdService.show_rewarded(AdService.PLACEMENT_DOUBLE_COINS)
 
 func _on_rewarded_result(placement: String, success: bool) -> void:
-	if not _reward_in_progress:
+	if not _reward_in_progress or placement != _reward_placement \
+	or _reward_run_id != GameState.active_run_id():
 		return
 	_reward_in_progress = false
+	_set_navigation_locked(false)
 	if not success:
 		_ad_msg_lbl.text = LocaleManager.t("AD_FAILED")
 		_continue_btn.disabled = false
@@ -625,16 +672,32 @@ func _on_rewarded_result(placement: String, success: bool) -> void:
 	match placement:
 		AdService.PLACEMENT_CONTINUE:
 			if GameState.request_continue():
+				_navigation_in_progress = true
 				TransitionManager.go_to("res://scenes/game.tscn")
 		AdService.PLACEMENT_DOUBLE_COINS:
 			var doubled_amount: int = GameState.claim_double_coins()
 			if doubled_amount > 0:
+				_update_stats_labels()
 				AudioManager.play_sfx("powerup")
 				_ad_msg_lbl.visible = true
 				_ad_msg_lbl.text = "+%d %s" % [doubled_amount, LocaleManager.t("COINS")]
 				_ad_row.visible = false
 			else:
 				_refresh_reward_actions()
+
+func _begin_reward(placement: String) -> void:
+	_reward_placement = placement
+	_reward_run_id = GameState.active_run_id()
+	_set_navigation_locked(true)
+
+func _set_navigation_locked(locked: bool) -> void:
+	for button in [_play_btn, _menu_btn, _lb_btn, _share_btn, _replay_btn, _submit_btn]:
+		if is_instance_valid(button): button.disabled = locked
+	if is_instance_valid(_submit_btn): _submit_btn.disabled = locked or _score_submitted
+
+func handle_back() -> void:
+	if not _reward_in_progress and not _navigation_in_progress:
+		_on_main_menu()
 
 func _on_share() -> void:
 	AudioManager.play_sfx("click")
@@ -652,7 +715,8 @@ func _on_copy_replay() -> void:
 		return
 	DisplayServer.clipboard_set(code)
 	_ad_msg_lbl.visible = true
-	_ad_msg_lbl.text = LocaleManager.t("REPLAY_CLIP_COPIED")
+	var replay: Dictionary = SaveSystem.get_value("latest_replay", {})
+	_ad_msg_lbl.text = LocaleManager.t("REPLAY_PARTIAL" if float(replay.get("window_start", 0.0)) > 0.0 else "REPLAY_CLIP_COPIED")
 
 # ══════════════════════ Inner draw node ═══════════════════════════
 

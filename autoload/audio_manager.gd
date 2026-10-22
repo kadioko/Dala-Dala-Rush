@@ -9,7 +9,7 @@ extends Node
 
 const AUDIO_DIR := "res://audio/"
 const SFX_KEYS := ["coin", "passenger", "crash", "click", "horn", "powerup"]
-## Conductor voice lines — file-only (silent until recordings are added).
+## Conductor voice lines: synthetic Swahili placeholders; see audio/SOURCES.md.
 ## See docs/AUDIO_ASSETS.md.
 const VOICE_KEYS := ["voice_mwisho", "voice_twende", "voice_karibu", "voice_mafuta", "voice_kituo"]
 const VOICE_POOL := 5  # simultaneous SFX

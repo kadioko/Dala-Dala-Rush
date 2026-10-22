@@ -12,7 +12,8 @@ const COL_MUTED := Color("#9aa3b2")
 static func make_button(text: String, primary: bool = true) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(280, 64)
+	b.custom_minimum_size = Vector2(0, 64)
+	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = COL_PRIMARY if primary else COL_PANEL
 	sb.corner_radius_top_left = 12
@@ -60,6 +61,8 @@ static func make_title(text: String, font_size: int = 42) -> Label:
 	l.add_theme_color_override("font_color", COL_ACCENT)
 	l.add_theme_font_size_override("font_size", font_size)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return l
 
 static func make_label(text: String, font_size: int = 20, color: Color = COL_TEXT) -> Label:
@@ -68,7 +71,17 @@ static func make_label(text: String, font_size: int = 20, color: Color = COL_TEX
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", font_size)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return l
+
+static func make_action_row(minimum_column_width: float = 150.0) -> GridContainer:
+	var row := preload("res://ui/responsive_actions.gd").new()
+	row.minimum_column_width = minimum_column_width
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 8)
+	return row
 
 static func make_panel(color: Color = COL_PANEL) -> PanelContainer:
 	var p := PanelContainer.new()

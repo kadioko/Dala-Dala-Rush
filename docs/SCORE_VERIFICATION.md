@@ -2,12 +2,12 @@
 
 ## Current State
 
-The production World endpoint is reachable and public-read. On October 8,
-2026, `/health` returned `{"ok":true}` and Kariakoo, Mwenge, Mbezi, Posta,
-Kigamboni, and Ubungo World endpoints returned HTTP 200 with valid
-`verification: "unverified"` responses and empty score arrays. This means the
-board works but had no opted-in public scores at the time of the check.
-Arusha returned HTTP 400 because its route migration has not reached Railway.
+The production World endpoint is reachable and public-read. On October 18,
+2026, `/health` returned `{"ok":true}` and all seven route endpoints, including
+Arusha, returned valid `verification: "unverified"` responses. Mwenge had one
+public score; the remaining routes were empty. Migrations through 009 were
+deployed on October 8. Empty route boards mean no public submissions were
+present for those routes at the time of the check.
 
 The server currently checks installation credentials, opt-in client behavior,
 route validity, display-name rules, integer score bounds, rate limits, and

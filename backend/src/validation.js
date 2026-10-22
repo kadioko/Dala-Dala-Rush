@@ -34,6 +34,7 @@ export function jsonByteLength(value) {
 export const TELEMETRY_EVENT_NAMES = new Set([
   "tutorial_stage_finished",
   "run_end",
+  "run_segment_end", "run_settled",
   "online_leaderboard_submit",
   "online_leaderboard_global",
   "online_leaderboard_friends",
@@ -43,6 +44,8 @@ export const TELEMETRY_EVENT_NAMES = new Set([
   "route_moment_complete",
   "route_moment_timeout",
   "vehicle_unlocked",
+  "tutorial_stage_started", "tutorial_step_completed", "tutorial_attempt_finished",
+  "ad_rewarded_requested", "ad_rewarded_loaded", "ad_rewarded_load_failed", "ad_rewarded_earned",
 ]);
 
 export function validTelemetryEvent(value) {

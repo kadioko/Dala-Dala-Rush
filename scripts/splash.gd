@@ -30,8 +30,9 @@ func _ready() -> void:
 	brand.anchor_left = 0.5
 	brand.anchor_right = 0.5
 	brand.anchor_top = 0.0
-	brand.offset_left = -220
-	brand.offset_right = 220
+	var brand_half_width: float = minf(220.0, view_size.x * 0.5 - 20.0)
+	brand.offset_left = -brand_half_width
+	brand.offset_right = brand_half_width
 	brand.offset_top = 64 + UIFactory.safe_top_inset(view_size.y)
 	brand.add_theme_constant_override("separation", 6)
 	add_child(brand)

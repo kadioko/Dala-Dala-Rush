@@ -1,5 +1,61 @@
 # Device QA Worksheet
 
+October 22: the owner explicitly deferred physical two-phone testing. No device
+results are marked passed. Backend HTTPS smoke tests succeeded separately;
+synthetic voice placeholders still need native-speaker/phone-speaker review.
+
+## Trust Follow-Up Acceptance - Not Yet Performed On Phones
+
+- [ ] On both phones, test UMP required/not-required regions, prior consent,
+  offline/update failure and the required Ad Privacy Options entry point.
+  Register devices in AdMob; never click production ads as a test.
+- [ ] Lose the transfer claim response, then acknowledgement response; restart
+  the receiving phone. Source remains authorized until acknowledgement; only
+  the receiver works afterward. An expired pending claim preserves source.
+- [ ] Compare receipt total with the wallet delta, including actual fines,
+  missions/season and one ad reward; revive must not count/pay a second run.
+- [ ] During an ad request, Play Again/Menu/hardware Back cannot leave Results.
+- [ ] Target leaves/rejoins; blocker still sees its private block. Verify
+  own/nearby rankings below 25 without stale route responses.
+- [ ] Back up with four maximum replays; progress succeeds, clips stay local.
+- [ ] Compare a 15-minute route at 60/30 FPS with fixed brightness/network/
+  charger state. Use debug Settings capture plus `capture_android_perf.ps1`;
+  record stalls, memory trend, heat and battery, not only average FPS.
+- [ ] Roadside event pictograms and bus roof details remain recognizable in
+  both languages, bright light and reduced brightness. No effect hides traffic.
+
+Local desktop source gate passed with 28 PostgreSQL-backed tests and 216
+rendered captures. CI screenshot jobs are prepared, not hosted-run evidence.
+ADB had no connected phone. Do not turn these unchecked gates into passes.
+
+October 18 source update: run `tests/secondary_ui_qa.tscn` as well as the
+existing UI runner. It checks 288 combinations across all 12 secondary/splash
+screens, two profiles, six sizes and both languages; the two runners together
+cover every scene. Normal rendering produces 156 secondary captures including
+collapsed Results, plus 60 menu/HUD captures. Headless checks do not render.
+See `RECOVERY_UPDATE.md` for recovery tests and remaining release requirements.
+
+## Recovery Acceptance On Each Phone
+
+- [ ] Settings/Results action rows stack on narrow screens; names/keyboard,
+  dialogs, live banner and splash title fit. Garage previews match the livery.
+- [ ] With test ads, go offline, open Results, reconnect and wait for load:
+  reward buttons become available without reopening. Dismiss/fail/reward once;
+  confirm exactly one reward through pause/resume and double taps.
+- [ ] Interrupt a cloud upload after server acceptance; retry keeps newer
+  local progress. Exercise transferred-phone revision conflicts, explicit
+  overwrite, confirmed restore and relaunch. Never use the primary save.
+- [ ] Crash before either lesson step and after one step: lesson repeats.
+  Complete both steps and check progression; test confirmed Skip Lessons.
+- [ ] On two disposable profiles, test moderation leave/rejoin, friend codes,
+  blocking, account deletion and old-rule Daily replay rejection.
+- [ ] Test rapid double steering, opposite input, pause mid-switch, stop
+  alignment and busy-traffic frame stalls. No stale buffered turn on resume.
+- [ ] Test storage pressure with a backed-up disposable save; failed writes
+  must preserve the prior save and show a Settings notice.
+
+These remain unchecked because desktop tests cannot supply phone evidence.
+
 Use this worksheet for production-update QA and for the separately gated online
 pilot. Record the exact version code under test.
 Capture one completed form for a low-end phone and one for a mid-range phone;

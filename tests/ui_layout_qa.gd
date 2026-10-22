@@ -162,6 +162,13 @@ func _capture_game_ui(locale_id: String, view_size: Vector2i) -> void:
 	for _frame in range(3):
 		await get_tree().process_frame
 	_check_all_bounds(hud, view_size, locale_id, "gameplay HUD")
+	for label_name in ["score_label", "coins_label", "pass_label"]:
+		var counter := game.get(label_name) as Label
+		if counter.get_line_count() > 1 or counter.size.y > 56.0:
+			_failures.append("%s %s HUD counter must remain a single compact line" % [locale_id, label_name])
+	var pause_button := game.get("pause_btn") as Button
+	if pause_button.size.y > 64.0:
+		_failures.append("%s pause button stretched beyond the compact HUD" % locale_id)
 	if locale_id == "en" and view_size == Vector2i(320, 568):
 		_check_drive_input_isolation(game)
 	for control_name in ["btn_left", "_horn_btn", "btn_right"]:

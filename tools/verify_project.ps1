@@ -4,11 +4,15 @@ param(
 	[string]$BundletoolJar,
 	[string]$ExpectedVersionName,
 	[int]$ExpectedVersionCode = 0,
-	[int]$ExpectedTargetSdk = 0
+	[int]$ExpectedTargetSdk = 0,
+	[switch]$RequirePostgres
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if (($BundlePath -or $RequirePostgres) -and -not $env:TEST_DATABASE_URL) {
+	throw 'A full release gate requires an isolated TEST_DATABASE_URL ending in _test. Use tools/test_postgres.ps1 -VerifyProject for source gates.'
+}
 
 if (-not $GodotPath) {
 	$command = Get-Command godot -ErrorAction SilentlyContinue
@@ -32,6 +36,12 @@ try {
 
 	& $GodotPath --headless --path . res://tests/ui_layout_qa.tscn
 	if ($LASTEXITCODE -ne 0) { throw "Godot responsive UI bounds checks failed." }
+	& $GodotPath --headless --path . res://tests/secondary_ui_qa.tscn
+	if ($LASTEXITCODE -ne 0) { throw "Godot secondary-screen bounds checks failed." }
+	& $GodotPath --headless --path . res://tests/recovery_contracts.tscn
+	if ($LASTEXITCODE -ne 0) { throw "Godot recovery/input/save regressions failed." }
+	& $GodotPath --headless --path . res://tests/trust_contracts.tscn
+	if ($LASTEXITCODE -ne 0) { throw "Godot consent/reward/GUI trust regressions failed." }
 
 	Push-Location (Join-Path $projectRoot "backend")
 	try {
@@ -52,7 +62,11 @@ try {
 		if ($LASTEXITCODE -ne 0) { throw "Android bundle verification failed." }
 	}
 
-	Write-Output "Project release gates: PASS"
+	if ($env:TEST_DATABASE_URL) {
+		Write-Output "Project release gates: PASS (including real PostgreSQL)"
+	} else {
+		Write-Output "Project source gates: PASS (PostgreSQL integration skipped; not a full release gate)"
+	}
 } finally {
 	Pop-Location
 }

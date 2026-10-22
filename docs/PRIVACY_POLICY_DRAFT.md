@@ -1,13 +1,13 @@
 # Privacy Policy Source
 
-Source updated: October 8, 2026. The matching HTML is published at the URL
-below. Review the Play Data Safety declaration against the currently enabled
-Railway features before the next store submission.
+Source updated: October 22, 2026. Publication of the matching HTML is part of
+the 1.0.18 release; see `releases/1.0.18.md` for verified status. Review the Play Data Safety declaration
+against enabled Railway features before the next store submission.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: October 8, 2026
+Effective date: October 22, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -44,6 +44,12 @@ records created through the pilot. It does not receive your email address,
 contacts, precise location, advertising ID, local analytics log, or referral
 codes.
 
+Replay clips remain on the phone and are excluded from cloud backups. During
+intentional phone transfer, the receiving phone saves its own random credential
+before acknowledgement. The server stores hashes and temporary claim IDs;
+source access is revoked only on acknowledgement. An unacknowledged code expires
+after 15 minutes without revoking the source phone.
+
 Online Leaderboards are separate from Cloud Backup and optional. Before
 joining, you will be asked to choose a
 short driver display name. That name and the route score you choose to submit
@@ -57,6 +63,12 @@ fixed reason; the report contains no free-text message. Players may block a
 friend, which removes the friend link and prevents a new link until unblocked.
 Reports and moderation snapshots are kept for up to 90 days, then scheduled for
 deletion. Deleting Cloud Data also deletes reports submitted by that installation.
+For the same anonymous installation, a moderation restriction remains in force
+when you leave and rejoin public rankings, for the same up-to-90-day period.
+Deleting Cloud Data removes the installation and that restriction record too.
+Leaving rankings clears your own block preferences, not blocks other players
+placed on your installation. Those remain until their owner unblocks or an
+associated installation is deleted. A new installation is a different identity.
 
 When the game connects to online services, the backend temporarily processes
 the connection IP address in memory to enforce request limits and reduce abuse.
@@ -69,11 +81,17 @@ under its own privacy practices.
 Gameplay Insights have their own in-app opt-in separate from Cloud Backup and
 Online Leaderboards. After you opt in, the game sends a small allowlist of
 sanitized gameplay events associated with an anonymous installation identifier.
-Events include tutorial completion, route and run outcomes (including score,
+Events include tutorial starts, steps, attempts and completion, rewarded-ad
+requests, loads, load failures and earned rewards, route and run outcomes (including score,
 distance, elapsed time, and end reason), route-moment starts/completions/timeouts,
 fuel failures, vehicle unlock type/price/run count, leaderboard request
 success/failure, and day-1/day-7 return markers. Reports use aggregated counts
 and do not include player-entered names.
+Each uploaded event includes a random event identifier to prevent counting
+network retries twice; it is not an advertising identifier.
+Completed runs also carry a random logical run ID so revives do not count as
+another completed run. Explicit debug frame captures stay local and are not
+uploaded to Railway.
 The service rejects names, friend codes, tokens, advertising IDs, contact
 details, and free-form nested data. You can turn this option off in Settings at
 any time; this stops future uploads. Gameplay Insights events and leaderboard
@@ -95,6 +113,10 @@ choose the app and recipient yourself.
 Dala Dala Rush TZ uses Google AdMob to show ads, including rewarded ads,
 interstitial ads, and banner ads.
 
+Google UMP's current SDK decision gates native ad requests; required forms are
+shown and required Ad Privacy Options appear in Settings. Advertising choices
+are separate from the three optional Railway services.
+
 Google Mobile Ads SDK may automatically collect and share data such as:
 
 - IP address, which may be used to estimate general location
@@ -112,7 +134,9 @@ https://policies.google.com/privacy
 ## Children
 
 Dala Dala Rush TZ is designed as a family-friendly game. It does not include
-gambling, betting, social chat, account creation, or user-generated content.
+gambling, betting or social chat. No email/password login is required. Optional
+online rankings contain player-entered public display names with reporting and
+moderation controls.
 
 If the app is later submitted as child-directed or included in Google Play's
 Families program, ad request settings and content must be reviewed to meet all

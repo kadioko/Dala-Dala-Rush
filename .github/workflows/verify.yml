@@ -8,7 +8,23 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ddrtz_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ddrtz_test
     steps:
       - uses: actions/checkout@v4
 
@@ -39,3 +55,27 @@ jobs:
           "$GODOT" --headless --editor --path . --quit
           "$GODOT" --headless --path . res://tests/logic_contracts.tscn
           "$GODOT" --headless --path . res://tests/ui_layout_qa.tscn
+          "$GODOT" --headless --path . res://tests/secondary_ui_qa.tscn
+          "$GODOT" --headless --path . res://tests/recovery_contracts.tscn
+          "$GODOT" --headless --path . res://tests/trust_contracts.tscn
+
+      - name: Render bilingual phone-size screenshots
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dri
+          GODOT=/tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          xvfb-run -a "$GODOT" --rendering-method gl_compatibility --audio-driver Dummy --path . res://tests/ui_layout_qa.tscn
+          xvfb-run -a "$GODOT" --rendering-method gl_compatibility --audio-driver Dummy --path . res://tests/secondary_ui_qa.tscn
+
+      - name: Preserve rendered QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bilingual-mobile-layouts
+          path: |
+            ~/.local/share/godot/app_userdata/Dala Dala Rush TZ/ui_qa/*.png
+            ~/.local/share/godot/app_userdata/Dala Dala Rush TZ/secondary_ui_qa/*.png
+          if-no-files-found: error
+          retention-days: 14

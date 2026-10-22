@@ -8,6 +8,7 @@ var sky_color: Color   = Color("#f7d794")
 var view_size: Vector2 = Vector2(540, 960)
 var num_lanes: int     = 3
 var route_id: String   = "kariakoo"
+var signature_active: bool = false
 
 var scroll_near: float = 0.0      # lane stripes, 1.0x
 var scroll_mid: float  = 0.0      # buildings, 0.44x
@@ -73,6 +74,44 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2(road_x - 4, 0), Vector2(4, h)), Color("#efefef"))
 	draw_rect(Rect2(Vector2(road_x + road_w, 0), Vector2(4, h)), Color("#efefef"))
 	_draw_curbs_and_street_furniture(road_x, road_w, h)
+	if signature_active:
+		_draw_signature_marker(road_x + road_w, h)
+
+func _draw_signature_marker(edge: float, height: float) -> void:
+	# A fixed roadside cue never covers a driving lane or carries a hitbox.
+	var width: float = maxf(20.0, view_size.x - edge - 6.0)
+	var center := Vector2(edge + width * 0.5 + 3.0, clampf(height * 0.38, 205.0, 420.0))
+	var radius: float = minf(22.0, width * 0.46)
+	var accent := Color("#ffd23f")
+	if route_id in ["kigamboni", "mbezi"]: accent = Color("#52e0b1")
+	if route_id in ["mwenge", "ubungo"]: accent = Color("#ff8d68")
+	draw_line(center, center + Vector2(0, radius * 2.5), Color("#dbe5e8"), 3.0, true)
+	draw_circle(center, radius, Color("#18272d"))
+	draw_arc(center, radius, 0.0, TAU, 24, accent, 2.0, true)
+	var unit: float = radius / 12.0
+	match route_id:
+		"kariakoo":
+			draw_circle(center + Vector2(0, -4) * unit, 3.0 * unit, accent)
+			draw_line(center + Vector2(-5, 5) * unit, center + Vector2(5, 5) * unit, accent, 5.0 * unit, true)
+		"mbezi", "arusha":
+			draw_rect(Rect2(center + Vector2(-7, -4) * unit, Vector2(10, 9) * unit), accent)
+			draw_rect(Rect2(center + Vector2(3, -1) * unit, Vector2(5, 6) * unit), accent)
+			for x in [-4, 5]: draw_circle(center + Vector2(x, 6) * unit, 2.0 * unit, Color.WHITE)
+		"posta":
+			var points := PackedVector2Array([Vector2(0, -8), Vector2(7, -5), Vector2(5, 5), Vector2(0, 9), Vector2(-5, 5), Vector2(-7, -5)])
+			for i in range(points.size()): points[i] = center + points[i] * unit
+			draw_colored_polygon(points, accent)
+		"kigamboni":
+			draw_rect(Rect2(center + Vector2(-6, -6) * unit, Vector2(11, 13) * unit), accent)
+			draw_rect(Rect2(center + Vector2(-3, -3) * unit, Vector2(5, 3) * unit), Color("#18272d"))
+		"mwenge":
+			for x in [-6, 6]: draw_arc(center + Vector2(x, 4) * unit, 3.5 * unit, 0.0, TAU, 16, accent, 1.5 * unit, true)
+			draw_line(center + Vector2(-6, 4) * unit, center + Vector2(3, -3) * unit, accent, 2.0 * unit, true)
+			draw_line(center + Vector2(3, -3) * unit, center + Vector2(6, 4) * unit, accent, 2.0 * unit, true)
+		_:
+			draw_line(center + Vector2(-7, 0) * unit, center + Vector2(3, 0) * unit, accent, 5.0 * unit, true)
+			draw_line(center + Vector2(3, -5) * unit, center + Vector2(3, 5) * unit, accent, 3.0 * unit, true)
+			draw_arc(center + Vector2(2, 0) * unit, 8.0 * unit, -0.7, 0.7, 12, accent, 1.5 * unit, true)
 
 # ──────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 # Godot editor/import cache
 .godot/
+.gradle/
 
 # Godot export/build output
 export.cfg
@@ -11,6 +12,12 @@ export_presets.cfg
 bin/
 build/
 exports/
+*.dump
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
 ios/plugins/
 
 # OS/editor noise

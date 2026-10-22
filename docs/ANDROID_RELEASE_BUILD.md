@@ -1,6 +1,18 @@
 # Android Release Build Runbook
 
-Last updated: October 8, 2026.
+Last updated: October 18, 2026.
+
+The changes in `RECOVERY_UPDATE.md` and `TRUST_UPDATE.md` are source-only and
+not included in the existing code 18 AAB. Deploy backend migrations 010-012 and
+publish the amended privacy page before distributing the updated client.
+The native consent bridge source is in `native/consent/`; run
+`tools/build_consent_bridge.ps1` after changing it, keep its local AAR with the
+export plugin, and confirm both AdMob and DalaConsent editor plugins are enabled.
+Configure AdMob Privacy & messaging and test SDK-required privacy options on
+registered devices; a successful Java build/manifest merge is not that test.
+The next AAB's manifest verifier also requires DalaConsent registration. Do not
+interpret a failure of the old code 18 artifact at this new gate as verification
+of a new export; none has been made for the trust update.
 
 Use this document to create and validate a signed Android App Bundle for Google
 Play production-track updates. Store-listing work and Play Console declarations are in
@@ -32,6 +44,16 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 ## Release Gates
 
 Complete these before rolling the verified bundle out to testers:
+
+- [ ] Run `tools/verify_project.ps1` and `tools/test_postgres.ps1` (Docker), or
+  use an isolated `TEST_DATABASE_URL` ending in `_test`; database tests must not
+  be skipped for release acceptance.
+- [ ] Review both rendered UI suites and complete the two-phone worksheet.
+- [ ] Deploy backend migrations 010-012 and matching code; publish privacy changes.
+- [ ] Verify the newly exported AAB against package and pinned upload certificate
+  in `data/release_identity.json`. Pass `-BundletoolJar`; it is now required.
+
+The following historical gates also remain applicable:
 
 - [ ] All intended code and documentation changes are present.
 - [ ] Settings includes an in-app Privacy Policy link.

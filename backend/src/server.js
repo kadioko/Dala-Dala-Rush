@@ -6,6 +6,10 @@ import {
 	boundedInteger, isUuid, jsonByteLength, validDisplayName, validRoute, validTelemetryEvent,
 } from "./validation.js";
 import { migrate } from "./migrate.js";
+import { installCloudRoutes } from "./cloud.js";
+import { installTransferRoutes } from "./transfers.js";
+import { telemetryProperties } from "./telemetry.js";
+import { installRankingRoutes } from "./rankings.js";
 
 const MAX_SAVE_BYTES = 64 * 1024;
 const MAX_SCORE = 2_000_000;
@@ -50,6 +54,7 @@ export async function purgeExpiredTelemetry(pool) {
 		 AND moderated_at < NOW() - ($1 * INTERVAL '1 day')`,
 		[TELEMETRY_RETENTION_DAYS],
 	);
+	await pool.query("UPDATE installations SET leaderboard_hidden_until = NULL WHERE leaderboard_hidden_until <= NOW()");
 	return deleted;
 }
 
@@ -122,22 +127,6 @@ function friendshipPair(firstId, secondId) {
 	return firstId < secondId ? [firstId, secondId] : [secondId, firstId];
 }
 
-function sanitizeTelemetryProperties(value) {
-	if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-	const clean = {};
-	for (const [rawKey, rawValue] of Object.entries(value)) {
-		const key = String(rawKey).toLowerCase();
-		if (!/^[a-z0-9_]{1,32}$/.test(key) || key.includes("name") || key.includes("code")
-			|| key.includes("token") || key.includes("id")) continue;
-		if (typeof rawValue === "boolean" || (typeof rawValue === "number" && Number.isFinite(rawValue))) {
-			clean[key] = rawValue;
-		} else if (typeof rawValue === "string" && rawValue.length <= 64) {
-			clean[key] = rawValue;
-		}
-	}
-	return clean;
-}
-
 export function createApp(pool) {
   const app = express();
   app.disable("x-powered-by");
@@ -195,9 +184,12 @@ export function createApp(pool) {
 	app.get("/v1/admin/profiles/hidden", requireModerator, async (_req, res) => {
 		try {
 			const result = await pool.query(
-				`SELECT installation_id AS target_id, display_name, moderated_at
-				 FROM leaderboard_profiles WHERE moderation_status = 'hidden'
-				 ORDER BY moderated_at DESC NULLS LAST LIMIT 200`,
+				`SELECT installation.id AS target_id, COALESCE(profile.display_name, 'Profile removed') AS display_name,
+				 installation.leaderboard_hidden_until - INTERVAL '90 days' AS moderated_at
+				 FROM installations AS installation LEFT JOIN leaderboard_profiles AS profile
+				 ON profile.installation_id = installation.id
+				 WHERE installation.leaderboard_hidden_until > NOW()
+				 ORDER BY installation.leaderboard_hidden_until DESC LIMIT 200`,
 			);
 			return res.json({ profiles: result.rows.map((row) => ({
 				targetId: row.target_id, displayName: row.display_name, moderatedAt: row.moderated_at,
@@ -241,7 +233,7 @@ export function createApp(pool) {
 					return problem(res, 409, "report_target_deleted");
 				}
 				const hidden = await client.query(
-					"UPDATE leaderboard_profiles SET moderation_status = 'hidden', moderated_at = NOW() WHERE installation_id = $1",
+					"UPDATE installations SET leaderboard_hidden_until = NOW() + INTERVAL '90 days' WHERE id = $1 RETURNING id",
 					[targetId],
 				);
 				if (hidden.rowCount !== 1) {
@@ -249,6 +241,7 @@ export function createApp(pool) {
 					transactionStarted = false;
 					return problem(res, 409, "report_target_deleted");
 				}
+				await client.query("UPDATE leaderboard_profiles SET moderation_status = 'hidden', moderated_at = NOW() WHERE installation_id = $1", [targetId]);
 				await client.query(
 					`UPDATE leaderboard_reports SET review_status = 'actioned', review_action = 'profile_hidden', reviewed_at = NOW()
 					 WHERE reported_installation_id = $1 AND review_status = 'open'`,
@@ -280,13 +273,16 @@ export function createApp(pool) {
 					UPDATE leaderboard_profiles SET moderation_status = 'active', moderated_at = NULL
 					WHERE installation_id = $1 AND moderation_status = 'hidden'
 					RETURNING installation_id, display_name
+				), restored_installation AS (
+					UPDATE installations SET leaderboard_hidden_until = NULL
+					WHERE id = $1 AND leaderboard_hidden_until IS NOT NULL RETURNING id
 				), refreshed_reports AS (
 					UPDATE leaderboard_reports SET review_action = 'profile_restored', reviewed_at = NOW()
 					WHERE reported_installation_id = $1 AND review_status = 'actioned'
 					AND review_action = 'profile_hidden'
 					RETURNING id
 				)
-				SELECT display_name FROM restored_profile`,
+				SELECT id FROM restored_installation`,
 				[targetId],
 			);
 			return res.json({ restored: result.rowCount === 1 });
@@ -318,6 +314,7 @@ export function createApp(pool) {
       problem(res, 503, "database_unavailable");
     }
   });
+	installRankingRoutes(app, pool, requireInstallation, limitWorldReads, problem);
 
   async function requireInstallation(req, res, next) {
     const installationId = String(req.get("X-Installation-Id") || "");
@@ -352,42 +349,7 @@ export function createApp(pool) {
     }
   });
 
-  app.get("/v1/cloud-save", requireInstallation, async (req, res) => {
-    try {
-      const result = await pool.query(
-        "SELECT revision, save_data, updated_at FROM cloud_saves WHERE installation_id = $1",
-        [req.installationId],
-      );
-      if (result.rowCount === 0) return res.status(404).json({ error: "not_found" });
-      const row = result.rows[0];
-      return res.json({ revision: Number(row.revision), save: row.save_data, updatedAt: row.updated_at });
-    } catch {
-      return problem(res, 503, "database_unavailable");
-    }
-  });
-
-	app.post("/v1/cloud-save", requireInstallation, async (req, res) => {
-    const { revision, save } = req.body || {};
-    if (!boundedInteger(revision, 0, 2_147_483_647) || !save || typeof save !== "object" || Array.isArray(save)) {
-      return problem(res, 400, "invalid_save");
-    }
-    if (jsonByteLength(save) > MAX_SAVE_BYTES) return problem(res, 413, "save_too_large");
-    try {
-      const result = await pool.query(
-        `INSERT INTO cloud_saves (installation_id, revision, save_data)
-         VALUES ($1, $2, $3::jsonb)
-         ON CONFLICT (installation_id) DO UPDATE SET revision = EXCLUDED.revision,
-           save_data = EXCLUDED.save_data, updated_at = NOW()
-         WHERE EXCLUDED.revision > cloud_saves.revision
-         RETURNING revision`,
-        [req.installationId, revision, JSON.stringify(save)],
-      );
-      if (result.rowCount === 0) return res.status(409).json({ error: "stale_revision" });
-      return res.json({ revision: Number(result.rows[0].revision) });
-    } catch {
-      return problem(res, 503, "database_unavailable");
-    }
-	});
+	installCloudRoutes(app, pool, requireInstallation, problem);
 
 	app.delete("/v1/account", requireInstallation, async (req, res) => {
 		try {
@@ -420,49 +382,9 @@ export function createApp(pool) {
 		}
 	});
 
-	app.post("/v1/account/claim-transfer", async (req, res) => {
-		const transferCode = String(req.body?.transferCode || "").trim().toUpperCase();
-		if (!/^DDR-T-[A-Z0-9_-]{8,32}$/.test(transferCode)) return problem(res, 400, "invalid_transfer");
-		let client;
-		let transactionStarted = false;
-		try {
-			client = await pool.connect();
-			await client.query("BEGIN");
-			transactionStarted = true;
-			const transfer = await client.query(
-				`SELECT installation_id FROM account_transfers
-				 WHERE code_hash = $1 AND claimed_at IS NULL AND expires_at > NOW() FOR UPDATE`,
-				[tokenHash(transferCode)],
-			);
-			if (transfer.rowCount !== 1) {
-				await client.query("ROLLBACK");
-				transactionStarted = false;
-				return problem(res, 404, "transfer_not_found");
-			}
-			const installationId = transfer.rows[0].installation_id;
-			const syncToken = crypto.randomBytes(32).toString("base64url");
-			await client.query(
-				"UPDATE installations SET sync_token_hash = $1, last_seen_at = NOW() WHERE id = $2",
-				[tokenHash(syncToken), installationId],
-			);
-			await client.query(
-				"UPDATE account_transfers SET claimed_at = NOW() WHERE code_hash = $1",
-				[tokenHash(transferCode)],
-			);
-			await client.query("COMMIT");
-			transactionStarted = false;
-			return res.json({ installationId, syncToken });
-		} catch {
-			if (client != null && transactionStarted) {
-				await client.query("ROLLBACK");
-			}
-			return problem(res, 503, "database_unavailable");
-		} finally {
-			if (client != null) {
-				client.release();
-			}
-		}
-	});
+	installTransferRoutes(app, pool, fixedWindowRateLimit(pool, {
+		windowMs: 60 * 60 * 1000, max: 60, key: (req) => req.ip, scope: "transfer_claims",
+	}), problem);
 
 	app.put("/v1/leaderboard-profile", requireInstallation, limitProfileChanges, async (req, res) => {
 		const displayName = String(req.body?.displayName || "").trim();
@@ -470,13 +392,15 @@ export function createApp(pool) {
 		try {
 			const profile = await pool.query(
 				`INSERT INTO leaderboard_profiles (installation_id, display_name)
-				 VALUES ($1, $2)
+				 SELECT $1, $2 FROM installations WHERE id = $1
+				 AND (leaderboard_hidden_until IS NULL OR leaderboard_hidden_until <= NOW())
 				 ON CONFLICT (installation_id) DO UPDATE SET display_name = EXCLUDED.display_name,
 				 updated_at = NOW() WHERE leaderboard_profiles.moderation_status = 'active'
 				 RETURNING display_name`,
 				[req.installationId, displayName],
 			);
 			if (profile.rowCount !== 1) return problem(res, 403, "profile_hidden");
+			await pool.query("UPDATE installations SET leaderboard_left = FALSE WHERE id = $1", [req.installationId]);
 			return res.json({ displayName });
 		} catch {
 			return problem(res, 503, "database_unavailable");
@@ -493,10 +417,12 @@ export function createApp(pool) {
 			client = await pool.connect();
 			await client.query("BEGIN");
 			transactionStarted = true;
+			await client.query("UPDATE installations SET leaderboard_left = TRUE WHERE id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_scores WHERE installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friend_invites WHERE owner_installation_id = $1 OR claimed_by_installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friendships WHERE first_installation_id = $1 OR second_installation_id = $1", [req.installationId]);
-			await client.query("DELETE FROM leaderboard_blocks WHERE blocker_installation_id = $1 OR blocked_installation_id = $1", [req.installationId]);
+			// Leaving public rankings must not revoke somebody else's private block.
+			await client.query("DELETE FROM leaderboard_blocks WHERE blocker_installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_profiles WHERE installation_id = $1", [req.installationId]);
 			await client.query("COMMIT");
 			transactionStarted = false;
@@ -517,7 +443,9 @@ export function createApp(pool) {
     try {
 			const profile = await pool.query(
 				`INSERT INTO leaderboard_profiles (installation_id, display_name)
-				 VALUES ($1, $2)
+				 SELECT $1, $2 FROM installations WHERE id = $1
+				 AND leaderboard_left = FALSE
+				 AND (leaderboard_hidden_until IS NULL OR leaderboard_hidden_until <= NOW())
 				 ON CONFLICT (installation_id) DO UPDATE SET display_name = EXCLUDED.display_name,
 				 updated_at = NOW() WHERE leaderboard_profiles.moderation_status = 'active'
 				 RETURNING display_name`,
@@ -556,7 +484,7 @@ export function createApp(pool) {
          FROM best_scores
          INNER JOIN leaderboard_profiles AS profile
            ON profile.installation_id = best_scores.installation_id
-         ORDER BY best_scores.score DESC, best_scores.created_at ASC LIMIT 25`,
+         ORDER BY best_scores.score DESC, best_scores.created_at ASC, best_scores.installation_id ASC LIMIT 25`,
         [req.params.routeId],
       );
       return res.json({ verification: "unverified", scores: result.rows.map((row, index) => ({
@@ -812,7 +740,7 @@ export function createApp(pool) {
 				FROM best_scores INNER JOIN leaderboard_profiles AS profile
 					ON profile.installation_id = best_scores.installation_id
 				WHERE profile.moderation_status = 'active'
-				ORDER BY best_scores.score DESC, best_scores.created_at ASC LIMIT 25`,
+				ORDER BY best_scores.score DESC, best_scores.created_at ASC, best_scores.installation_id ASC LIMIT 25`,
 				[req.installationId, req.params.routeId],
 			);
 			return res.json({ verification: "unverified", scores: result.rows.map((row, index) => ({
@@ -838,24 +766,33 @@ export function createApp(pool) {
 			if (!event || typeof event !== "object" || Array.isArray(event)) return problem(res, 400, "invalid_event");
 			const name = event.e;
 			const occurredAt = event.t;
-			const properties = sanitizeTelemetryProperties(event.p || {});
-			const routeId = typeof properties.route === "string" && validRoute(properties.route) ? properties.route : null;
+			const properties = telemetryProperties(name, event.p || {}, event.v ?? 1);
 			if (!validTelemetryEvent(name) || !boundedInteger(occurredAt, nowSeconds - MAX_TELEMETRY_AGE_SECONDS, nowSeconds + 300)
-				|| properties == null || jsonByteLength(properties) > 2048) {
+				|| properties == null || jsonByteLength(properties) > 2048 || (event.id !== undefined && !isUuid(event.id))) {
 				return problem(res, 400, "invalid_event");
 			}
-			rows.push([req.installationId, name, routeId, JSON.stringify(properties), new Date(occurredAt * 1000)]);
+			const routeId = typeof properties.route === "string" && validRoute(properties.route) ? properties.route : null;
+			rows.push([req.installationId, name, routeId, JSON.stringify(properties), new Date(occurredAt * 1000), event.id || null,
+				event.v ?? 1, properties.run_ref || null]);
 		}
+		let client;
 		try {
+			client = await pool.connect();
+			await client.query("BEGIN");
 			for (const row of rows) {
-				await pool.query(
-					`INSERT INTO telemetry_events (installation_id, event_name, route_id, properties, occurred_at)
-					 VALUES ($1, $2, $3, $4::jsonb, $5)`, row,
+				await client.query(
+					`INSERT INTO telemetry_events (installation_id, event_name, route_id, properties, occurred_at, event_id, schema_version, run_ref)
+					 VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
+					 ON CONFLICT DO NOTHING`, row,
 				);
 			}
+			await client.query("COMMIT");
 			return res.status(201).json({ accepted: rows.length });
 		} catch {
+			if (client) await client.query("ROLLBACK").catch(() => {});
 			return problem(res, 503, "database_unavailable");
+		} finally {
+			client?.release();
 		}
 	});
 

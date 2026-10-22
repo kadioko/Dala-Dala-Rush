@@ -14,6 +14,9 @@ const Vehicles      := preload("res://data/vehicles.gd")
 const Routes        := preload("res://data/routes.gd")
 const GhostDataLib  := preload("res://data/ghost_data.gd")
 const UIFactory     := preload("res://ui/ui_factory.gd")
+const CollisionChecks := preload("res://data/collision_math.gd")
+var _previous_player_rect: Rect2
+var _previous_entity_rects: Dictionary = {}
 
 # ── World ─────────────────────────────────────────────────────────
 var view_size: Vector2
@@ -65,6 +68,9 @@ var _fx_rng := RandomNumberGenerator.new()
 var _completed_runs: int = 0
 var _missed_stops: int = 0
 var _fines: int = 0
+var _fines_paid: int = 0
+var _chase_coins: int = 0
+var _replay_truncated: bool = false
 var _clean_checkpoints: int = 0
 
 # ── Route signature moments ───────────────────────────────────────
@@ -362,6 +368,7 @@ func _ready() -> void:
 	player.reduced_motion = reduced_effects
 	entity_layer.add_child(player)
 	player.setup(lanes, current_vehicle)
+	player.lane_changed.connect(_on_player_lane_changed)
 	# The bus needs its own clear road space above the driving dock.
 	# Include gesture-navigation clearance so Android devices keep the same gap.
 	var gameplay_bottom_inset: float = UIFactory.safe_bottom_inset(view_size.y)
@@ -432,6 +439,8 @@ func _ready() -> void:
 		fuel_drain_mult  = maxf(0.1, float(resume_state.get("fuel_drain_mult", fuel_drain_mult)))
 		_missed_stops = maxi(0, int(resume_state.get("missed_stops", 0)))
 		_fines = maxi(0, int(resume_state.get("fines", 0)))
+		_fines_paid = maxi(0, int(resume_state.get("fines_paid", 0)))
+		_chase_coins = maxi(0, int(resume_state.get("chase_coins", 0)))
 		_clean_checkpoints = maxi(0, int(resume_state.get("clean_checkpoints", 0)))
 		_route_moment_successes = maxi(0, int(resume_state.get("route_moments", 0)))
 		_update_handling()
@@ -465,7 +474,7 @@ func _ready() -> void:
 		"condition": condition,
 		"rush_hour": rush_hour,
 	})
-	set_process(true)
+	set_physics_process(true)
 	set_process_input(true)
 
 ## Auto-use one of each owned consumable at the start of a fresh run.
@@ -739,6 +748,9 @@ func _build_hud() -> void:
 	hud_layer.add_child(top)
 
 	score_label = UIFactory.make_label("0", 30, UIFactory.COL_ACCENT)
+	score_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	score_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	score_label.clip_text = true
 	score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	top.add_child(score_label)
@@ -747,6 +759,8 @@ func _build_hud() -> void:
 	coin_stat.add_theme_constant_override("separation", 5)
 	coin_stat.add_child(_make_game_icon(_GameIcon.IconKind.COIN, UIFactory.COL_ACCENT, Vector2(22, 22)))
 	coins_label = UIFactory.make_label("", 18, UIFactory.COL_ACCENT)
+	coins_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	coins_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	coin_stat.add_child(coins_label)
 	top.add_child(coin_stat)
 
@@ -754,6 +768,8 @@ func _build_hud() -> void:
 	passenger_stat.add_theme_constant_override("separation", 5)
 	passenger_stat.add_child(_make_game_icon(_GameIcon.IconKind.PASSENGER, UIFactory.COL_TEXT, Vector2(22, 22)))
 	pass_label = UIFactory.make_label("", 18, UIFactory.COL_TEXT)
+	pass_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	pass_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	passenger_stat.add_child(pass_label)
 	top.add_child(passenger_stat)
 
@@ -1111,6 +1127,7 @@ func _confirm_pause_exit() -> void:
 func _toggle_pause() -> void:
 	if game_over or _counting_down: return
 	paused = not paused
+	player.set_steering_paused(paused)
 	AudioManager.set_game_paused(paused)
 	pause_overlay.visible = paused
 	if paused:
@@ -1122,6 +1139,7 @@ func _notification(what: int) -> void:
 		if _restart_countdown_on_resume and not game_over:
 			_restart_countdown_on_resume = false
 			paused = false
+			player.set_steering_paused(false)
 			AudioManager.set_game_paused(false)
 			pause_overlay.visible = false
 			if is_instance_valid(_countdown_layer):
@@ -1141,6 +1159,7 @@ func _notification(what: int) -> void:
 			_countdown_layer.visible = false
 		return
 	paused = true
+	player.set_steering_paused(true)
 	AudioManager.set_game_paused(true)
 	pause_overlay.visible = true
 	_show_pause_menu()
@@ -1187,7 +1206,7 @@ func _update_hud() -> void:
 	_horn_btn.disabled = horn_charges <= 0
 
 	# Dim unavailable lane buttons so touch controls communicate their limits.
-	var can_steer: bool = not player.is_lane_switching()
+	var can_steer: bool = not paused and not game_over and not _counting_down
 	var can_move_left: bool = can_steer and player.current_lane > 0
 	var can_move_right: bool = can_steer and player.current_lane < num_lanes - 1
 	btn_left.disabled = not can_move_left
@@ -1234,6 +1253,7 @@ func _update_route_moment_hud() -> void:
 	if route_moment_label == null:
 		return
 	var is_active: bool = not _route_moment_id.is_empty() and _route_moment_time > 0.0
+	road.signature_active = is_active
 	route_moment_label.visible = is_active and status_label.text.is_empty()
 	if not is_active:
 		return
@@ -1282,6 +1302,7 @@ func _start_tutorial() -> void:
 	if tutorial_stage <= 0:
 		return
 	_tutorial_step = 0
+	SaveSystem.set_value("tutorial_started", true)
 	_tutorial_timer = 0.0
 	_tutorial_spawned = false
 	_set_tutorial_prompt("TUTORIAL_%d_STEP_0" % tutorial_stage)
@@ -1301,6 +1322,7 @@ func _advance_tutorial_step(next_step: int) -> void:
 		"step": next_step - 1,
 	})
 	if next_step >= 2:
+		GameState.complete_tutorial_stage(tutorial_stage, next_step)
 		_tutorial_prompt_key = ""
 		_spawn_float_label(LocaleManager.t("TUTORIAL_STEP_DONE"),
 			player.position + Vector2(0, -128), Color("#2ecc71"))
@@ -1362,7 +1384,7 @@ func _spawn_tutorial_kituo() -> void:
 
 # ═════════════════════════ MAIN LOOP ══════════════════════════════
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if _counting_down:
 		# Keep the city alive behind the route intro without spawning danger yet.
 		road.advance(72.0 * delta)
@@ -1441,8 +1463,17 @@ func _process(delta: float) -> void:
 
 	road.advance(move)
 	speed_lines.advance(move)
+	_previous_entity_rects.clear()
+	for entity in obstacles_active:
+		_previous_entity_rects[entity.get_instance_id()] = entity.get_collision_aabb()
+	for entity in collectibles_active:
+		_previous_entity_rects[entity.get_instance_id()] = entity.get_aabb()
 	_move_entities(move, delta)
 	_check_collisions()
+	_previous_player_rect = player.get_collision_aabb()
+	if game_over:
+		return
+	_cleanup_passed_entities()
 	_update_status()
 	_update_hud()
 
@@ -1517,6 +1548,7 @@ func _process(delta: float) -> void:
 		if kituo_timer <= 0.0:
 			_spawn_kituo()
 	else:
+		var previous_stop_y: float = kituo.position.y
 		kituo.position.y += move
 		# Approach warning once it's getting close
 		if not _kituo_warned and kituo.position.y > player.position.y - 420.0:
@@ -1530,8 +1562,8 @@ func _process(delta: float) -> void:
 			AudioManager.play_sfx("voice_kituo")
 		# Serve: player in the adjacent lane as the kituo passes
 		if not kituo.served and not kituo.missed \
-		and abs(kituo.position.y - player.position.y) < 80.0 \
-		and player.current_lane == kituo.lane_idx:
+		and bus_stop_service_window(previous_stop_y, kituo.position.y, player.position.y) \
+		and player.aligned_with_lane(kituo.lane_idx):
 			_serve_kituo()
 		# Missed it
 		if not kituo.served and not kituo.missed and kituo.position.y > player.position.y + 130.0:
@@ -1590,10 +1622,7 @@ func _move_entities(move: float, delta: float) -> void:
 				var warning_lane: int = int(warning_lane_value)
 				if warning_lane < _lane_warnings.size():
 					(_lane_warnings[warning_lane] as _LaneWarning).flash(1.20)
-		if o.position.y > view_size.y + 140:
-			_despawn_obstacle(o)
-		else:
-			obstacle_index += 1
+		obstacle_index += 1
 	var collectible_index: int = 0
 	while collectible_index < collectibles_active.size():
 		var c := collectibles_active[collectible_index] as Collectible
@@ -1601,10 +1630,28 @@ func _move_entities(move: float, delta: float) -> void:
 		if magnet_time > 0.0 and c.type_id == "coin":
 			var dx: float = player.position.x - c.position.x
 			c.position.x += sign(dx) * min(abs(dx), 380.0 * delta)
-		if c.position.y > view_size.y + 140:
-			_despawn_collectible(c)
+		collectible_index += 1
+
+func _cleanup_passed_entities() -> void:
+	# Keep crossed objects alive until their entire movement has been checked.
+	var index: int = 0
+	while index < obstacles_active.size():
+		var obstacle := obstacles_active[index] as Obstacle
+		if obstacle.position.y > view_size.y + 140:
+			_despawn_obstacle(obstacle)
 		else:
-			collectible_index += 1
+			index += 1
+	index = 0
+	while index < collectibles_active.size():
+		var collectible := collectibles_active[index] as Collectible
+		if collectible.position.y > view_size.y + 140:
+			_despawn_collectible(collectible)
+		else:
+			index += 1
+
+static func bus_stop_service_window(previous_y: float, current_y: float, player_y: float) -> bool:
+	return minf(previous_y, current_y) < player_y + 80.0 \
+		and maxf(previous_y, current_y) > player_y - 80.0
 
 func _check_collisions() -> void:
 	var prect: Rect2 = player.get_collision_aabb()
@@ -1612,14 +1659,18 @@ func _check_collisions() -> void:
 	while obstacle_index < obstacles_active.size():
 		var o := obstacles_active[obstacle_index] as Obstacle
 		var orect: Rect2 = o.get_collision_aabb()
+		var contacted: bool = CollisionChecks.swept_intersects(
+			_previous_player_rect if _previous_player_rect.has_area() else prect, prect,
+			_previous_entity_rects.get(o.get_instance_id(), orect), orect)
 		if not near_miss_done.get(o.get_instance_id(), false):
 			var h_gap: float = absf(o.position.x - player.position.x)
-			if near_miss_is_eligible(prect, orect, h_gap):
+			if not contacted and near_miss_is_eligible(prect, orect, h_gap):
 				near_miss_done[o.get_instance_id()] = true
 				# Passing a police checkpoint while overloaded = fine!
 				if o.type_id == "police" and _overload_excess() > 0:
 					var fine: int = _overload_excess() * POLICE_FINE_PER_EXCESS
 					_fines += 1
+					_fines_paid += mini(coins, fine)
 					coins = max(0, coins - fine)
 					_spawn_float_label("%s -%d 🪙" % [LocaleManager.t("FINE"), fine],
 						player.position + Vector2(0, -50), UIFactory.COL_DANGER)
@@ -1635,7 +1686,7 @@ func _check_collisions() -> void:
 					_on_near_miss(o.position, o.type_id)
 			elif near_miss_window_expired(prect, orect):
 				near_miss_done[o.get_instance_id()] = true
-		if prect.intersects(orect):
+		if contacted:
 			if grace_time > 0.0:
 				obstacle_index += 1
 				continue
@@ -1655,7 +1706,9 @@ func _check_collisions() -> void:
 	var collectible_index: int = 0
 	while collectible_index < collectibles_active.size():
 		var c := collectibles_active[collectible_index] as Collectible
-		if prect.intersects(c.get_aabb()):
+		if CollisionChecks.swept_intersects(
+			_previous_player_rect if _previous_player_rect.has_area() else prect, prect,
+			_previous_entity_rects.get(c.get_instance_id(), c.get_aabb()), c.get_aabb()):
 			_on_collect(c)
 		else:
 			collectible_index += 1
@@ -1703,6 +1756,8 @@ func _get_compatible_replay() -> Dictionary:
 		var replay: Dictionary = GhostDataLib.sanitize(candidate)
 		if replay.is_empty():
 			continue
+		if float(replay.get("window_start", 0.0)) > 0.0:
+			continue
 		if _daily_run_active:
 			if GhostDataLib.matches_daily_challenge(replay, GameState.daily_route_challenge):
 				return replay
@@ -1724,6 +1779,8 @@ func _make_replay_clip(score: int) -> Dictionary:
 		"vehicle_id": String(current_vehicle.get("id", "classic_blue")),
 		"challenge_id": String(GameState.daily_route_challenge.get("id", "")) if _daily_run_active else "",
 		"traffic_seed": _run_seed,
+		"rules_version": preload("res://data/daily_route_challenge.gd").RULES_VERSION,
+		"window_start": float(_ghost_events[0][0]) if _replay_truncated else 0.0,
 	})
 
 static func daily_run_chases_allowed(daily_run: bool, completed_runs: int) -> bool:
@@ -1939,6 +1996,7 @@ func _end_chase(escaped: bool) -> void:
 	chase_active = false
 	if escaped:
 		coins += CHASE_REWARD
+		_chase_coins += CHASE_REWARD
 		_spawn_float_label("%s +%d 🪙" % [LocaleManager.t("CHASE_ESCAPED"), CHASE_REWARD],
 			player.position + Vector2(0, -60), Color("#2ecc71"))
 		AudioManager.play_sfx("powerup")
@@ -1946,6 +2004,7 @@ func _end_chase(escaped: bool) -> void:
 	else:
 		var fine: int = CHASE_FINE + _overload_excess() * POLICE_FINE_PER_EXCESS
 		_fines += 1
+		_fines_paid += mini(coins, fine)
 		coins = max(0, coins - fine)
 		_spawn_float_label("%s -%d 🪙" % [LocaleManager.t("FINE"), fine],
 			player.position + Vector2(0, -60), UIFactory.COL_DANGER)
@@ -2569,26 +2628,17 @@ func _is_hud_interaction(screen_position: Vector2) -> bool:
 	return false
 
 func _move_left() -> void:
-	var previous_lane: int = player.current_lane
 	player.move_left()
-	if player.current_lane == previous_lane:
-		return
-	_ghost_events.append([elapsed, player.current_lane])
+
+func _on_player_lane_changed(_lane: int) -> void:
+	_replay_truncated = GhostDataLib.record_event(_ghost_events, elapsed, player.current_lane) or _replay_truncated
 	AudioManager.play_sfx("click")
 	FeedbackManager.tap()
 	if tutorial_stage == 1 and _tutorial_step == 0:
 		_advance_tutorial_step(1)
 
 func _move_right() -> void:
-	var previous_lane: int = player.current_lane
 	player.move_right()
-	if player.current_lane == previous_lane:
-		return
-	_ghost_events.append([elapsed, player.current_lane])
-	AudioManager.play_sfx("click")
-	FeedbackManager.tap()
-	if tutorial_stage == 1 and _tutorial_step == 0:
-		_advance_tutorial_step(1)
 
 func _current_score() -> int:
 	return int(distance * 0.1) + bonus_score
@@ -2611,10 +2661,12 @@ func _handle_pause_back() -> void:
 func _end_run() -> void:
 	if game_over: return
 	game_over = true
+	player.set_steering_paused(true)
 	AchievementManager.try_unlock("first_run")
 	var run_stats: Dictionary = _current_route_stats()
 	var route_goal_met: bool = Routes.is_goal_met(current_route, run_stats)
-	AnalyticsService.log_event("run_end", {
+	AnalyticsService.log_event("run_segment_end", {
+		"run_ref": GameState.active_run_id(),
 		"score": _current_score(),
 		"coins": coins,
 		"distance": int(distance),
@@ -2630,7 +2682,7 @@ func _end_run() -> void:
 		"tutorial_stage": tutorial_stage,
 		"daily_route": GameState.is_daily_route_challenge_active(),
 	})
-	# Store a compact replay clip for sharing and deterministic same-day rivals.
+	# Same-day rivals share setup metadata; traffic still adapts to driver input.
 	if not _was_continued:
 		var replay := _make_replay_clip(_current_score())
 		SaveSystem.set_value("latest_replay", replay)
@@ -2658,6 +2710,8 @@ func _end_run() -> void:
 		"fuel_drain_mult": fuel_drain_mult,
 		"missed_stops": _missed_stops,
 		"fines": _fines,
+		"fines_paid": _fines_paid,
+		"chase_coins": _chase_coins,
 		"clean_checkpoints": _clean_checkpoints,
 		"route_moments": _route_moment_successes,
 		"condition": condition,
@@ -2667,8 +2721,8 @@ func _end_run() -> void:
 		"daily_route": _daily_run_active,
 	})
 	if tutorial_stage > 0 and not _was_continued:
-		GameState.complete_tutorial_stage(tutorial_stage)
-		AnalyticsService.log_event("tutorial_stage_finished", {
+		GameState.complete_tutorial_stage(tutorial_stage, _tutorial_step)
+		AnalyticsService.log_event("tutorial_stage_finished" if _tutorial_step >= 2 else "tutorial_attempt_finished", {
 			"stage": tutorial_stage,
 			"step_reached": _tutorial_step,
 		})

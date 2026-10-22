@@ -1,13 +1,22 @@
 # Dala Dala Rush TZ 🚌
 
 A Tanzanian daladala endless runner built with **Godot 4.7.1**.
+
+**October 18 source update:** consent-gated native ads, acknowledged phone
+transfer, save schema 18, nearby ranks, accurate reward receipts, bounded
+replays and battery/performance tools. See [Trust Update](docs/TRUST_UPDATE.md)
+for tested behavior and outstanding deployment/phone/audio gates. These changes
+are being prepared as 1.0.18 / code 19; backend migrations 010-012 are deployed.
+See [release evidence and bilingual notes](docs/releases/1.0.18.md) for artifact,
+hosted verification and outstanding phone acceptance. Five synthetic Swahili
+voice cues now ship as placeholders, not human conductor recordings.
 Drive your dala dala through Dar es Salaam: board abiria, stop at **vituo**
 for fares, overload at your own risk, dodge bodabodas and goats, escape
 police chases — then paint your bus with a proper slogan and share it.
 
-**Offline-first**: the whole game runs with zero network and zero binary
-assets. All art is code-drawn and all audio is synthesized; drop real
-sprites/sounds into `sprites/` and `audio/` and they're used automatically.
+**Offline-first**: driving works without a network connection. Art is code-drawn;
+SFX/music are synthesized and five small rendered Swahili voice placeholders
+are bundled. Cleared sprites/sounds can replace the placeholders later.
 
 ---
 
@@ -52,7 +61,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 - **Daily challenge** + **login streak** with a 7-day reward calendar.
 - **Ghost racing**: race your best run's ghost; share/import **ghost codes**
   via clipboard/WhatsApp — competitive play with zero servers. Daily rivals
-  must match the date, route, starter vehicle, and traffic seed; daily passes
+  must match the date, route, starter vehicle, traffic seed, and rules version; daily passes
   give no extra score. Clips are friendly comparisons, not verified score proof.
 - **Leaderboards**: set a real driver name once, view route-specific personal
   bests offline, then optionally join Friends and World boards. Friend codes
@@ -62,6 +71,7 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   without affecting offline progress.
 - **Daily Run**: a same-rules daily route with a shared traffic seed, starter
   dala, and no-revive policy makes local score comparisons more meaningful.
+  Traffic still adapts to steering; this is not an identical-course guarantee.
 - **Invite & Earn**: offline referral codes reward the invited player with 75
   coins and the inviter with 125 after a one-time confirmation. Self-referrals,
   duplicate confirmations, and repeated welcome claims are blocked locally;
@@ -74,7 +84,8 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
   battery life, and lower-end Android phones.
 - Three persistent, non-modal first-session lessons: steering and coins, then
   passengers and a stop, then horn and slow motion. Existing player saves skip
-  them automatically.
+  them automatically. Unfinished lessons repeat instead of advancing on a crash;
+  Settings also provides an explicit skip.
 - **Driver Reputation** turns passenger service, close calls, clean checkpoints,
   route moments, missed stops, and fines into a simple A-D end-of-run rating.
 - **Route Mastery** gives every route three permanent performance stars and a
@@ -205,6 +216,10 @@ sprites/sounds into `sprites/` and `audio/` and they're used automatically.
 | `docs/LIVE_OPS.md` | Remote config, analytics, cloud save path |
 | `docs/RAILWAY_BACKEND.md` | Railway/PostgreSQL deployment and safety runbook |
 | `docs/SCORE_VERIFICATION.md` | Current score-trust limits and authoritative replay-validation plan |
+| `docs/PROJECT_AUDIT_2026-10-18.md` | Reproduced secondary-screen clipping, reliability findings, and prioritized upgrades |
+| `docs/RECOVERY_UPDATE.md` | Nine-priority implementation, regression evidence, deployment order and phone gates |
+| `docs/TRUST_UPDATE.md` | Eight audit fixes, native UMP bridge, rank/receipt/replay upgrades and remaining acceptance |
+| `docs/DEEP_AUDIT_2026-10-18.md` | Follow-up runtime findings, recovery/competition risks and prioritized product upgrades |
 | `docs/RELEASE_NOTES_1.0.17.md` | Bilingual production update notes for version 1.0.17 / code 18 |
 | `docs/RELEASE_NOTES_1.0.14.md` | Bilingual release notes for code 15 |
 | `docs/RELEASE_NOTES_1.0.13.md` | Historical production notes for code 14 |

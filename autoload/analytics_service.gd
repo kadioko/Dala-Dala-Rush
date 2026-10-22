@@ -1,7 +1,5 @@
 extends Node
-## Analytics seam. Offline-first: events queue to a local JSON log so
-## nothing is lost; when a real SDK (Firebase plugin) is wired in,
-## flush goes there instead. Zero network use until then.
+## Bounded local journal with separately consented Railway uploads.
 ##
 ## Usage anywhere: AnalyticsService.log_event("run_end", {"score": 1234})
 
@@ -15,12 +13,19 @@ const RAILWAY_EVENT_NAMES: Array[String] = [
 	"online_leaderboard_global", "online_leaderboard_friends", "retention_return",
 	"fuel_failure", "route_moment_start", "route_moment_complete", "route_moment_timeout",
 	"vehicle_unlocked",
+	"tutorial_stage_started", "tutorial_step_completed", "tutorial_attempt_finished",
+	"ad_rewarded_requested", "ad_rewarded_loaded", "ad_rewarded_load_failed", "ad_rewarded_earned",
+	"run_segment_end", "run_settled",
 ]
 
 var _queue: Array = []
+var _log_dirty: bool = false
+var _save_timer: Timer
+const Ids := preload("res://data/operation_ids.gd")
 
 func _ready() -> void:
 	_load_log()
+	GameState.finalize_run.call_deferred()
 	var now: int = int(Time.get_unix_time_from_system())
 	var first_open: int = int(SaveSystem.get_value("analytics_first_open_unix", 0))
 	var previous_open: int = int(SaveSystem.get_value("analytics_last_open_unix", 0))
@@ -41,11 +46,17 @@ func _ready() -> void:
 		if days_since_first == 1 or days_since_first == 7:
 			log_event("retention_return", {"day": days_since_first})
 
-func log_event(event_name: String, params: Dictionary = {}) -> void:
+func log_event(event_name: String, params: Dictionary = {}, event_id: String = "") -> void:
 	var clean_name: String = event_name.strip_edges().to_lower()
 	if clean_name.is_empty():
 		return
+	if Ids.is_valid(event_id):
+		for prior in _queue:
+			if prior is Dictionary and prior.get("id") == event_id:
+				return
 	var entry := {
+		"v": 2,
+		"id": event_id if Ids.is_valid(event_id) else Ids.create(),
 		"e": clean_name,
 		"p": _sanitize_params(params),
 		"t": int(Time.get_unix_time_from_system()),
@@ -53,7 +64,7 @@ func log_event(event_name: String, params: Dictionary = {}) -> void:
 	_queue.append(entry)
 	if _queue.size() > MAX_LOG_EVENTS:
 		_queue = _queue.slice(_queue.size() - MAX_LOG_EVENTS)
-	_save_log()
+	_schedule_save()
 	_send_to_sdk(entry)
 
 ## Keeps analytics useful without accidentally writing player-entered text,
@@ -87,6 +98,7 @@ func event_count() -> int:
 ## logged by this service.
 func get_railway_batch(max_events: int = 25) -> Array:
 	var batch: Array = []
+	var migrated_ids: bool = false
 	var now: int = int(Time.get_unix_time_from_system())
 	for entry_value in _queue:
 		if batch.size() >= max_events or entry_value is not Dictionary:
@@ -103,7 +115,15 @@ func get_railway_batch(max_events: int = 25) -> Array:
 		# Older local logs used fractional seconds. Normalize the queued event too
 		# so acknowledgement still matches it after the server accepts the batch.
 		entry["t"] = event_time
+		if not Ids.is_valid(entry.get("id")):
+			entry["id"] = Ids.create()
+			migrated_ids = true
 		batch.append(entry.duplicate(true))
+	if migrated_ids or _log_dirty:
+		_log_dirty = true
+		_save_log()
+		if _log_dirty:
+			return []
 	return batch
 
 func discard_railway_events() -> void:
@@ -129,8 +149,7 @@ func acknowledge_railway_batch(sent_events: Array) -> void:
 	_queue = remaining
 	_save_log()
 
-## TODO Firebase: install a GodotFirebase / Firebase Analytics plugin and
-## forward events here. Until then this is a no-op.
+## Reserved for optional platform integrations; Railway uses OnlineService.
 func _send_to_sdk(_entry: Dictionary) -> void:
 	pass
 
@@ -146,8 +165,22 @@ func _load_log() -> void:
 		_queue = parsed
 
 func _save_log() -> void:
-	var f := FileAccess.open(LOG_PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(JSON.stringify(_queue))
-	f.close()
+	if preload("res://scripts/atomic_json.gd").write(LOG_PATH, _queue) == OK:
+		_log_dirty = false
+		if is_instance_valid(_save_timer):
+			_save_timer.stop()
+
+func _schedule_save() -> void:
+	_log_dirty = true
+	if not is_instance_valid(_save_timer):
+		_save_timer = Timer.new()
+		_save_timer.one_shot = true
+		_save_timer.wait_time = 1.0
+		_save_timer.timeout.connect(_save_log)
+		add_child(_save_timer)
+	if _save_timer.is_stopped():
+		_save_timer.start()
+
+func _notification(what: int) -> void:
+	if what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST] and _log_dirty:
+		_save_log()

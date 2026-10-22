@@ -1,5 +1,38 @@
 # Dala Dala Rush TZ - Product Roadmap
 
+## October 22 Release Progress
+
+Backend migrations 010-012 are deployed and HTTPS recovery/World-board checks
+passed. Version 1.0.18 / code 19 is the next signed candidate; release evidence
+and bilingual notes are in `releases/1.0.18.md`. The owner explicitly postponed
+two-phone acceptance and approved synthetic Swahili placeholder clips instead
+of supplied human recordings. Original recordings and native-speaker/phone-
+speaker validation are still future work. Historical snapshots below retain
+their original deployment/QA status and are superseded by the release record.
+
+## October 18 Trust Follow-Up
+
+All eight deep-audit findings are addressed in source: UMP-gated native ads,
+acknowledged transfer, schema 18 structural recovery, actual steering-button
+buffering, replay-free progress backups, preserved third-party blocks, Results
+reward ownership and honest adaptive Daily Run wording. Nearby ranks, a single
+reward receipt, bounded replay windows, typed logical-run reporting, roadside
+cues and battery/performance tools are also implemented. See `TRUST_UPDATE.md`.
+Migrations **010-012**, backend deployment, privacy publication, a new AAB,
+GitHub-hosted CI execution, two-phone/native-ad/performance QA and cleared voice
+recordings remain. Scores are still unverified; identical-course rivals are
+not implemented. The sections below are historical snapshots.
+
+## October 18 Recovery Update
+
+The nine-priority responsive/recovery pass is implemented in source; see
+`RECOVERY_UPDATE.md` for per-area acceptance and commands. Save schema is 17,
+Daily Run compatibility uses rules version 2, and backend migration 010 is
+prepared but not deployed by this pass. No new AAB has been exported. The old
+code 18 artifact does not contain these changes. Phone/native-ad QA, publishing
+the updated privacy page, backend deployment and a new verified AAB remain.
+The release history below is retained for context.
+
 Updated October 8, 2026. Google Play production is active. Signed AAB
 `1.0.17` / code `18` (API 36) is built and manifest-verified as an upload
 candidate; A21s/second-phone QA and Play processing remain. It includes the

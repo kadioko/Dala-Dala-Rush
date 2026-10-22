@@ -75,18 +75,28 @@ func tutorial_stage_for_run(is_continuing: bool = false) -> int:
 	if is_continuing:
 		return 0
 	var completed_lessons: int = clampi(int(SaveSystem.get_value("first_session_stage", 0)), 0, 3)
-	if completed_lessons == 0 and int(SaveSystem.get_value("regular_runs", 0)) > 0:
+	if completed_lessons == 0 and int(SaveSystem.get_value("regular_runs", 0)) > 0 \
+	and not bool(SaveSystem.get_value("tutorial_started", false)):
 		return 0
 	return completed_lessons + 1 if completed_lessons < 3 else 0
 
-func complete_tutorial_stage(stage: int) -> void:
-	if stage < 1 or stage > 3:
+func complete_tutorial_stage(stage: int, completed_steps: int = 2) -> void:
+	if stage < 1 or stage > 3 or completed_steps < 2:
 		return
 	var completed_lessons: int = clampi(int(SaveSystem.get_value("first_session_stage", 0)), 0, 3)
 	if stage > completed_lessons:
 		SaveSystem.set_value("first_session_stage", stage)
 
+func skip_tutorials() -> void:
+	SaveSystem.begin_batch()
+	SaveSystem.set_value("tutorial_started", true)
+	SaveSystem.set_value("first_session_stage", 3)
+	SaveSystem.end_batch()
+
 func _ready() -> void:
+	reload_profile()
+
+func reload_profile() -> void:
 	selected_vehicle_id = String(SaveSystem.get_value("selected_vehicle", "classic_blue"))
 	selected_route_id   = String(SaveSystem.get_value("selected_route", "kariakoo"))
 	_migrate_route_unlocks()
@@ -145,6 +155,8 @@ func finish_daily_route_challenge() -> void:
 
 ## Called by game.gd when a brand-new run starts (not an ad-continue).
 func begin_run() -> void:
+	finalize_run()
+	SaveSystem.set_value("active_run_id", preload("res://data/operation_ids.gd").create())
 	continue_pending = false
 	continue_state = {}
 	continue_used = false
@@ -163,6 +175,9 @@ func request_continue() -> bool:
 		return false
 	continue_used = true
 	rewarded_choice_used = "continue"
+	var receipt: Dictionary = reward_receipt()
+	receipt["choice"] = "continue"
+	SaveSystem.set_value("last_reward_receipt", receipt)
 	continue_pending = true
 	continue_state = {
 		"distance": last_distance,
@@ -183,16 +198,61 @@ func request_continue() -> bool:
 func claim_double_coins() -> int:
 	if not rewarded_choice_used.is_empty() or last_coins <= 0:
 		return 0
+	var receipt: Dictionary = reward_receipt()
+	if not String(receipt.get("choice", "")).is_empty():
+		return 0
 	rewarded_choice_used = "double_coins"
+	SaveSystem.begin_batch()
 	SaveSystem.add_coins(last_coins)
+	var components: Dictionary = receipt.get("components", {})
+	components["ads"] = last_coins
+	receipt["components"] = components
+	receipt["choice"] = "double_coins"
+	receipt["run_ref"] = active_run_id()
+	receipt["total"] = int(receipt.get("total", 0)) + last_coins
+	SaveSystem.set_value("last_reward_receipt", receipt)
+	SaveSystem.end_batch()
 	return last_coins
+
+func active_run_id() -> String:
+	var value: String = String(SaveSystem.get_value("active_run_id", ""))
+	if value.is_empty():
+		value = preload("res://data/operation_ids.gd").create()
+		SaveSystem.set_value("active_run_id", value)
+	return value
+
+func reward_receipt() -> Dictionary:
+	var receipt: Dictionary = SaveSystem.get_value("last_reward_receipt", {})
+	return SaveSystem.clean_reward_receipt(receipt) if receipt.get("run_ref") == SaveSystem.get_value("active_run_id", "") else {}
+
+func finalize_run() -> void:
+	var receipt: Dictionary = reward_receipt()
+	if receipt.is_empty() or bool(receipt.get("finalized", false)):
+		return
+	var summary: Dictionary = receipt.get("summary", {}).duplicate(true)
+	if summary.is_empty(): return
+	summary["run_ref"] = String(receipt.run_ref)
+	summary["coins"] = int(receipt.get("total", 0))
+	AnalyticsService.log_event("run_settled", summary, String(receipt.run_ref))
+	AnalyticsService._save_log()
+	if not AnalyticsService._log_dirty:
+		receipt["finalized"] = true
+		SaveSystem.set_value("last_reward_receipt", receipt)
+	OnlineService.flush_telemetry()
 
 func can_claim_rewarded_choice() -> bool:
 	return not is_daily_route_challenge_active() and rewarded_choice_used.is_empty()
 
 func record_run(score: int, coins: int, passengers: int, distance: float,
 		near_misses: int = 0, extra: Dictionary = {}) -> void:
+	var run_ref: String = active_run_id()
+	var receipt: Dictionary = reward_receipt()
+	var segment: String = "continued" if continue_used else "initial"
+	var segments: Array = receipt.get("segments", [])
+	if segment in segments:
+		return
 	SaveSystem.begin_batch()
+	var wallet_before: int = int(SaveSystem.get_value("total_coins", 0))
 	var previous_best_score: int = int(SaveSystem.get_value("best_score", 0))
 	var previous_run_count: int = int(SaveSystem.get_value("total_runs", 0))
 	last_score      = score
@@ -231,6 +291,8 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 		"fuel_drain_mult": float(extra.get("fuel_drain_mult", 1.0)),
 		"missed_stops": int(extra.get("missed_stops", 0)),
 		"fines": int(extra.get("fines", 0)),
+		"fines_paid": int(extra.get("fines_paid", 0)),
+		"chase_coins": int(extra.get("chase_coins", 0)),
 		"combo_peak": last_combo_peak,
 		"condition": String(extra.get("condition", "day")),
 		"rush_hour": bool(extra.get("rush_hour", false)),
@@ -324,6 +386,10 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 		"boosts": max(0, int(extra.get("boosts", 0)) - int(_banked_misc.get("boosts", 0))),
 	}
 	last_missions_completed = MissionsData.update_from_run(mission_stats)
+	var mission_coins: int = 0
+	for mission in last_missions_completed:
+		mission_coins += int(mission.reward)
+	var season_coins: int = int(SaveSystem.get_value("total_coins", 0)) - wallet_before - mission_coins
 	_banked_misc = {
 		"near_misses": near_misses,
 		"dropoffs": last_dropoffs,
@@ -334,14 +400,37 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 
 	# Only credit the delta beyond what was already banked at an earlier
 	# crash in this same run (ad-continue case).
-	var new_coins: int = max(0, coins - _banked_coins)
+	var new_coins: int = coins - _banked_coins
 	var new_distance: float = max(0.0, distance - _banked_distance)
 	var new_passengers: int = max(0, passengers - _banked_passengers)
 	var earned_coins := new_coins + last_bonus_coins + last_daily_bonus_coins \
 		+ last_mastery_bonus_coins + last_route_contract_bonus_coins
-	SaveSystem.add_coins(earned_coins)
-	SaveSystem.add_run_stats(new_distance, earned_coins, new_passengers, not _run_counted,
+	if earned_coins >= 0:
+		SaveSystem.add_coins(earned_coins)
+	else:
+		SaveSystem.spend_coins(-earned_coins)
+	SaveSystem.add_run_stats(new_distance, maxi(0, earned_coins), new_passengers, not _run_counted,
 		bool(extra.get("daily_route", false)))
+	var components: Dictionary = receipt.get("components", {})
+	var fines_paid: int = int(extra.get("fines_paid", 0))
+	var other_coins: int = int(extra.get("chase_coins", 0))
+	components["pickups"] = maxi(0, coins + fines_paid - last_fares - other_coins)
+	components["fares"] = last_fares
+	components["other"] = other_coins
+	components["fines"] = -fines_paid
+	var bonuses: Dictionary = {"route_goal": last_bonus_coins, "missions": mission_coins,
+		"season": season_coins, "mastery": last_mastery_bonus_coins,
+		"daily": last_daily_bonus_coins, "contract": last_route_contract_bonus_coins}
+	for key in bonuses:
+		components[key] = int(components.get(key, 0)) + int(bonuses[key])
+	var receipt_total: int = 0
+	for amount in components.values(): receipt_total += int(amount)
+	segments.append(segment)
+	receipt.merge({"run_ref": run_ref, "components": components, "total": receipt_total,
+		"segments": segments, "finalized": false, "summary": {"route": selected_route_id,
+		"score": score, "distance": distance, "elapsed": float(extra.get("elapsed", 0.0)),
+		"end_reason": last_end_reason, "goal_met": last_route_goal_met, "continued": continue_used}}, true)
+	SaveSystem.set_value("last_reward_receipt", receipt)
 
 	_banked_coins = coins
 	_banked_distance = distance
