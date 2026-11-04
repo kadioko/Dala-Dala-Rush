@@ -16,7 +16,12 @@ it reaches phones. Update Play Console Data Safety and validate consent wording,
 two-phone presence/blocks, small-screen layout and actual coin economy before
 public rollout.
 
-## October 22 Release Progress
+Version 1.0.19 / code 20 is now exported and signed. Signature, pinned
+certificate, target SDK, manifest, bundletool and hosted CI checks pass. It has
+not been uploaded or installed on physical devices. See
+`docs/releases/1.0.19.md` for the artifact hash and bilingual notes.
+
+## October 22 Release Progress (Historical)
 
 Backend migrations 010-012 are deployed and HTTPS recovery/World-board checks
 passed. Version 1.0.18 / code 19 is exported and verified; release evidence and

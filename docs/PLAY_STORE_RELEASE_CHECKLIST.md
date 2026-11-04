@@ -114,7 +114,9 @@ Features:
 - Offline-friendly gameplay
 - Multiple routes, vehicles, missions and upgrades
 - Optional rewarded ads for revive or double coins
-- No gambling, betting, chat or real-money wagering
+- No gambling, betting, free-text/voice chat or real-money wagering. The game
+  does have optional public display names/scores and preset-emote interaction;
+  disclose this limited social feature in Play Console.
 
 Traffic imekubana. Can you become the king of the road?
 ```
@@ -158,13 +160,16 @@ Detailed copy/paste answers are in
     language locally on device.
   - AdMob may collect device/ad identifiers, diagnostics, approximate location,
     and ad interaction data according to Google Mobile Ads SDK behavior.
-  - Complete the Data safety form based on the final SDKs enabled at release.
+  - Declare optional public names/scores and temporary fictional hub
+    coordinates/preset emotes as described in
+    `PLAY_CONSOLE_APP_CONTENT_ANSWERS.md`; do not call them GPS location.
+  - Complete the Data safety form based on the exact shipped SDKs and backend.
 - Privacy policy URL:
   `https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html`.
   It returned HTTP 200 on August 19, 2026; recheck before submission.
-- Content rating: complete the Play questionnaire. Expected result should be
-  low/family-friendly if no violent, sexual, gambling, or user-generated content
-  is added.
+- Content rating: complete the Play questionnaire; identify limited public
+  player names and interactions accurately. The game has no free chat, graphic
+  violence, sexual content, gambling or real-money purchases.
 
 ## Pre-Upload QA
 

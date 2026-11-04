@@ -2,22 +2,13 @@
 
 A Tanzanian daladala endless runner built with **Godot 4.7.1**.
 
-**November 4 hub update:** the new *Mtaa Wetu* district adds walk-around
-exploration, three discoverable shops/plazas, one daily errand route, buyable
-neighborhood decorations, and an explicitly opted-in online plaza with temporary
-player presence and preset emotes. This source update needs a new AAB before it
-reaches phones; see [World Hub](docs/WORLD_HUB.md) for the shipped scope and
-limits. Railway migration 013 and the matching privacy policy are included in
-this change.
-
-**October 22 release candidate:** consent-gated native ads, acknowledged phone
-transfer, save schema 18, nearby ranks, accurate reward receipts, bounded
-replays and battery/performance tools. See [Trust Update](docs/TRUST_UPDATE.md)
-for tested behavior and outstanding phone/audio gates. Version 1.0.18 / code 19
-is exported and signed; backend migrations 010-012 are deployed. See [release
-evidence and bilingual notes](docs/releases/1.0.18.md) for artifact, hosted
-verification and outstanding phone acceptance. Five synthetic Swahili
-voice cues now ship as placeholders, not human conductor recordings.
+**November 4 release candidate:** Version 1.0.19 / code 20 adds Mtaa Wetu. It
+is signed and verified, but not uploaded or phone-tested. Backend migration 013
+and the matching privacy policy are live. Update Play Console Data Safety and
+content rating, then complete two-phone validation before upload. See [release
+evidence and bilingual notes](docs/releases/1.0.19.md). The prior trust-release
+evidence remains in [1.0.18](docs/releases/1.0.18.md). Five synthetic Swahili
+voice cues are placeholders, not human conductor recordings.
 Drive your dala dala through Dar es Salaam: board abiria, stop at **vituo**
 for fares, overload at your own risk, dodge bodabodas and goats, escape
 police chases — then paint your bus with a proper slogan and share it.

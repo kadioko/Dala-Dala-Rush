@@ -1,14 +1,16 @@
 # Play Console App Content Answers
 
-Last verified against the project: August 19, 2026. Recheck the final SDK list
-and current Play Console wording before submission; policy forms can change.
+Last verified against the project: November 4, 2026. Recheck the current SDK
+list and Play Console wording against the exact uploaded artifact; policy forms
+can change.
 
 Use this while completing **Policy > App content** in Google Play Console for
 Dala Dala Rush TZ.
 
-These answers match the current MVP: an offline-friendly Godot mobile game with
-AdMob ads, local saves, no account login, no gambling, no real-money betting,
-and no health/financial/government features.
+These answers match the 1.0.19 / code 20 candidate: an offline-friendly Godot
+mobile game with AdMob, local saves, opt-in cloud/rankings and a small opt-in
+social hub. There is no login, free-text chat, real-world location sharing,
+gambling, real-money betting, or health/financial/government feature.
 
 ## Let Us Know About The Content Of Your App
 
@@ -18,9 +20,10 @@ Recommended summary:
 Dala Dala Rush TZ is a family-friendly 2D endless driving game inspired by
 Tanzanian city traffic. Players dodge obstacles, collect coins and passengers,
 unlock vehicle skins using fake in-game coins, and can watch optional rewarded
-ads for revive/double coins. The app has no login, no user-generated content,
-no chat, no gambling, no betting, no real-money wagering, no financial services,
-no health features, and no government services.
+ads for revive/double coins. Players may opt into public display names, scores
+and a Kariakoo social hub with fixed emotes; there is no open text or voice
+chat. The app has no login, gambling, betting, real-money wagering, financial
+services, health features or government services.
 ```
 
 ## Privacy Policy
@@ -43,7 +46,7 @@ Current GitHub Pages URL:
 https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html
 ```
 
-This URL returned HTTP 200 on August 19, 2026. Confirm it still opens publicly,
+This URL returned HTTP 200 on November 4, 2026. Confirm it still opens publicly,
 without login or an editable-document UI, immediately before submission.
 
 ## Sign In Details / App Access
@@ -109,9 +112,14 @@ Recommended answers for current MVP:
 - Language/profanity: **No.**
 - Controlled substances: **No.**
 - Gambling: **No.**
-- User-generated content: **No.**
-- Online interaction/chat: **No.**
-- Location sharing: **No.**
+- User-generated content: **Yes, limited.** Players can choose a short public
+  leaderboard name; preset emotes are the only hub interaction. There is no
+  open text, image, or voice posting. Keep the report/block controls available.
+- Online interaction: **Yes, limited.** Opted-in players can see public names,
+  scores and temporary avatars in Kariakoo, and use fixed wave/horn/dance
+  emotes. There is no free-text or voice chat.
+- Location sharing: **No real-world location sharing.** Hub coordinates refer
+  only to a fictional game map and cannot locate players in the real world.
 - Digital purchases: **No real-money purchases in MVP.**
 
 Notes:
@@ -212,7 +220,7 @@ online competition, or turning on Gameplay Insights.
    - Data: the 2-16 character driver display name chosen for online rankings.
    - Purpose: App functionality.
    - Collected: Yes, optional.
-   - Shared: Yes, with other opted-in players on public rankings or Hub Presence.
+   - Shared: Yes, with leaderboard viewers and opted-in Hub Presence players.
    - Deletion: leaving online competition removes the public profile, scores,
      friend links, and friend codes.
 
@@ -221,7 +229,8 @@ online competition, or turning on Gameplay Insights.
    - Purpose: App functionality for cloud backup, restore, online competition,
      and deletion; Analytics only when Gameplay Insights is separately enabled.
    - Collected: Yes, optional.
-   - Shared: No, unless the developer's final service arrangement changes.
+   - Shared: No for the service installation ID/sync credential; AdMob
+     identifiers are covered by the separate SDK disclosure above.
    - Do not describe this as an advertising ID. AdMob's advertising-ID behavior
      remains covered by its separate declaration above.
 
@@ -230,7 +239,8 @@ online competition, or turning on Gameplay Insights.
      voluntarily submitted to the unverified leaderboard.
    - Purpose: App functionality.
    - Collected: Yes, optional.
-   - Shared: No, unless the developer's final service arrangement changes.
+   - Shared: Scores are shown with the player's chosen public name on the
+     leaderboard. Cloud-backup progress is not shown to other players.
 
 4. **App activity - App interactions and Other actions**
    - Data: the small Gameplay Insights allowlist: tutorial completion, run end
@@ -251,10 +261,11 @@ online competition, or turning on Gameplay Insights.
    - Collected: Yes, optional.
    - Shared: Yes, with opted-in players. No chat text or voice is collected.
 
-The hub's emote/location row is temporary operational state, not an analytics
-history. The client sends only after explicit Hub Presence consent; disabling
-presence or leaving removes the row, and inactive rows are deleted within the
-45-second expiry plus the cleanup interval. Do not claim GPS/precise location.
+The hub's fictional map position/emote row is temporary operational state, not
+an analytics history or device location. The client sends only after explicit
+Hub Presence consent; disabling presence or leaving removes the row, and
+inactive rows are deleted within the 45-second expiry plus cleanup interval.
+Do not declare this as GPS, precise location, or a way to locate a person.
 
 Before saving, compare the exact choices to Google Play's current Data Safety
 guidance and any embedded SDK disclosures. The developer remains responsible

@@ -3,6 +3,8 @@
 October 22: the owner explicitly deferred physical two-phone testing. No device
 results are marked passed. Backend HTTPS smoke tests succeeded separately;
 synthetic voice placeholders still need native-speaker/phone-speaker review.
+The 1.0.19 / code 20 hub build is available for device testing, but this is not
+evidence of acceptance on either phone.
 
 ## Trust Follow-Up Acceptance - Not Yet Performed On Phones
 
@@ -17,6 +19,11 @@ synthetic voice placeholders still need native-speaker/phone-speaker review.
 - [ ] During an ad request, Play Again/Menu/hardware Back cannot leave Results.
 - [ ] Target leaves/rejoins; blocker still sees its private block. Verify
   own/nearby rankings below 25 without stale route responses.
+- [ ] On code 20, opt into Hub Presence on both phones; verify avatar/emote
+  visibility, block in both directions, opt out/leave deletion, stale expiry,
+  and offline/reconnect behavior. Confirm no GPS permission or free chat.
+- [ ] Visit every Mtaa Wetu destination, complete/resume the daily errand,
+  buy each decoration, restart the app, and verify each purchase/reward once.
 - [ ] Back up with four maximum replays; progress succeeds, clips stay local.
 - [ ] Compare a 15-minute route at 60/30 FPS with fixed brightness/network/
   charger state. Use debug Settings capture plus `capture_android_perf.ps1`;
@@ -24,9 +31,10 @@ synthetic voice placeholders still need native-speaker/phone-speaker review.
 - [ ] Roadside event pictograms and bus roof details remain recognizable in
   both languages, bright light and reduced brightness. No effect hides traffic.
 
-Local desktop source gate passed with 28 PostgreSQL-backed tests and 216
-rendered captures. CI screenshot jobs are prepared, not hosted-run evidence.
-ADB had no connected phone. Do not turn these unchecked gates into passes.
+For code 20, the local release gate passed with 32 PostgreSQL-backed tests and
+312 responsive screen-state checks; hosted CI also rendered bilingual layouts.
+These are not phone results. ADB had no connected phone, so do not turn the
+unchecked device gates into passes.
 
 October 18 source update: run `tests/secondary_ui_qa.tscn` as well as the
 existing UI runner. It checks 288 combinations across all 12 secondary/splash
