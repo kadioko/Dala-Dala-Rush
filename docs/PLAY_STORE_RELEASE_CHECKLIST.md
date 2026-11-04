@@ -166,7 +166,7 @@ Detailed copy/paste answers are in
   - Complete the Data safety form based on the exact shipped SDKs and backend.
 - Privacy policy URL:
   `https://kadioko.github.io/Dala-Dala-Rush/privacy-policy.html`.
-  It returned HTTP 200 on August 19, 2026; recheck before submission.
+  It returned HTTP 200 on November 4, 2026; recheck before submission.
 - Content rating: complete the Play questionnaire; identify limited public
   player names and interactions accurately. The game has no free chat, graphic
   violence, sexual content, gambling or real-money purchases.

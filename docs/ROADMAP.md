@@ -11,10 +11,10 @@ and preset wave/horn/dance, with block filtering and no free-text chat. Railway
 migration 013 and a matching privacy-policy revision are part of this change.
 Migration 013 is deployed and passed the production smoke test; the updated
 privacy page is live. Local PostgreSQL 17 and bilingual responsive-screen tests
-pass. This source change needs a new signed AAB (next code 20 or higher) before
-it reaches phones. Update Play Console Data Safety and validate consent wording,
-two-phone presence/blocks, small-screen layout and actual coin economy before
-public rollout.
+pass. Version 1.0.19 / code 20 is exported and signed, but not on phones yet.
+Update Play Console Data Safety and validate consent wording, two-phone
+presence/blocks, small-screen layout and actual coin economy before public
+rollout.
 
 Version 1.0.19 / code 20 is now exported and signed. Signature, pinned
 certificate, target SDK, manifest, bundletool and hosted CI checks pass. It has
@@ -25,7 +25,7 @@ not been uploaded or installed on physical devices. See
 
 Backend migrations 010-012 are deployed and HTTPS recovery/World-board checks
 passed. Version 1.0.18 / code 19 is exported and verified; release evidence and
-bilingual notes are in `releases/1.0.18.md`. The owner explicitly postponed
+bilingual notes are in `docs/releases/1.0.18.md`. The owner explicitly postponed
 two-phone acceptance and approved synthetic Swahili placeholder clips instead
 of supplied human recordings. Original recordings and native-speaker/phone-
 speaker validation are future work. Historical snapshots below retain their
