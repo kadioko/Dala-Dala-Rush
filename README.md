@@ -2,13 +2,13 @@
 
 A Tanzanian daladala endless runner built with **Godot 4.7.1**.
 
-**October 18 source update:** consent-gated native ads, acknowledged phone
+**October 22 release candidate:** consent-gated native ads, acknowledged phone
 transfer, save schema 18, nearby ranks, accurate reward receipts, bounded
 replays and battery/performance tools. See [Trust Update](docs/TRUST_UPDATE.md)
-for tested behavior and outstanding deployment/phone/audio gates. These changes
-are being prepared as 1.0.18 / code 19; backend migrations 010-012 are deployed.
-See [release evidence and bilingual notes](docs/releases/1.0.18.md) for artifact,
-hosted verification and outstanding phone acceptance. Five synthetic Swahili
+for tested behavior and outstanding phone/audio gates. Version 1.0.18 / code 19
+is exported and signed; backend migrations 010-012 are deployed. See [release
+evidence and bilingual notes](docs/releases/1.0.18.md) for artifact, hosted
+verification and outstanding phone acceptance. Five synthetic Swahili
 voice cues now ship as placeholders, not human conductor recordings.
 Drive your dala dala through Dar es Salaam: board abiria, stop at **vituo**
 for fares, overload at your own risk, dodge bodabodas and goats, escape

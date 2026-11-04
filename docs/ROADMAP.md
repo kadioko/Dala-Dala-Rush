@@ -3,12 +3,12 @@
 ## October 22 Release Progress
 
 Backend migrations 010-012 are deployed and HTTPS recovery/World-board checks
-passed. Version 1.0.18 / code 19 is the next signed candidate; release evidence
-and bilingual notes are in `releases/1.0.18.md`. The owner explicitly postponed
+passed. Version 1.0.18 / code 19 is exported and verified; release evidence and
+bilingual notes are in `releases/1.0.18.md`. The owner explicitly postponed
 two-phone acceptance and approved synthetic Swahili placeholder clips instead
 of supplied human recordings. Original recordings and native-speaker/phone-
-speaker validation are still future work. Historical snapshots below retain
-their original deployment/QA status and are superseded by the release record.
+speaker validation are future work. Historical snapshots below retain their
+original status and are superseded by the release record.
 
 ## October 18 Trust Follow-Up
 
@@ -18,10 +18,9 @@ buffering, replay-free progress backups, preserved third-party blocks, Results
 reward ownership and honest adaptive Daily Run wording. Nearby ranks, a single
 reward receipt, bounded replay windows, typed logical-run reporting, roadside
 cues and battery/performance tools are also implemented. See `TRUST_UPDATE.md`.
-Migrations **010-012**, backend deployment, privacy publication, a new AAB,
-GitHub-hosted CI execution, two-phone/native-ad/performance QA and cleared voice
-recordings remain. Scores are still unverified; identical-course rivals are
-not implemented. The sections below are historical snapshots.
+Two-phone/native-ad/performance QA and original or licensed voice recordings
+remain. Scores are still unverified; identical-course rivals are not
+implemented. The sections below are historical snapshots.
 
 ## October 18 Recovery Update
 

@@ -1,10 +1,11 @@
 # Android Release Build Runbook
 
-Last updated: October 18, 2026.
+Last updated: October 22, 2026.
 
-The changes in `RECOVERY_UPDATE.md` and `TRUST_UPDATE.md` are source-only and
-not included in the existing code 18 AAB. Deploy backend migrations 010-012 and
-publish the amended privacy page before distributing the updated client.
+The 1.0.18 / code 19 candidate is exported and verified; backend migrations
+010-012 are deployed and the amended privacy page is published. Physical-device
+consent, ad, transfer and performance acceptance remains outstanding. Do not
+interpret a valid export as a phone-tested or Play-approved release.
 The native consent bridge source is in `native/consent/`; run
 `tools/build_consent_bridge.ps1` after changing it, keep its local AAR with the
 export plugin, and confirm both AdMob and DalaConsent editor plugins are enabled.
@@ -32,9 +33,9 @@ Play production-track updates. Store-listing work and Play Console declarations 
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
 | Current production release | Version 1.0.13, code 14 |
-| Last exported candidate | Version 1.0.17, code 18 |
-| Artifact status | Signed AAB and manifest verified; A21s/second-phone QA and Play processing remain before rollout. |
-| Artifact path | `exports/android/DalaDalaRushTZ-1.0.17-code18.aab` |
+| Last exported candidate | Version 1.0.18, code 19 |
+| Artifact status | Signed AAB and manifest verified; physical-device QA, Play processing and rollout approval remain. |
+| Artifact path | `exports/android/DalaDalaRushTZ-1.0.18-code19.aab` |
 | Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
@@ -49,7 +50,7 @@ Complete these before rolling the verified bundle out to testers:
   use an isolated `TEST_DATABASE_URL` ending in `_test`; database tests must not
   be skipped for release acceptance.
 - [ ] Review both rendered UI suites and complete the two-phone worksheet.
-- [ ] Deploy backend migrations 010-012 and matching code; publish privacy changes.
+- [x] Deploy backend migrations 010-012 and matching code; publish privacy changes.
 - [ ] Verify the newly exported AAB against package and pinned upload certificate
   in `data/release_identity.json`. Pass `-BundletoolJar`; it is now required.
 
@@ -82,8 +83,8 @@ signing configuration.
 The current release candidate is exported from the Android AAB preset with:
 
 ```text
-Version name: 1.0.17
-Version code: 18
+Version name: 1.0.18
+Version code: 19
 ```
 
 The code must be greater than every active artifact in every Play track,
@@ -293,6 +294,20 @@ physical-device, consent, or Play pre-launch checks below.
   `36`, both ARM architectures, AdMob application metadata, and AD_ID permission.
 - This is an upload candidate only. A21s/second-phone validation and Play
   processing remain outstanding.
+
+### Code 19 Test Candidate
+
+- Artifact: `exports/android/DalaDalaRushTZ-1.0.18-code19.aab`
+- Size: `61,733,584` bytes.
+- SHA-256: `56119927A43DEFB443E7E6550CB630AE75EB1867E9ED2D238FBA3B80F7A0236E`.
+- `jarsigner`, pinned certificate verification, bundle structure and bundletool
+  validation passed. Manifest and packaged content confirm version `1.0.18`,
+  code `19`, min API `24`, target API `36`, AdMob/AD_ID, DalaConsent and UMP,
+  both ARM ABIs, and five compressed voice cues.
+- Hosted CI and the live privacy page are verified; see
+  `docs/releases/1.0.18.md` for direct links.
+- This remains an upload/test candidate only. Two-phone QA was explicitly
+  deferred; it has not been uploaded to Play Console or rolled out.
 
 ## 6. Install Through Play Testing
 
