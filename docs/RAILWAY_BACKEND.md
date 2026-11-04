@@ -1,5 +1,21 @@
 # Railway Backend Runbook
 
+## November 4 Deployment
+
+Production migration `013_ephemeral_hub_presence.sql` is deployed with commit
+`891210e`. Railway's pre-deploy command applied it before starting the API.
+The local PostgreSQL 17 migration/regression suite passed (32 backend tests),
+and the production smoke run passed health, all seven World reads, cloud retry,
+acknowledged transfer recovery, Mtaa Wetu presence join/crowd/leave, and
+disposable-account deletion. The updated privacy page is live and returned
+HTTP 200. Migration 013 stores only the latest fictional Kariakoo position per
+installation; stale rows expire after 45 seconds and are cleaned every 15
+seconds. Presence remains opt-in and is not available on the existing code-19
+AAB. The next client release must update the Play Data Safety form and pass
+two-phone consent, block, expiry and resume QA before public rollout.
+The November 4 backend lockfile update also resolves the production `body-parser`
+and `qs` advisories; `npm audit --omit=dev` now reports zero vulnerabilities.
+
 ## October 22 Deployment
 
 Migrations **010-012 and their backend are deployed**. The migration ledger,
@@ -215,17 +231,15 @@ invalidating the old phone's server access.
 
 ## Remaining Production Checks
 
-- Migrations through `009` were deployed on October 8, 2026. Railway logs
-  confirmed the migration runner completed; `/health` and Arusha's public World
-  endpoint returned HTTP 200 with a valid unverified response. The Dar and
+- Migrations through `013` are deployed as of November 4, 2026. Railway logs
+  confirmed migration 013 and the production smoke run passed; the Dar and
   Arusha boards may be empty until players opt in and submit scores.
 - Railway's production pre-deploy command is now `npm run migrate`. Keep it
   enabled for future schema changes.
 - Shared request limits are abuse friction, not anti-cheat. Scores remain
   forgeable and must stay labelled unverified and reward-free.
-- Migration `008_arusha_route_pack.sql` expands the accepted route IDs;
-  migration `009_moderation_console.sql` adds report-review and visibility
-  state. Both were applied by the production pre-deploy migration runner.
+- Migrations `008` and `009` added Arusha routes and moderation state; later
+  production records above supersede their original deployment status.
 - The protected console is deployed and `MODERATION_ADMIN_TOKEN` is configured.
   Smoke-test authenticated list, dismiss, hide, and restore with a disposable
   report/profile before relying on moderation operations.

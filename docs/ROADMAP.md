@@ -9,10 +9,12 @@ friends plaza. World Presence is an additional explicit opt-in for online
 leaderboard members; it shares only a short-lived game-map position, chosen bus
 and preset wave/horn/dance, with block filtering and no free-text chat. Railway
 migration 013 and a matching privacy-policy revision are part of this change.
-The migration must pass PostgreSQL tests and be deployed before clients use the
-plaza. This source change needs a new signed AAB (next code 20 or higher) before
-it reaches phones. Validate the consent wording, two-phone presence/blocks,
-small-screen layout and actual coin economy before production rollout.
+Migration 013 is deployed and passed the production smoke test; the updated
+privacy page is live. Local PostgreSQL 17 and bilingual responsive-screen tests
+pass. This source change needs a new signed AAB (next code 20 or higher) before
+it reaches phones. Update Play Console Data Safety and validate consent wording,
+two-phone presence/blocks, small-screen layout and actual coin economy before
+public rollout.
 
 ## October 22 Release Progress
 

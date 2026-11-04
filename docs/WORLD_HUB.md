@@ -34,16 +34,18 @@ removes the current row, and inactivity expires it. Migration
 `backend/sql/013_ephemeral_hub_presence.sql` creates only the current presence
 table and index.
 
-## Before A Public Release
+## Release Readiness
 
-- Deploy migration 013 and confirm its schema in Railway before using presence.
-- Publish the matching privacy policy and review Play Console Data Safety.
+- Migration 013 is deployed to Railway and its presence flow passed the
+  production smoke test. The matching privacy page is published and returns
+  HTTP 200. Review/update Play Console Data Safety before distributing a build
+  that contains the hub.
 - Test two real phones, including opt-in/out, app suspend/resume, expiry, emotes,
   blocking and the leaderboard profile requirement.
 - Record how quickly the first decoration is affordable and whether the daily
   route feels worthwhile; adjust costs/reward only from observed runs.
-- Build a higher-version signed AAB. The October code-19 candidate predates this
-  feature and must not be used to claim the hub is on devices.
+- Build and verify a higher-version signed AAB. The October code-19 candidate
+  predates this feature and must not be used to claim the hub is on devices.
 
 ## Expansion Path
 
