@@ -556,6 +556,9 @@ func _check_save_normalization() -> void:
 	save_node.data["route_mastery"] = {"kariakoo": 9, "mwenge": -2, "bad": "stars"}
 	save_node.data["route_contract_claimed_on"] = {"kariakoo": "2026-09-02", "bad": 42, "": "2026-01-01"}
 	save_node.data["seen_discoveries"] = ["DISCOVERY_WEATHER", "DISCOVERY_WEATHER", 42, "bad"]
+	save_node.data["hub_owned_decor"] = ["kanga_flag", "invalid", 42]
+	save_node.data["hub_daily_started_date"] = "not-a-date"
+	save_node.data["hub_daily_progress"] = ["market", "unknown", 42]
 	save_node.data["online_installation_id"] = 42
 	save_node.data["online_sync_token"] = []
 	save_node.call("_normalize_core_data")
@@ -587,6 +590,11 @@ func _check_save_normalization() -> void:
 	_check(String(save_node.data.online_installation_id).is_empty()
 		and String(save_node.data.online_sync_token).is_empty(),
 		"Malformed cloud-sync identity was not removed")
+	_check((save_node.data.hub_owned_decor as Array) == ["kanga_flag"],
+		"Unknown neighborhood cosmetics were not removed")
+	_check(String(save_node.data.hub_daily_started_date).is_empty()
+		and (save_node.data.hub_daily_progress as Array) == ["market"],
+		"Neighborhood daily activity save was not normalized")
 	_check(SaveScript.normalize_leaderboard_name("  Konda   Juma  ") == "Konda Juma",
 		"Leaderboard name normalization should trim repeated whitespace")
 	# Keep these persistence contracts in memory; test runs must not touch a

@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 
 if (!process.argv.includes('--allow-production')) throw new Error('Explicit --allow-production is required.');
 const base = 'https://dala-dala-api-production.up.railway.app';
-const report = { health: false, worldRoutes: [], cloudRecovery: false, transferRecovery: false, cleanup: false };
+const report = { health: false, worldRoutes: [], cloudRecovery: false, transferRecovery: false, hubPresence: false, cleanup: false };
 let installationId;
 let sourceToken;
 let receivingToken;
@@ -51,6 +51,17 @@ try {
   }
   assert.equal((await request('/v1/cloud-save', 'GET', undefined, sourceToken)).status, 401);
   assert.equal((await request('/v1/cloud-save', 'GET', undefined, receivingToken)).body.save.total_coins, 123);
+  assert.equal((await request('/v1/leaderboard-profile', 'PUT', { displayName: 'Hub Smoke' }, receivingToken)).status, 200);
+  const presence = await request('/v1/hub/presence', 'PUT', {
+    districtId: 'kariakoo', x: 500, y: 500, vehicleId: 'classic_blue', emote: 'wave',
+  }, receivingToken);
+  assert.equal(presence.status, 200);
+  assert.equal(presence.body.present, true);
+  const crowd = await request('/v1/hub/crowd/kariakoo', 'GET', undefined, receivingToken);
+  assert.equal(crowd.status, 200);
+  assert.deepEqual(crowd.body.players, []);
+  assert.equal((await request('/v1/hub/presence', 'DELETE', undefined, receivingToken)).body.left, true);
+  report.hubPresence = true;
   const nearby = await request('/v1/leaderboards/nearby/kariakoo', 'GET', undefined, receivingToken);
   assert.equal(nearby.status, 200);
   assert.equal(nearby.body.own, null);

@@ -212,7 +212,7 @@ online competition, or turning on Gameplay Insights.
    - Data: the 2-16 character driver display name chosen for online rankings.
    - Purpose: App functionality.
    - Collected: Yes, optional.
-   - Shared: No, unless the developer's final service arrangement changes.
+   - Shared: Yes, with other opted-in players on public rankings or Hub Presence.
    - Deletion: leaving online competition removes the public profile, scores,
      friend links, and friend codes.
 
@@ -240,6 +240,21 @@ online competition, or turning on Gameplay Insights.
    - Purpose: Analytics.
    - Collected: Yes, optional, only after the separate Gameplay Insights opt-in.
    - Shared: No, unless the developer's final service arrangement changes.
+
+5. **App activity - Other actions / App interactions**
+   - Data: only after the separate Hub Presence opt-in, the player's current
+     position in the fictional Kariakoo map, selected vehicle and one of three
+     fixed emotes. It is not device GPS or a real-world location. The current
+     position is replaced on each update, expires after 45 seconds and is
+     automatically purged; it is visible to opted-in players in the same hub.
+   - Purpose: App functionality and in-game social interaction.
+   - Collected: Yes, optional.
+   - Shared: Yes, with opted-in players. No chat text or voice is collected.
+
+The hub's emote/location row is temporary operational state, not an analytics
+history. The client sends only after explicit Hub Presence consent; disabling
+presence or leaving removes the row, and inactive rows are deleted within the
+45-second expiry plus the cleanup interval. Do not claim GPS/precise location.
 
 Before saving, compare the exact choices to Google Play's current Data Safety
 guidance and any embedded SDK disclosures. The developer remains responsible

@@ -4,7 +4,7 @@ extends Node
 const SIZES: Array[Vector2i] = [Vector2i(320, 568), Vector2i(360, 640),
 	Vector2i(393, 873), Vector2i(412, 915), Vector2i(540, 960), Vector2i(720, 1600)]
 const SCREENS := ["splash", "game_over", "settings", "garage", "routes", "shop",
-	"how_to_play", "leaderboard", "missions", "stats", "referrals", "livery"]
+	"how_to_play", "leaderboard", "missions", "stats", "referrals", "livery", "world_hub"]
 var _failures: Array[String] = []
 var _checks: int = 0
 var _captures: int = 0

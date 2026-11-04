@@ -26,8 +26,8 @@ for store assets, declarations, and rollout checks.
 - Enabled ABIs for the next export: `armeabi-v7a` and `arm64-v8a`
 - Source status: the signed code-14 artifact contains Waves 16-29, the A21s
   main-menu fit pass plus responsive narrow-width fallback, and consent-gated cloud-pilot UI. Cloud sync,
-  online leaderboards, and Gameplay Insights remain off until each player opts
-  in. Complete two-phone QA and update Play privacy/Data Safety declarations
+  online leaderboards, Hub Presence and Gameplay Insights remain off until each
+  player opts in. Complete two-phone QA and update Play privacy/Data Safety declarations
   before broad rollout.
 
 Before a replacement upload, check every Play track first. Google Play rejects

@@ -26,7 +26,7 @@ const PRIVATE_LOCAL_KEYS: Array[String] = [
 	"leaderboard_upload_route", "leaderboard_upload_score", "leaderboard_upload_updated_at",
 	"online_pending_cloud_upload",
 	"online_pending_transfer", "active_run_id", "last_reward_receipt",
-	"ghost_best", "ghost_rival", "latest_replay", "daily_replay_best",
+	"ghost_best", "ghost_rival", "latest_replay", "daily_replay_best", "hub_presence_opt_in",
 ]
 
 var _submission_in_flight: bool = false
@@ -313,6 +313,31 @@ func report_leaderboard_entry(report_ref: String, route_id: String, reason: Stri
 		{"reportRef": report_ref, "routeId": route_id, "reason": reason},
 		"leaderboard_report", true)
 
+func update_hub_presence(x: int, y: int, vehicle_id: String, emote: String = "") -> void:
+	if not SaveSystem.get_value("hub_presence_opt_in", false) or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("hub_presence", false, {"reason": "not_opted_in"})
+		return
+	if not is_enabled() or not has_identity():
+		_finish("hub_presence", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/hub/presence", HTTPClient.METHOD_PUT,
+		{"districtId": "kariakoo", "x": clampi(x, 0, 1000), "y": clampi(y, 0, 1000),
+		"vehicleId": vehicle_id, "emote": emote}, "hub_presence", true)
+
+func fetch_hub_crowd() -> void:
+	if not SaveSystem.get_value("hub_presence_opt_in", false) or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("hub_crowd", false, {"reason": "not_opted_in"})
+		return
+	if not is_enabled() or not has_identity():
+		_finish("hub_crowd", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/hub/crowd/kariakoo", HTTPClient.METHOD_GET, {}, "hub_crowd", true)
+
+func leave_hub_presence() -> void:
+	if not is_enabled() or not has_identity():
+		return
+	_request_json("/v1/hub/presence", HTTPClient.METHOD_DELETE, {}, "hub_presence_leave", true)
+
 func leave_online_leaderboard() -> void:
 	if not is_enabled() or not has_identity():
 		_finish("leaderboard_leave", false, {"reason": "not_ready"})
@@ -456,6 +481,20 @@ static func valid_response(operation: String, payload: Dictionary) -> bool:
 			if payload.get("own") != null and not _valid_rank_row(payload.own): return false
 			for row in payload.nearby:
 				if not _valid_rank_row(row): return false
+			return true
+		"hub_presence": return payload.get("present") == true and valid_revision(payload.get("expiresInSeconds"))
+		"hub_presence_leave": return payload.get("left") == true
+		"hub_crowd":
+			if payload.get("districtId") != "kariakoo" or payload.get("players") is not Array or payload.players.size() > 20:
+				return false
+			for player in payload.players:
+				if player is not Dictionary or not Ids.is_valid(player.get("playerId")) \
+				or player.get("displayName") is not String or String(player.displayName).length() > 64 \
+				or not valid_revision(player.get("x")) or int(player.x) > 1000 \
+				or not valid_revision(player.get("y")) or int(player.y) > 1000 \
+				or player.get("vehicleId") not in ["classic_blue", "kariakoo_yellow", "mwendokasi_red", "night_bus", "vip", "old_school", "simba_express", "bongo_flava"] \
+				or player.get("emote") not in ["", "wave", "horn", "dance"]:
+					return false
 			return true
 		"telemetry": return valid_revision(payload.get("accepted"))
 	return not payload.is_empty()

@@ -26,7 +26,7 @@ test("real PostgreSQL migrations, recovery, moderation, and ingestion", {
 	try {
 		await t.test("migration ledger serializes first setup and repeated deploys", async () => {
 			await Promise.all([migrate(pool), migrate(pool)]);
-			assert.equal(Number((await pool.query("SELECT COUNT(*) FROM schema_migrations")).rows[0].count), 12);
+			assert.equal(Number((await pool.query("SELECT COUNT(*) FROM schema_migrations")).rows[0].count), 13);
 		});
 		server = createApp(pool).listen(0, "127.0.0.1");
 		await once(server, "listening");

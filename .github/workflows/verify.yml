@@ -56,6 +56,7 @@ jobs:
           "$GODOT" --headless --path . res://tests/logic_contracts.tscn
           "$GODOT" --headless --path . res://tests/ui_layout_qa.tscn
           "$GODOT" --headless --path . res://tests/secondary_ui_qa.tscn
+          "$GODOT" --headless --path . res://tests/world_hub_contracts.tscn
           "$GODOT" --headless --path . res://tests/recovery_contracts.tscn
           "$GODOT" --headless --path . res://tests/trust_contracts.tscn
 

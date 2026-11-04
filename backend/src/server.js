@@ -10,6 +10,7 @@ import { installCloudRoutes } from "./cloud.js";
 import { installTransferRoutes } from "./transfers.js";
 import { telemetryProperties } from "./telemetry.js";
 import { installRankingRoutes } from "./rankings.js";
+import { installHubRoutes } from "./hub.js";
 
 const MAX_SAVE_BYTES = 64 * 1024;
 const MAX_SCORE = 2_000_000;
@@ -56,6 +57,11 @@ export async function purgeExpiredTelemetry(pool) {
 	);
 	await pool.query("UPDATE installations SET leaderboard_hidden_until = NULL WHERE leaderboard_hidden_until <= NOW()");
 	return deleted;
+}
+
+export async function purgeExpiredHubPresence(pool) {
+	const result = await pool.query("DELETE FROM hub_presence WHERE updated_at <= NOW() - INTERVAL '45 seconds'");
+	return result.rowCount ?? result.rows?.length ?? 0;
 }
 
 function fixedWindowRateLimit(pool, { windowMs, max, key, scope, error = "rate_limited" }) {
@@ -305,6 +311,9 @@ export function createApp(pool) {
 	const limitLeaderboardReports = fixedWindowRateLimit(pool, {
 		windowMs: 60 * 60 * 1000, max: 3, key: (req) => req.installationId, scope: "leaderboard_reports",
 	});
+	const limitHubPresence = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 1000, max: 15, key: (req) => req.installationId, scope: "hub_presence",
+	});
 
   app.get("/health", async (_req, res) => {
     try {
@@ -315,6 +324,7 @@ export function createApp(pool) {
     }
   });
 	installRankingRoutes(app, pool, requireInstallation, limitWorldReads, problem);
+	installHubRoutes(app, pool, requireInstallation, limitHubPresence, limitWorldReads, problem);
 
   async function requireInstallation(req, res, next) {
     const installationId = String(req.get("X-Installation-Id") || "");
@@ -418,6 +428,7 @@ export function createApp(pool) {
 			await client.query("BEGIN");
 			transactionStarted = true;
 			await client.query("UPDATE installations SET leaderboard_left = TRUE WHERE id = $1", [req.installationId]);
+			await client.query("DELETE FROM hub_presence WHERE installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_scores WHERE installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friend_invites WHERE owner_installation_id = $1 OR claimed_by_installation_id = $1", [req.installationId]);
 			await client.query("DELETE FROM leaderboard_friendships WHERE first_installation_id = $1 OR second_installation_id = $1", [req.installationId]);
@@ -883,6 +894,11 @@ async function start() {
 	void purgeTelemetry();
 	const retentionTimer = setInterval(() => { void purgeTelemetry(); }, 6 * 60 * 60 * 1000);
 	retentionTimer.unref();
+	const purgeHubPresence = () => purgeExpiredHubPresence(pool)
+		.catch(() => console.error("Expired neighborhood presence cleanup failed."));
+	void purgeHubPresence();
+	const hubPresenceTimer = setInterval(() => { void purgeHubPresence(); }, 15 * 1000);
+	hubPresenceTimer.unref();
 	const app = createApp(pool);
   const port = Number.parseInt(process.env.PORT || "3000", 10);
   const server = app.listen(port, "0.0.0.0", () => console.log(`Dala Dala Rush service on ${port}`));

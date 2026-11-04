@@ -2,6 +2,14 @@
 
 A Tanzanian daladala endless runner built with **Godot 4.7.1**.
 
+**November 4 hub update:** the new *Mtaa Wetu* district adds walk-around
+exploration, three discoverable shops/plazas, one daily errand route, buyable
+neighborhood decorations, and an explicitly opted-in online plaza with temporary
+player presence and preset emotes. This source update needs a new AAB before it
+reaches phones; see [World Hub](docs/WORLD_HUB.md) for the shipped scope and
+limits. Railway migration 013 and the matching privacy policy are included in
+this change.
+
 **October 22 release candidate:** consent-gated native ads, acknowledged phone
 transfer, save schema 18, nearby ranks, accurate reward receipts, bounded
 replays and battery/performance tools. See [Trust Update](docs/TRUST_UPDATE.md)
@@ -204,6 +212,7 @@ are bundled. Cleared sprites/sounds can replace the placeholders later.
 | Doc | What's in it |
 |-----|--------------|
 | `docs/ROADMAP.md` | Current status, release priorities, and remaining work |
+| `docs/WORLD_HUB.md` | Mtaa Wetu design, systems, privacy and expansion notes |
 | `docs/UPGRADES.md` | Changelog of implemented systems + balancing notes |
 | `docs/SACCO_CREWS_DESIGN.md` | Privacy-first design and release gates for future crews |
 | `docs/DEVICE_QA.md` | Physical phone QA worksheet, including Arusha/replay/season checks |

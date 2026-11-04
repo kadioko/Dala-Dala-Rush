@@ -25,6 +25,7 @@ var _rank_label: Label
 var _rank_up: Dictionary = {}
 var _btn_play: Button
 var _btn_current_route: Button
+var _btn_world_hub: Button
 var _btn_garage: Button
 var _btn_shop: Button
 var _btn_settings: Button
@@ -118,6 +119,13 @@ func _ready() -> void:
 	_btn_current_route.add_theme_font_size_override("font_size", 18)
 	_btn_current_route.pressed.connect(func(): _go("res://scenes/routes.tscn"))
 	v.add_child(_btn_current_route)
+	_btn_world_hub = UIFactory.make_button("", false)
+	_btn_world_hub.custom_minimum_size = Vector2(0, 58)
+	_btn_world_hub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_btn_world_hub.add_theme_font_size_override("font_size", 18)
+	UIFactory.tint_button(_btn_world_hub, Color("#148f77"))
+	_btn_world_hub.pressed.connect(func(): _go("res://scenes/world_hub.tscn"))
+	v.add_child(_btn_world_hub)
 
 	var primary_grid := GridContainer.new()
 	primary_grid.columns = 2
@@ -335,6 +343,7 @@ func _refresh_text(_l := "") -> void:
 	_btn_play.text         = LocaleManager.t("PLAY")
 	var selected_route: Dictionary = Routes.get_by_id(GameState.selected_route_id)
 	_btn_current_route.text = "%s: %s" % [LocaleManager.t("ROUTES"), LocaleManager.t(String(selected_route.get("name_key", "ROUTE_KARIAKOO")))]
+	_btn_world_hub.text = "🏙  " + LocaleManager.t("WORLD_HUB_MENU")
 	_btn_more.text = LocaleManager.t("MORE_OPTIONS" if not _more_expanded else "LESS_OPTIONS")
 	_daily_label.text      = _daily_text()
 	var daily_route: Dictionary = DailyRouteChallengeData.current()

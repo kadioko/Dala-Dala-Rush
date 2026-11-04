@@ -1,13 +1,14 @@
 # Privacy Policy Source
 
-Source updated: October 22, 2026. Publication of the matching HTML is part of
-the 1.0.18 release; see `releases/1.0.18.md` for verified status. Review the Play Data Safety declaration
-against enabled Railway features before the next store submission.
+Source updated: November 4, 2026. This revision documents optional, ephemeral
+in-game plaza presence. Publish the matching HTML before distributing the hub
+client and review the Play Data Safety declaration against enabled Railway
+features before the next store submission.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: October 22, 2026
+Effective date: November 4, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.

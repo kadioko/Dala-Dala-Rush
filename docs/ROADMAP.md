@@ -1,5 +1,19 @@
 # Dala Dala Rush TZ - Product Roadmap
 
+## November 4 Mtaa Wetu Prototype
+
+The client now has a walkable Kariakoo neighborhood linked from the main menu:
+four destinations, a once-per-day three-stop errand, three persistent coin-
+priced decorations that appear in the environment, bus garage access, and a
+friends plaza. World Presence is an additional explicit opt-in for online
+leaderboard members; it shares only a short-lived game-map position, chosen bus
+and preset wave/horn/dance, with block filtering and no free-text chat. Railway
+migration 013 and a matching privacy-policy revision are part of this change.
+The migration must pass PostgreSQL tests and be deployed before clients use the
+plaza. This source change needs a new signed AAB (next code 20 or higher) before
+it reaches phones. Validate the consent wording, two-phone presence/blocks,
+small-screen layout and actual coin economy before production rollout.
+
 ## October 22 Release Progress
 
 Backend migrations 010-012 are deployed and HTTPS recovery/World-board checks

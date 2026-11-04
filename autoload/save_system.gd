@@ -17,7 +17,12 @@ var recovery_read_only: bool = false
 const MAX_SAVE_BYTES := 1048576
 
 const DEFAULTS := {
-	"schema_version": 18,
+	"schema_version": 19,
+	"hub_owned_decor": [],
+	"hub_daily_completed_date": "",
+	"hub_daily_started_date": "",
+	"hub_daily_progress": [],
+	"hub_presence_opt_in": false,
 	"online_pending_transfer": {},
 	"active_run_id": "",
 	"last_reward_receipt": {},
@@ -301,6 +306,20 @@ func _normalize_core_data() -> void:
 	data["unlocked_routes"] = _normalized_string_array(
 		data.get("unlocked_routes", []), "kariakoo"
 	)
+	var decor: Array[String] = _normalized_string_array(data.get("hub_owned_decor", []))
+	decor = decor.filter(func(item: String) -> bool:
+		return item in ["kanga_flag", "soko_lanterns", "kituo_bench"]
+	)
+	data["hub_owned_decor"] = decor
+	var hub_date := String(data.get("hub_daily_completed_date", ""))
+	data["hub_daily_completed_date"] = hub_date if hub_date.length() == 10 \
+		and hub_date[4] == "-" and hub_date[7] == "-" else ""
+	var hub_start := String(data.get("hub_daily_started_date", ""))
+	data["hub_daily_started_date"] = hub_start if hub_start.length() == 10 \
+		and hub_start[4] == "-" and hub_start[7] == "-" else ""
+	var hub_progress: Array[String] = _normalized_string_array(data.get("hub_daily_progress", []))
+	hub_progress = hub_progress.filter(func(stop: String) -> bool: return stop in ["market", "garage", "plaza"])
+	data["hub_daily_progress"] = hub_progress
 	data["achievements"] = _normalized_string_array(data.get("achievements", []))
 	data["referral_claimed_invitees"] = _normalized_string_array(
 		data.get("referral_claimed_invitees", [])

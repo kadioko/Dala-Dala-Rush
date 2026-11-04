@@ -38,6 +38,8 @@ try {
 	if ($LASTEXITCODE -ne 0) { throw "Godot responsive UI bounds checks failed." }
 	& $GodotPath --headless --path . res://tests/secondary_ui_qa.tscn
 	if ($LASTEXITCODE -ne 0) { throw "Godot secondary-screen bounds checks failed." }
+	& $GodotPath --headless --path . res://tests/world_hub_contracts.tscn
+	if ($LASTEXITCODE -ne 0) { throw "Godot neighborhood hub economy checks failed." }
 	& $GodotPath --headless --path . res://tests/recovery_contracts.tscn
 	if ($LASTEXITCODE -ne 0) { throw "Godot recovery/input/save regressions failed." }
 	& $GodotPath --headless --path . res://tests/trust_contracts.tscn

@@ -11,6 +11,7 @@ var _ghost_btn: CheckButton
 var _effects_btn: CheckButton
 var _cloud_btn: CheckButton
 var _telemetry_btn: CheckButton
+var _hub_presence_btn: CheckButton
 var _sw_btn: Button
 var _en_btn: Button
 var _privacy_btn: Button
@@ -28,6 +29,8 @@ var _effects_label: Label
 var _lang_label: Label
 var _cloud_label: Label
 var _telemetry_label: Label
+var _hub_presence_label: Label
+var _hub_presence_status: Label
 var _telemetry_status: Label
 var _cloud_status: Label
 var _cloud_pending_enable: bool = false
@@ -124,6 +127,13 @@ func _ready() -> void:
 	_telemetry_status = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
 	_telemetry_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_telemetry_status)
+	_hub_presence_label = _make_setting_label()
+	_hub_presence_btn = _make_switch()
+	_hub_presence_btn.toggled.connect(_toggle_hub_presence)
+	v.add_child(_make_setting_row(_hub_presence_label, _hub_presence_btn))
+	_hub_presence_status = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
+	_hub_presence_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_hub_presence_status)
 
 	_cloud_status = UIFactory.make_label("", 14, UIFactory.COL_MUTED)
 	_cloud_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -254,6 +264,8 @@ func _refresh(_locale: String = "") -> void:
 	_effects_label.text = LocaleManager.t("REDUCED_EFFECTS")
 	_cloud_label.text = LocaleManager.t("CLOUD_SYNC")
 	_telemetry_label.text = LocaleManager.t("TELEMETRY")
+	_hub_presence_label.text = LocaleManager.t("HUB_PRESENCE")
+	_hub_presence_status.text = LocaleManager.t("HUB_PRESENCE_DETAILS")
 	_lang_label.text = LocaleManager.t("SELECT_LANGUAGE")
 	_refresh_switch(_music_btn, AudioManager.music_on)
 	_refresh_switch(_sfx_btn, AudioManager.sfx_on)
@@ -262,9 +274,12 @@ func _refresh(_locale: String = "") -> void:
 	_refresh_switch(_effects_btn, bool(SaveSystem.get_value("reduced_effects", false)))
 	_refresh_switch(_cloud_btn, bool(SaveSystem.get_value("cloud_sync_opt_in", false)) or _cloud_pending_enable)
 	_refresh_switch(_telemetry_btn, SaveSystem.is_online_telemetry_opted_in() or _telemetry_pending_enable)
+	_refresh_switch(_hub_presence_btn, bool(SaveSystem.get_value("hub_presence_opt_in", false)))
 	var cloud_available: bool = OnlineService.is_enabled()
 	_cloud_btn.disabled = not cloud_available
 	_telemetry_btn.disabled = not cloud_available
+	_hub_presence_btn.disabled = not cloud_available or not OnlineService.has_identity() \
+		or not SaveSystem.is_online_leaderboard_opted_in()
 	_cloud_backup_btn.text = LocaleManager.t("CLOUD_BACKUP_NOW")
 	_cloud_restore_btn.text = LocaleManager.t("CLOUD_RESTORE")
 	_cloud_delete_btn.text = LocaleManager.t("CLOUD_DELETE")
@@ -361,6 +376,19 @@ func _toggle_telemetry(enabled: bool) -> void:
 		_refresh()
 		return
 	_show_confirm("TELEMETRY_ENABLE_TITLE", "TELEMETRY_ENABLE_BODY", "ON", _begin_telemetry_opt_in)
+
+func _toggle_hub_presence(enabled: bool) -> void:
+	if not enabled:
+		SaveSystem.set_value("hub_presence_opt_in", false)
+		OnlineService.leave_hub_presence()
+		_refresh()
+		return
+	if not OnlineService.has_identity() or not SaveSystem.is_online_leaderboard_opted_in():
+		_refresh()
+		return
+	_show_confirm("HUB_PRESENCE", "HUB_PRESENCE_CONFIRM", "ON", func():
+		SaveSystem.set_value("hub_presence_opt_in", true)
+		_refresh())
 
 func _begin_telemetry_opt_in() -> void:
 	_telemetry_pending_enable = true
