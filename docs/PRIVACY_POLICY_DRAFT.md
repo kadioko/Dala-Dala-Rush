@@ -2,10 +2,10 @@
 
 Source updated: November 6, 2026. This revision documents optional, ephemeral
 in-game plaza presence, fixed preset lounge phrases, local NPC property rent,
-and the optional fictional Dala Dala World election. Publish the matching HTML
-and deploy migrations 014-015 before distributing this client; review the Play
-Data Safety declaration against enabled Railway features before the next store
-submission.
+and the optional fictional Dala Dala World election. Matching HTML was
+published on GitHub Pages and migrations 014-015 were deployed on November 6,
+2026. Review the Play Data Safety declaration against enabled Railway features
+before the next store submission.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.

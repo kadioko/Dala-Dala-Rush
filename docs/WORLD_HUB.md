@@ -91,7 +91,8 @@ claimed until the A21s and a second phone complete the QA worksheet.
 ## Online Presence And Election Safety
 
 Presence is a polling feature, not MMO or authoritative multiplayer. The client
-sends a fictional map position, selected vehicle and one of three preset emotes.
+sends a fictional map position, selected vehicle and one of the allowlisted
+preset emotes or short lounge phrases.
 A single row per installation expires after 45 seconds. Crowd size is capped at
 20, blocks apply in both directions, and there is no free-text chat, voice chat,
 real-world GPS or movement history. Presence defaults off.
@@ -105,25 +106,25 @@ deletion cascades to its votes.
 Migration `013_ephemeral_hub_presence.sql` provides presence. Migration
 `014_mtaa_election.sql` creates the election and vote tables. Migration
 `015_hub_preset_lounge.sql` expands the database allowlist for preset phrases.
-Migrations 014 and 015 are prepared but not deployed to Railway; online election
-and lounge requests must be treated as unavailable until deploy.
+Migrations 014 and 015 were applied on Railway on November 6, 2026. The
+production smoke test confirmed election reads, preset lounge phrases and
+cleanup. This confirms service availability, not two-phone user acceptance.
 
 ## Release Readiness
 
-- Migration 013 is deployed. Migrations 014-015 are prepared but not deployed.
-- Privacy HTML now includes local election, property-rent and preset-lounge
-  disclosures but has not been published. Publish it and update the Play
-  Console Data Safety answers before distributing a build with these features.
+- Migrations 013-015 are deployed; the code-21 API passes the production smoke
+  test. GitHub Pages serves the updated privacy HTML with HTTP 200.
+- Review/update Play Console Data Safety and content-rating declarations before
+  rollout; these console declarations were not changed by the repository push.
 - Test two real phones for opt-in/out, suspend/resume, expiry, blocking, voting
   once per device, tally refresh and account deletion. No device results are
   claimed yet.
-- Validate property prices and job cadence on devices before tuning. The code
-  20 / version 1.0.19 bundle predates these changes. A future AAB needs a higher
-  version code and a deliberate deploy/release of migrations 014-015.
+- Validate property prices and job cadence on devices before tuning. The
+  version 1.0.20 / code 21 candidate contains these changes but has not been
+  installed or tested on phones.
 - The local save schema is now 23. Passport, album, NPC relationships, decor
-  placement, phone ownership and bus display are device-local; these source
-  additions require no backend schema change. Election and lounge APIs still
-  depend on undeployed migrations 014-015.
+  placement, phone ownership and bus display are device-local; election and
+  lounge services use the deployed migrations 014-015.
 
 ## Expansion Path
 
