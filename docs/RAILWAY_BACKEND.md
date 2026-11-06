@@ -1,5 +1,27 @@
 # Railway Backend Runbook
 
+## November 6 Neighborhood Update
+
+Migration `015_hub_preset_lounge.sql` permits only five fixed phrase IDs in the
+existing ephemeral hub-presence row. Crowd reads hide phrases after 15 seconds;
+cleanup clears their stored value, while presence itself retains its existing
+45-second expiry. No open text or voice endpoint was added. NPC property rent
+is local-only and requires no backend storage. Migrations 014-015 and matching
+privacy/store disclosures must be verified after deployment. Do not call the
+client production-ready until deployment and two-phone QA are complete.
+
+## November 4 Source-Only Election Update
+
+Migration `014_mtaa_election.sql` and its API are part of the 1.0.20 candidate.
+It seeds one 30-day fictional ballot, permits one vote per
+installation, returns aggregate totals only, and deletes votes one year after
+the election closes. The Railway pre-deploy migration must succeed before the
+client ballot can load.
+The deployment smoke script performs a read-only ballot check; it never casts a
+production vote. Run the release schema check after deployment, then publish
+the matching privacy policy and update Play Data Safety before releasing an
+AAB. The migration should not be presented as live until Railway confirms it.
+
 ## November 4 Deployment
 
 Production migration `013_ephemeral_hub_presence.sql` is deployed with commit

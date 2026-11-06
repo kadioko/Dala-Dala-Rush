@@ -318,6 +318,11 @@ func record_run(score: int, coins: int, passengers: int, distance: float,
 	last_route_goal_key = String(route.get("goal_key", ""))
 	last_route_goal_progress = Routes.goal_progress(route, stats)
 	last_route_goal_met = Routes.is_goal_met(route, stats)
+	var hub_activity: Dictionary = SaveSystem.get_value("hub_route_activity", {}).duplicate(true)
+	if String(hub_activity.get("status", "")) == "active" and String(hub_activity.get("route", "")) == selected_route_id and last_route_goal_met:
+		hub_activity["status"] = "success_pending"
+		hub_activity["score"] = score
+		SaveSystem.set_value("hub_route_activity", hub_activity)
 	if last_route_goal_met and not _goal_rewarded:
 		_goal_rewarded = true
 		last_bonus_coins = int(route.get("goal_reward", 0))

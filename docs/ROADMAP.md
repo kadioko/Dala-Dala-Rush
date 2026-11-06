@@ -1,5 +1,60 @@
 # Dala Dala Rush TZ - Product Roadmap
 
+## November 6 Mtaa Usability Pass (Source Only)
+
+First-visit guidance now names the nearby action button and advances to the
+next errand landmark. Phone ownership is optional for navigation. Owned-item
+inventory shows placement, plot items are clearer on-scene and movable, and a
+single portfolio lists properties/perks/rent. Walking and route-job cards show
+pickup/drop-off, reward and paid-slot availability; payout feedback distinguishes
+paid from queued rewards. District transitions use existing synthetic Swahili
+barks under the SFX setting and a reduced-effects-aware arrival cue. NPC job
+progress gets a visible reaction. Global preset chat and multiplayer scope are
+unchanged pending two-phone QA. Source gates pass; no AAB/device acceptance is
+claimed.
+
+## November 6 Mtaa Passport, Properties And Phone (Source Only)
+
+The next Mtaa layer adds permanent six-district passport/album progress,
+one-time visit milestones, three-slot owned-plot placement with preview and
+confirmation, useful home/workshop/kiosk/Posta property panels, three NPC
+friendship rewards, a personal bus display, a paid Mtaa Phone with shortcuts,
+and a results-to-hub summary. A public preset-phrase lounge is reachable from
+the phone but remains Kariakoo-only and depends on migration 015. This is not
+free-text or voice chat. Friend-bus displays remain deferred pending two-phone
+friend/block QA. Save schema 23. No new AAB, migration deployment, privacy-page
+publication or phone QA is included.
+
+Before release: run all source/backend gates, deploy migrations 014-015, publish
+the privacy page and reconcile Play declarations, then test the full hub flow
+on two Android phones in both languages. Verify placement/save recovery,
+milestone deduplication, phone purchase, preset lounge opt-in/blocking and
+resume behavior before exporting a higher-version bundle.
+
+## November 6 Hub Activities And Personalization (Source Only)
+
+Mtaa Wetu now has a six-tile mini-map with current/job-target markers, district
+greetings and reactions, shop previews plus owned inventory, six equipable local
+wearables, and district-specific driving contracts tied to the existing route
+goal. Contracts reuse the two-paid-jobs-per-day cap and defer a successful
+reward if the cap is full. Kiosk/Mbezi discounts, a workshop job bonus, and a
+Posta Flat stock unlock provide modest disclosed property perks. Save schema
+22 adds only local state. No AAB, backend migration, or public policy publish
+is included in this source update; physical phone QA remains outstanding.
+
+## November 4 Hub Expansion (Source Only)
+
+The working tree began expanding Mtaa Wetu with explicit errand check-ins,
+first-visit guidance, a larger six-district follow-camera map, district
+cosmetics, nine buildable local plots, daily capped NPC rent, nine paid jobs, a
+fixed-phrase opt-in lounge, and a fictional seasonal election with one vote per
+installation and aggregate-only results. Property ownership is not shared with visitors. Migrations 014
+and 015 are prepared but not deployed; privacy/store text is updated locally
+only. The 1.0.19/code-20 AAB does not contain this work. Before release: run
+backend/Godot tests, deploy migrations, publish privacy updates, review Play
+Console declarations, and perform two-phone QA. No AAB is claimed for this
+source update.
+
 ## November 4 Mtaa Wetu Prototype
 
 The client now has a walkable Kariakoo neighborhood linked from the main menu:

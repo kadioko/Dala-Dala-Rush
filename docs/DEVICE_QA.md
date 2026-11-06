@@ -4,7 +4,8 @@ October 22: the owner explicitly deferred physical two-phone testing. No device
 results are marked passed. Backend HTTPS smoke tests succeeded separately;
 synthetic voice placeholders still need native-speaker/phone-speaker review.
 The 1.0.19 / code 20 hub build is available for device testing, but this is not
-evidence of acceptance on either phone.
+evidence of acceptance on either phone. Newer property, rent, lounge and
+election source changes are not in that bundle.
 
 ## Trust Follow-Up Acceptance - Not Yet Performed On Phones
 
@@ -24,6 +25,18 @@ evidence of acceptance on either phone.
   and offline/reconnect behavior. Confirm no GPS permission or free chat.
 - [ ] Visit every Mtaa Wetu destination, complete/resume the daily errand,
   buy each decoration, restart the app, and verify each purchase/reward once.
+- [ ] Verify first-visit guidance, explicit stop check-ins, property purchase/
+  upgrade and visible plot changes, rent once-per-day/cap, job resume/reward
+  cap, both languages, and offline election fallback. After migrations 014-015
+  are deployed, test one vote per phone, aggregate results, preset lounge phrase
+  delivery/15-second expiry, and online block behavior on two phones. Confirm
+  property ownership/rent is local NPC simulation and not shared with visitors.
+- [ ] Walk across all six connected districts, test the follow-camera at map
+  edges, quick-travel to each area, and confirm the displayed district/route
+  names. Visit each district's stall, plot office and activity marker; buy and
+  upgrade a local item, then verify the owned object/building appears after
+  leaving and returning to the area. Confirm presence is removed outside
+  Kariakoo.
 - [ ] Back up with four maximum replays; progress succeeds, clips stay local.
 - [ ] Compare a 15-minute route at 60/30 FPS with fixed brightness/network/
   charger state. Use debug Settings capture plus `capture_android_perf.ps1`;

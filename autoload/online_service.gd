@@ -13,6 +13,9 @@ const RELEASE_CLOUD_SYNC_ENABLED := true
 const MAX_SNAPSHOT_BYTES := 65536
 const REQUEST_TIMEOUT_SECONDS := 12.0
 const MAX_RESPONSE_BYTES := 131072
+const HUB_LOUNGE_PHRASES: Array[String] = [
+	"chat_hello", "chat_route", "chat_business", "chat_drive", "chat_thanks",
+]
 const Ids := preload("res://data/operation_ids.gd")
 const PRIVATE_LOCAL_KEYS: Array[String] = [
 	"leaderboard", "referral_invite_code", "referral_welcome_claimed",
@@ -324,6 +327,20 @@ func update_hub_presence(x: int, y: int, vehicle_id: String, emote: String = "")
 		{"districtId": "kariakoo", "x": clampi(x, 0, 1000), "y": clampi(y, 0, 1000),
 		"vehicleId": vehicle_id, "emote": emote}, "hub_presence", true)
 
+func send_hub_lounge_phrase(x: int, y: int, vehicle_id: String, phrase_id: String) -> void:
+	if phrase_id not in HUB_LOUNGE_PHRASES:
+		_finish("hub_lounge", false, {"reason": "invalid_phrase", "phrase_id": phrase_id})
+		return
+	if not bool(SaveSystem.get_value("hub_presence_opt_in", false)) or not SaveSystem.is_online_leaderboard_opted_in():
+		_finish("hub_lounge", false, {"reason": "not_opted_in", "phrase_id": phrase_id})
+		return
+	if not is_enabled() or not has_identity():
+		_finish("hub_lounge", false, {"reason": "not_ready", "phrase_id": phrase_id})
+		return
+	_request_json("/v1/hub/presence", HTTPClient.METHOD_PUT,
+		{"districtId": "kariakoo", "x": clampi(x, 0, 1000), "y": clampi(y, 0, 1000),
+		"vehicleId": vehicle_id, "emote": phrase_id}, "hub_lounge", true, {"phrase_id": phrase_id})
+
 func fetch_hub_crowd() -> void:
 	if not SaveSystem.get_value("hub_presence_opt_in", false) or not SaveSystem.is_online_leaderboard_opted_in():
 		_finish("hub_crowd", false, {"reason": "not_opted_in"})
@@ -337,6 +354,19 @@ func leave_hub_presence() -> void:
 	if not is_enabled() or not has_identity():
 		return
 	_request_json("/v1/hub/presence", HTTPClient.METHOD_DELETE, {}, "hub_presence_leave", true)
+
+func fetch_hub_election() -> void:
+	if not is_enabled() or not has_identity():
+		_finish("hub_election", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/hub/election", HTTPClient.METHOD_GET, {}, "hub_election", true)
+
+func vote_hub_election(election_id: String, candidate_id: String) -> void:
+	if not is_enabled() or not has_identity():
+		_finish("hub_election_vote", false, {"reason": "not_ready"})
+		return
+	_request_json("/v1/hub/election/vote", HTTPClient.METHOD_POST,
+		{"electionId": election_id, "candidateId": candidate_id}, "hub_election_vote", true)
 
 func leave_online_leaderboard() -> void:
 	if not is_enabled() or not has_identity():
@@ -482,8 +512,9 @@ static func valid_response(operation: String, payload: Dictionary) -> bool:
 			for row in payload.nearby:
 				if not _valid_rank_row(row): return false
 			return true
-		"hub_presence": return payload.get("present") == true and valid_revision(payload.get("expiresInSeconds"))
+		"hub_presence", "hub_lounge": return payload.get("present") == true and valid_revision(payload.get("expiresInSeconds"))
 		"hub_presence_leave": return payload.get("left") == true
+		"hub_election", "hub_election_vote": return _valid_hub_election(payload)
 		"hub_crowd":
 			if payload.get("districtId") != "kariakoo" or payload.get("players") is not Array or payload.players.size() > 20:
 				return false
@@ -493,11 +524,45 @@ static func valid_response(operation: String, payload: Dictionary) -> bool:
 				or not valid_revision(player.get("x")) or int(player.x) > 1000 \
 				or not valid_revision(player.get("y")) or int(player.y) > 1000 \
 				or player.get("vehicleId") not in ["classic_blue", "kariakoo_yellow", "mwendokasi_red", "night_bus", "vip", "old_school", "simba_express", "bongo_flava"] \
-				or player.get("emote") not in ["", "wave", "horn", "dance"]:
+				or player.get("emote") not in ["", "wave", "horn", "dance", "chat_hello", "chat_route", "chat_business", "chat_drive", "chat_thanks"]:
 					return false
 			return true
 		"telemetry": return valid_revision(payload.get("accepted"))
 	return not payload.is_empty()
+
+static func _valid_hub_election(payload: Dictionary) -> bool:
+	if payload.get("electionId") is not String or not String(payload.electionId).begins_with("dala_world_head_s") \
+		or payload.get("titleKey") != "ELECTION_TITLE_S1" \
+		or payload.get("opensAt") is not String or payload.get("closesAt") is not String \
+		or payload.get("hasVoted") is not bool \
+		or payload.get("isOpen") is not bool \
+		or payload.get("candidates") is not Array or payload.candidates.size() != 3 \
+		or payload.get("results") is not Array or payload.results.size() != 3:
+		return false
+	var allowed := ["konda_juma", "fundi_rehema", "mama_tunu"]
+	var candidate_ids: Array[String] = []
+	for candidate in payload.candidates:
+		if candidate is not Dictionary or candidate.get("id") not in allowed \
+			or candidate.get("nameKey") is not String or candidate.get("roleKey") is not String:
+			return false
+		candidate_ids.append(String(candidate.id))
+	if candidate_ids.size() != allowed.size():
+		return false
+	for candidate_id in allowed:
+		if not candidate_ids.has(candidate_id):
+			return false
+	var result_ids: Array[String] = []
+	for result in payload.results:
+		if result is not Dictionary or result.get("candidateId") not in allowed \
+			or not valid_revision(result.get("votes")):
+			return false
+		result_ids.append(String(result.candidateId))
+	if result_ids.size() != allowed.size():
+		return false
+	for candidate_id in allowed:
+		if not result_ids.has(candidate_id):
+			return false
+	return true
 
 static func _valid_rank_row(row: Variant) -> bool:
 	return row is Dictionary and valid_revision(row.get("rank")) and int(row.rank) > 0 \

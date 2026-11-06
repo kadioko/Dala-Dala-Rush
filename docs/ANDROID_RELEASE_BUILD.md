@@ -1,13 +1,11 @@
 # Android Release Build Runbook
 
-Last updated: November 4, 2026.
+Last updated: November 6, 2026.
 
-The 1.0.19 / code 20 candidate including Mtaa Wetu is exported and verified;
-backend migration 013 is deployed and the amended privacy page is published.
-The matching Play Data Safety and content-rating declarations still need to be
-updated before upload. Physical-device consent, ads, transfer, hub/social and
-performance acceptance remains outstanding. Do not interpret a valid export as
-a phone-tested or Play-approved release.
+The 1.0.20 / code 21 candidate adds the latest Mtaa Wetu improvements. Export
+and verify the bundle after deployment. Physical-device consent, ads, transfer,
+hub/social and performance acceptance remains outstanding. Do not interpret a
+valid export as a phone-tested or Play-approved release.
 The native consent bridge source is in `native/consent/`; run
 `tools/build_consent_bridge.ps1` after changing it, keep its local AAR with the
 export plugin, and confirm both AdMob and DalaConsent editor plugins are enabled.
@@ -35,9 +33,9 @@ Play production-track updates. Store-listing work and Play Console declarations 
 | Build system | Gradle custom build |
 | Format | Android App Bundle (`.aab`) |
 | Current production release | Version 1.0.18, code 19 |
-| Last exported candidate | Version 1.0.19, code 20 |
+| Last exported candidate | Version 1.0.20, code 21 |
 | Artifact status | Signed AAB and manifest verified; physical-device QA, Play processing and rollout approval remain. |
-| Artifact path | `exports/android/DalaDalaRushTZ-1.0.19-code20.aab` |
+| Artifact path | `exports/android/DalaDalaRushTZ-1.0.20-code21.aab` |
 | Version rule | Use a never-before-used code higher than every artifact in every Play track |
 
 API 36 satisfies Google Play's mobile app-update requirement beginning August
@@ -52,10 +50,10 @@ Complete these before rolling the verified bundle out to testers:
   use an isolated `TEST_DATABASE_URL` ending in `_test`; database tests must not
   be skipped for release acceptance.
 - [ ] Review both rendered UI suites and complete the two-phone worksheet.
-- [x] Deploy backend migration 013 and matching code; publish privacy changes.
+- [ ] Deploy backend migrations 014-015 and matching code; publish privacy changes.
 - [ ] Update/verify Play Console Data Safety and content-rating answers for the
-  hub before uploading the code-20 AAB.
-- [x] Verify code 20 against package, pinned upload certificate, version, API 36
+  hub before uploading the code-21 AAB.
+- [ ] Verify code 21 against package, pinned upload certificate, version, API 36
   manifest and bundletool validation.
 
 The following historical gates also remain applicable:
@@ -84,11 +82,11 @@ signing configuration.
 
 ## 1. Confirm The Version
 
-The current release candidate is exported from the Android AAB preset with:
+The current release candidate should be exported from the Android AAB preset with:
 
 ```text
-Version name: 1.0.19
-Version code: 20
+Version name: 1.0.20
+Version code: 21
 ```
 
 The code must be greater than every active artifact in every Play track,
@@ -164,7 +162,7 @@ Equivalent command-line export:
 $godot = 'C:\Users\USER\Downloads\Godot_v4.7.1-stable_win64.exe\Godot_v4.7.1-stable_win64_console.exe'
 & $godot --headless --path '.' `
   --export-release 'Android AAB Release' `
-  'exports/android/DalaDalaRushTZ-1.0.19-code20.aab'
+  'exports/android/DalaDalaRushTZ-1.0.20-code21.aab'
 ```
 
 Do not interrupt the process. A successful command must return exit code 0 and
@@ -190,7 +188,7 @@ physical-device QA or Play Console review has passed.
 Set the artifact path once:
 
 ```powershell
-$aab = 'exports/android/DalaDalaRushTZ-1.0.19-code20.aab'
+$aab = 'exports/android/DalaDalaRushTZ-1.0.20-code21.aab'
 ```
 
 Confirm it exists, record its size, and create a checksum:
@@ -235,8 +233,8 @@ AdMob metadata, and the Advertising ID permission:
 .\tools\verify_android_release.ps1 `
   -BundlePath $aab `
   -BundletoolJar 'C:\path\to\bundletool-all.jar' `
-  -ExpectedVersionName '1.0.19' `
-  -ExpectedVersionCode 20 `
+  -ExpectedVersionName '1.0.20' `
+  -ExpectedVersionCode 21 `
   -ExpectedTargetSdk 36
 ```
 
@@ -326,6 +324,22 @@ physical-device, consent, or Play pre-launch checks below.
 - Not uploaded or installed on phones. Play Data Safety/content-rating updates
   and two-phone acceptance remain outstanding; see
   `docs/releases/1.0.19.md`.
+
+### Code 21 Mtaa Wetu Candidate
+
+- Artifact: `exports/android/DalaDalaRushTZ-1.0.20-code21.aab`
+- Size: `61,858,895` bytes; SHA-256:
+  `E0EC0C19813239EE74A74139B955078FF5AE4DEBF9B7EE28FC3659ECB3F9245F`.
+- Version `1.0.20`, code `21`, minimum API `24`, target API `36`, package
+  `com.kadioko.daladalarush`.
+- Godot 4.7.1 export completed. The pinned upload certificate, JAR signature,
+  bundle structure, manifest permissions, AdMob/DalaConsent entries and
+  bundletool manifest checks passed.
+- Includes the expanded six-district hub, local activities, passport/album,
+  property decoration and portfolio, phone shortcuts, preset lounge and
+  fictional election.
+- Not uploaded or phone-tested. Confirm Railway migrations 014-015, published
+  privacy policy, Play Data Safety declarations and two-phone QA before rollout.
 
 ## 6. Install Through Play Testing
 

@@ -1,14 +1,16 @@
 # Privacy Policy Source
 
-Source updated: November 4, 2026. This revision documents optional, ephemeral
-in-game plaza presence. Publish the matching HTML before distributing the hub
-client and review the Play Data Safety declaration against enabled Railway
-features before the next store submission.
+Source updated: November 6, 2026. This revision documents optional, ephemeral
+in-game plaza presence, fixed preset lounge phrases, local NPC property rent,
+and the optional fictional Dala Dala World election. Publish the matching HTML
+and deploy migrations 014-015 before distributing this client; review the Play
+Data Safety declaration against enabled Railway features before the next store
+submission.
 
 Keep this copy synchronized with both `privacy-policy.html` and
 `docs/privacy-policy.html`. The public GitHub Pages URL is active.
 
-Effective date: November 4, 2026
+Effective date: November 6, 2026
 
 Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data
 the game handles and how it is used.
@@ -25,6 +27,10 @@ The game stores gameplay progress locally on your device, including:
 - Sound and music settings
 - Haptics, reduced-effects, and language settings
 - Routes, missions, achievements, career upgrades, and daily/streak progress
+- Neighborhood ownership/build levels and the local rent-claim date; included
+  in the optional gameplay-progress backup when Cloud Backup is enabled.
+  Simulated rent comes from game-controlled NPC tenants, uses fake coins, and
+  is capped at 40 coins per local calendar day.
 - Optional local ghost-race, livery, and leaderboard data
 - Random referral invite codes, one-time confirmation codes, and local claim
   history used to prevent duplicate in-game coin rewards
@@ -71,6 +77,13 @@ Leaving rankings clears your own block preferences, not blocks other players
 placed on your installation. Those remain until their owner unblocks or an
 associated installation is deleted. A new installation is a different identity.
 
+If you separately opt into hub presence, while in Kariakoo five fixed
+Swahili/English phrases may briefly appear with your public driver name. No
+custom text or voice is accepted. Phrases are hidden from crowd responses
+after 15 seconds and cleared during service cleanup. Map presence expires
+after 45 seconds. Leaving Kariakoo or turning presence off removes the active
+presence row.
+
 When the game connects to online services, the backend temporarily processes
 the connection IP address in memory to enforce request limits and reduce abuse.
 The game backend does not write this address to the game database or use it to
@@ -99,11 +112,12 @@ any time; this stops future uploads. Gameplay Insights events and leaderboard
 reports are scheduled for deletion after 90 days. Cleanup is periodic, so
 service interruptions may delay removal until service resumes.
 
-You can turn Cloud Backup off at any time. The in-game **Delete Cloud Data**
-control permanently deletes the anonymous installation's cloud backup, online
-scores, referral records, and temporary transfer codes. It does not delete the
-game progress stored on your phone. We will keep this policy and the Google
-Play Data Safety form updated if this service's data handling changes.
+You can turn Cloud Backup off at any time. The in-game **Delete Online Data**
+control permanently deletes the anonymous installation identity, election
+votes, cloud backup, online scores, referral records, and temporary transfer
+codes. It does not delete the game progress stored on your phone. We will keep
+this policy and the Google Play Data Safety form updated if this service's data
+handling changes.
 
 The referral feature does not read or upload your contacts, phone number, name,
 account, or precise location. Sharing opens the Android share sheet, and you

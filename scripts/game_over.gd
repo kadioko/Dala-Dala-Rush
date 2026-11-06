@@ -5,6 +5,7 @@ const UIFactory := preload("res://ui/ui_factory.gd")
 const RouteContracts := preload("res://data/route_contracts.gd")
 const Vehicles := preload("res://data/vehicles.gd")
 const GhostDataLib := preload("res://data/ghost_data.gd")
+const MtaaHub := preload("res://scripts/world_hub.gd")
 
 var _title_lbl: Label
 var _record_lbl: Label
@@ -387,6 +388,9 @@ func _refresh(_l := "") -> void:
 	var tip_key: String = String(END_TIP_KEYS.get(GameState.last_end_reason, "RUN_TIP_GENERAL"))
 	_coach_body_lbl.text = LocaleManager.t(tip_key)
 	_next_step_lbl.text = _next_step_text()
+	var hub_activity: Dictionary = SaveSystem.get_value("hub_route_activity", {})
+	if not hub_activity.is_empty():
+		_next_step_lbl.text = LocaleManager.t("HUB_ROUTE_RESULT_SUCCESS" if String(hub_activity.get("status", "")) == "success_pending" else "HUB_ROUTE_RESULT_RETRY") + "\n" + _hub_return_summary(hub_activity)
 	_reputation_title_lbl.text = "%s: %s  %d/100" % [
 		LocaleManager.t("HUDUMA_RATING"), GameState.last_reputation_grade, GameState.last_reputation,
 	]
@@ -398,7 +402,7 @@ func _refresh(_l := "") -> void:
 		LocaleManager.t("DISCOVERY_TITLE"), LocaleManager.t(GameState.last_discovery_key),
 	]
 	_play_btn.text  = LocaleManager.t("PLAY_AGAIN")
-	_menu_btn.text  = LocaleManager.t("MAIN_MENU")
+	_menu_btn.text  = LocaleManager.t("HUB_RETURN") if not hub_activity.is_empty() else LocaleManager.t("MAIN_MENU")
 	_lb_btn.text    = LocaleManager.t("LEADERBOARD")
 	_share_btn.text = LocaleManager.t("SHARE_SCORE")
 	_replay_btn.text = LocaleManager.t("REPLAY_CLIP_COPY")
@@ -410,6 +414,23 @@ func _refresh(_l := "") -> void:
 	if _submit_btn and not _score_submitted:
 		_submit_btn.text = LocaleManager.t("SUBMIT")
 	_update_stats_labels()
+
+func _hub_return_summary(activity: Dictionary) -> String:
+	var route_id := String(activity.get("route", "kariakoo"))
+	var route := Routes.get_by_id(route_id)
+	var district_key := "HUB_AREA_" + String(activity.get("district", "kariakoo")).to_upper()
+	var next_item: Dictionary = {}
+	for item in MtaaHub.DECOR:
+		if int(item.get("price", 0)) <= 0 or bool(item.get("bond", "") != "") or String(item.id) in SaveSystem.get_value("hub_owned_decor", []):
+			continue
+		var property_id := String(item.get("property", ""))
+		if not property_id.is_empty() and int(SaveSystem.get_value("hub_properties", {}).get(property_id, 0)) < int(item.get("level", 1)):
+			continue
+		next_item = item
+		break
+	var item_name := LocaleManager.t(String(next_item.get("key", "HUB_PHONE_TITLE")))
+	var remaining := maxi(0, int(next_item.get("price", 0)) - int(SaveSystem.get_value("total_coins", 0)))
+	return LocaleManager.t("HUB_RETURN_SUMMARY").replace("{run}", str(GameState.last_coins)).replace("{reward}", str(activity.get("reward", 25) if String(activity.get("status", "")) == "success_pending" else 0)).replace("{progress}", GameState.last_route_goal_progress).replace("{area}", LocaleManager.t(district_key)).replace("{item}", item_name).replace("{remaining}", str(remaining)).replace("{used}", str(SaveSystem.get_value("hub_jobs_claimed_count", 0)))
 
 func _next_step_text() -> String:
 	# A fuel failure needs an immediate, actionable recovery hint before progression.
@@ -597,7 +618,8 @@ func _on_play_again() -> void:
 
 func _on_main_menu() -> void:
 	AudioManager.play_sfx("click")
-	_go_after_optional_interstitial("res://scenes/main_menu.tscn")
+	var activity: Dictionary = SaveSystem.get_value("hub_route_activity", {})
+	_go_after_optional_interstitial("res://scenes/world_hub.tscn" if not activity.is_empty() else "res://scenes/main_menu.tscn")
 
 func _on_view_leaderboard() -> void:
 	AudioManager.play_sfx("click")

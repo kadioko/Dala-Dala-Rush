@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 
 if (!process.argv.includes('--allow-production')) throw new Error('Explicit --allow-production is required.');
 const base = 'https://dala-dala-api-production.up.railway.app';
-const report = { health: false, worldRoutes: [], cloudRecovery: false, transferRecovery: false, hubPresence: false, cleanup: false };
+const report = { health: false, worldRoutes: [], cloudRecovery: false, transferRecovery: false, hubPresence: false, hubLoungePhrase: false, hubElectionRead: false, cleanup: false };
 let installationId;
 let sourceToken;
 let receivingToken;
@@ -57,9 +57,19 @@ try {
   }, receivingToken);
   assert.equal(presence.status, 200);
   assert.equal(presence.body.present, true);
+  const lounge = await request('/v1/hub/presence', 'PUT', {
+    districtId: 'kariakoo', x: 500, y: 500, vehicleId: 'classic_blue', emote: 'chat_hello',
+  }, receivingToken);
+  assert.equal(lounge.status, 200);
+  report.hubLoungePhrase = true;
   const crowd = await request('/v1/hub/crowd/kariakoo', 'GET', undefined, receivingToken);
   assert.equal(crowd.status, 200);
   assert.deepEqual(crowd.body.players, []);
+  const election = await request('/v1/hub/election', 'GET', undefined, receivingToken);
+  assert.equal(election.status, 200);
+  assert.ok(Array.isArray(election.body.candidates));
+  assert.equal(election.body.results.length, election.body.candidates.length);
+  report.hubElectionRead = true;
   assert.equal((await request('/v1/hub/presence', 'DELETE', undefined, receivingToken)).body.left, true);
   report.hubPresence = true;
   const nearby = await request('/v1/leaderboards/nearby/kariakoo', 'GET', undefined, receivingToken);

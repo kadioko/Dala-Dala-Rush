@@ -60,7 +60,18 @@ export async function purgeExpiredTelemetry(pool) {
 }
 
 export async function purgeExpiredHubPresence(pool) {
+	await pool.query("UPDATE hub_presence SET last_emote = '', emote_at = NULL WHERE emote_at <= NOW() - INTERVAL '15 seconds'");
 	const result = await pool.query("DELETE FROM hub_presence WHERE updated_at <= NOW() - INTERVAL '45 seconds'");
+	return result.rowCount ?? result.rows?.length ?? 0;
+}
+
+export async function purgeExpiredHubElectionVotes(pool) {
+	const result = await pool.query(
+		`DELETE FROM hub_election_votes AS vote
+		 USING hub_elections AS election
+		 WHERE election.election_id = vote.election_id
+		 AND election.closes_at <= NOW() - INTERVAL '1 year'`,
+	);
 	return result.rowCount ?? result.rows?.length ?? 0;
 }
 
@@ -314,6 +325,9 @@ export function createApp(pool) {
 	const limitHubPresence = fixedWindowRateLimit(pool, {
 		windowMs: 60 * 1000, max: 15, key: (req) => req.installationId, scope: "hub_presence",
 	});
+	const limitHubElectionVotes = fixedWindowRateLimit(pool, {
+		windowMs: 60 * 60 * 1000, max: 3, key: (req) => req.installationId, scope: "hub_election_votes",
+	});
 
   app.get("/health", async (_req, res) => {
     try {
@@ -324,7 +338,8 @@ export function createApp(pool) {
     }
   });
 	installRankingRoutes(app, pool, requireInstallation, limitWorldReads, problem);
-	installHubRoutes(app, pool, requireInstallation, limitHubPresence, limitWorldReads, problem);
+	installHubRoutes(app, pool, requireInstallation, limitHubPresence,
+		limitHubElectionVotes, limitWorldReads, problem);
 
   async function requireInstallation(req, res, next) {
     const installationId = String(req.get("X-Installation-Id") || "");
@@ -899,6 +914,11 @@ async function start() {
 	void purgeHubPresence();
 	const hubPresenceTimer = setInterval(() => { void purgeHubPresence(); }, 15 * 1000);
 	hubPresenceTimer.unref();
+	const purgeElectionVotes = () => purgeExpiredHubElectionVotes(pool)
+		.catch(() => console.error("Closed election retention cleanup failed."));
+	void purgeElectionVotes();
+	const electionRetentionTimer = setInterval(() => { void purgeElectionVotes(); }, 24 * 60 * 60 * 1000);
+	electionRetentionTimer.unref();
 	const app = createApp(pool);
   const port = Number.parseInt(process.env.PORT || "3000", 10);
   const server = app.listen(port, "0.0.0.0", () => console.log(`Dala Dala Rush service on ${port}`));

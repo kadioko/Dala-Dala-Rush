@@ -2,13 +2,25 @@
 
 A Tanzanian daladala endless runner built with **Godot 4.7.1**.
 
-**November 4 release candidate:** Version 1.0.19 / code 20 adds Mtaa Wetu. It
-is signed and verified, but not uploaded or phone-tested. Backend migration 013
-and the matching privacy policy are live. Update Play Console Data Safety and
-content rating, then complete two-phone validation before upload. See [release
-evidence and bilingual notes](docs/releases/1.0.19.md). The prior trust-release
-evidence remains in [1.0.18](docs/releases/1.0.18.md). Five synthetic Swahili
-voice cues are placeholders, not human conductor recordings.
+**Current release candidate:** Version 1.0.20 / code 21 adds expanded Mtaa Wetu
+district activities, property customization, neighborhood progression and
+social safety improvements. See [bilingual release notes](docs/releases/1.0.20.md),
+the [Android release runbook](docs/ANDROID_RELEASE_BUILD.md), and [hub status](docs/WORLD_HUB.md).
+The working tree now also includes district driving contracts, practical plot
+perks, map markers, character reactions, shop previews, owned-item browsing and
+equipable local wearables. The Mtaa update adds a permanent
+district passport and album, visit milestones, three-slot property decoration,
+NPC friendship rewards, useful property panels, a personal bus display, and a
+buyable phone with game-service shortcuts. Its public preset-phrase lounge is
+Kariakoo-only, requires opt-in presence and migration 015, and has no free-text
+or voice chat. The code-21 candidate includes these changes; physical-device
+testing remains outstanding. See [Mtaa Wetu status](docs/WORLD_HUB.md).
+The latest Mtaa usability pass clarifies first-visit steps, keeps the phone
+optional for navigation, shows plot/slot ownership, adds a combined property
+portfolio, and makes job itineraries and daily reward-cap receipts explicit.
+Arrival cues honor SFX and Reduced Effects. It remains source-only until
+migration deployment, privacy publication and real-device QA are done.
+Five synthetic Swahili voice cues remain placeholders, not human recordings.
 Drive your dala dala through Dar es Salaam: board abiria, stop at **vituo**
 for fares, overload at your own risk, dodge bodabodas and goats, escape
 police chases — then paint your bus with a proper slogan and share it.

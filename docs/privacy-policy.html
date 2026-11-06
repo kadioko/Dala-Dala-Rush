@@ -36,25 +36,29 @@
 <body>
   <main>
     <h1>Dala Dala Rush TZ Privacy Policy</h1>
-    <p><strong>Effective date:</strong> October 22, 2026</p>
+    <p><strong>Effective date:</strong> November 6, 2026</p>
 
     <p>Dala Dala Rush TZ is a mobile game by Kadioko. This policy explains what data the game handles and how it is used.</p>
 
     <h2>Information Stored On Your Device</h2>
-    <p>The game stores gameplay progress locally on your device, including scores, coins, unlocked content, selected vehicle and route, settings, missions, achievements, career progress, daily rewards, neighborhood decor and errand progress, liveries, ghost races, local leaderboard entries, random referral invite and confirmation codes, local referral claim history, ad pacing, and an offline analytics-event log.</p>
+    <p>The game stores gameplay progress locally on your device, including scores, coins, unlocked content, selected vehicle and route, settings, missions, achievements, career progress, daily rewards, neighborhood decor, property ownership and rent-claim date, errand progress, liveries, ghost races, local leaderboard entries, random referral invite and confirmation codes, local referral claim history, ad pacing, and an offline analytics-event log.</p>
     <p>This local gameplay data is used only to make the game work and remember your progress. Gameplay Insights only sends information after you choose to turn it on in Settings. This data is not sold by us and can be removed by clearing app storage or uninstalling the game.</p>
     <p>The referral feature does not read or upload your contacts, phone number, name, account, or precise location. Sharing opens the Android share sheet, and you choose the app and recipient yourself.</p>
 
     <h2>Optional Cloud Backup And Leaderboard Pilot</h2>
     <p>Replay clips remain on your phone and are excluded from cloud progress backups. When you intentionally move cloud access to another phone, that phone saves a new random credential before acknowledging the transfer. The server stores credential hashes and temporary claim identifiers; the old phone loses access only after acknowledgement. An unacknowledged code expires after 15 minutes without revoking the old phone.</p>
     <p>Cloud Backup is optional. The game first shows an in-app consent screen and only uploads a gameplay-progress backup after you choose to turn it on.</p>
-    <p>The Railway service stores an anonymous installation identifier, a protected device sync credential, gameplay progress, and anonymous referral records created through the pilot. We do not collect GPS or real-world location. If you separately opt in to Hub Presence, the service briefly processes your public driver name, selected dala, preset emote and current position on the fictional game map so opted-in players can see one another. The latest position is overwritten, expires after 45 seconds and is automatically deleted; it is not stored as a location history. You can turn this off at any time. The service does not receive your email address, contacts, advertising ID, local analytics log, or referral codes.</p>
+    <p>The Railway service stores an anonymous installation identifier, a protected device sync credential, gameplay progress, and anonymous referral records created through the pilot. We do not collect GPS or real-world location. If you separately opt in to Hub Presence, while you are in Kariakoo the service briefly processes your public driver name, selected dala, preset emote and current position on that fictional game district so opted-in players can see one another. The latest position is overwritten, expires after 45 seconds and is automatically deleted; it is not stored as a location history. Leaving Kariakoo or turning presence off removes the active presence. The service does not receive your email address, contacts, advertising ID, local analytics log, or referral codes.</p>
     <p>Online Leaderboards are separate from Cloud Backup and optional. Before joining, you will choose a short driver display name. That name and submitted route scores will be visible to other players on friends or world leaderboards. Rankings have no prizes and scores are labelled unverified. You can avoid this sharing by not joining; your personal leaderboard remains on-device. You can also leave online competition to remove your public profile, submitted scores, friend links, and active friend codes.</p>
     <p>Players who join online competition can report a public display name using a fixed reason, or block a friend. Reports are reviewed for abuse; they do not include a free-text message. Reports and moderation snapshots are retained for up to 90 days and then scheduled for deletion. Blocking removes the friend link and prevents future friend-code linking between those players.</p>
     <p>For the same anonymous installation, a moderation restriction remains in force when you leave and rejoin public rankings, for the same up-to-90-day period. Deleting Cloud Data removes the installation and that restriction record too.</p>
     <p>Leaving public rankings clears your own friend-block preferences but does not clear blocks other players placed on your installation. Those safety preferences stay until their owner unblocks you or an associated installation is fully deleted. A new anonymous installation is a different identity.</p>
     <p>When the game connects to online services, the backend temporarily processes the connection IP address in memory to enforce request limits and reduce abuse. It stores a keyed, pseudonymous HMAC of the address with the endpoint and time window in PostgreSQL so limits are shared across service restarts and replicas. These counters expire at the end of the applicable limit window and are removed during cleanup. The raw address is not written to the game database or used to infer location. The hosting/network provider may process connection metadata under its own privacy practices.</p>
-    <p>You can turn Cloud Backup off at any time. The in-game <strong>Delete Cloud Data</strong> control permanently deletes the anonymous installation's cloud backup, online scores, referral records, and temporary transfer codes. It does not delete progress stored on your phone. We will keep this policy and the Google Play Data Safety form updated if this service's data handling changes.</p>
+    <p>You can turn Cloud Backup off at any time. The in-game <strong>Delete Online Data</strong> control permanently deletes the anonymous installation identity, election votes, cloud backup, online scores, referral records, and temporary transfer codes. It does not delete progress stored on your phone. We will keep this policy and the Google Play Data Safety form updated if this service's data handling changes.</p>
+
+    <h2>Neighborhood Properties And Lounge</h2>
+    <p>Property ownership, building levels, and rent-claim dates are stored locally on your device and are included in the optional gameplay-progress cloud backup if you enable Cloud Backup. Rent is simulated from game-controlled NPC tenants, uses only fictional game coins, can be claimed once per local calendar day, and is capped at 40 coins a day. It is not a real property, a payment, or a rental arrangement with another player.</p>
+    <p>If you opt into Hub Presence, while you are in the Kariakoo plaza you may send one of a small set of preset phrases. Other opted-in players may briefly see the phrase with your public driver name. The service accepts no custom text or voice messages. Phrases are no longer returned after 15 seconds and are cleared during service cleanup; Hub map presence expires after 45 seconds. Leaving Kariakoo or turning presence off removes your active presence.</p>
 
     <h2>Optional Gameplay Insights</h2>
     <p>Completed-run events also use a random logical run identifier so a revive is not counted as a second completed run. This identifier is not an advertising ID. Debug builds can explicitly record a bounded local frame-performance report for testing; it is not uploaded to Railway.</p>
@@ -69,7 +73,8 @@
     <p>You can learn more about Google privacy practices at <a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a>.</p>
 
     <h2>Children</h2>
-    <p>Dala Dala Rush TZ is designed as a family-friendly game. It does not include gambling, betting, or free-form social chat. The optional Hub Presence feature uses only a few preset gestures and includes blocking; presence is off unless you opt in. No email/password login is required. Optional online rankings include player-entered public display names with reporting and moderation controls.</p>
+    <p>Dala Dala Rush TZ is designed as a family-friendly game. It does not include gambling, betting, or free-form social chat. Optional Hub Presence uses preset gestures and a small set of preset phrases, includes blocking, and is off unless you opt in. No email/password login is required. Optional online rankings include player-entered public display names with reporting and moderation controls.</p>
+    <p>The optional Dala Dala World game election lets an installation vote once for a fictional game character each season. The backend stores the installation identifier and selected candidate to prevent duplicate votes; it does not publish an individual choice or associate it with a public leaderboard name. Only aggregate totals are shown, and votes are not rewarded. Votes are deleted one year after the election closes, or sooner when you use Delete Online Data in Settings. This is a fictional in-game activity, not a real-world political election.</p>
     <p>If the app is later submitted as child-directed or included in Google Play's Families program, ad request settings and content must be reviewed to meet all children and families requirements.</p>
 
     <h2>Purchases</h2>
@@ -82,7 +87,7 @@
     <p>For privacy questions, contact: <a href="mailto:support@kadioko.com">support@kadioko.com</a></p>
 
     <h2>Changes</h2>
-    <p>This policy is effective November 4, 2026. It may be updated when the app changes. Any major updates should be reflected on this page before uploading a new release.</p>
+    <p>This policy is effective November 6, 2026. It may be updated when the app changes. Any major updates should be reflected on this page before uploading a new release.</p>
   </main>
 </body>
 </html>

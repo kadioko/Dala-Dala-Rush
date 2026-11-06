@@ -282,7 +282,7 @@ func _refresh(_locale: String = "") -> void:
 		or not SaveSystem.is_online_leaderboard_opted_in()
 	_cloud_backup_btn.text = LocaleManager.t("CLOUD_BACKUP_NOW")
 	_cloud_restore_btn.text = LocaleManager.t("CLOUD_RESTORE")
-	_cloud_delete_btn.text = LocaleManager.t("CLOUD_DELETE")
+	_cloud_delete_btn.text = LocaleManager.t("ONLINE_DATA_DELETE")
 	_cloud_transfer_out_btn.text = LocaleManager.t("CLOUD_MOVE_OUT")
 	_cloud_transfer_in_btn.text = LocaleManager.t("CLOUD_MOVE_IN")
 	_cloud_backup_btn.disabled = not cloud_available or not bool(SaveSystem.get_value("cloud_sync_opt_in", false))
@@ -428,7 +428,7 @@ func _confirm_cloud_restore() -> void:
 	)
 
 func _confirm_cloud_delete() -> void:
-	_show_confirm("CLOUD_DELETE_TITLE", "CLOUD_DELETE_BODY", "CLOUD_DELETE", func():
+	_show_confirm("ONLINE_DATA_DELETE_TITLE", "ONLINE_DATA_DELETE_BODY", "ONLINE_DATA_DELETE", func():
 		_cloud_notice_key = "CLOUD_WORKING"
 		_cloud_notice_text = ""
 		_refresh()

@@ -7,10 +7,12 @@ can change.
 Use this while completing **Policy > App content** in Google Play Console for
 Dala Dala Rush TZ.
 
-These answers match the 1.0.19 / code 20 candidate: an offline-friendly Godot
-mobile game with AdMob, local saves, opt-in cloud/rankings and a small opt-in
-social hub. There is no login, free-text chat, real-world location sharing,
-gambling, real-money betting, or health/financial/government feature.
+These answers describe the current local source, not the older 1.0.19 / code 20
+candidate. The new hub includes six districts with locally owned plots, capped
+NPC rent, and an optional lounge with fixed, short-lived phrases. There is no login, player-
+authored text or voice chat, real-world location sharing, gambling, real-money
+betting, or health/financial/government feature. Recheck the exact uploaded
+artifact and deployed Railway migrations before submitting declarations.
 
 ## Let Us Know About The Content Of Your App
 
@@ -21,8 +23,9 @@ Dala Dala Rush TZ is a family-friendly 2D endless driving game inspired by
 Tanzanian city traffic. Players dodge obstacles, collect coins and passengers,
 unlock vehicle skins using fake in-game coins, and can watch optional rewarded
 ads for revive/double coins. Players may opt into public display names, scores
-and a Kariakoo social hub with fixed emotes; there is no open text or voice
-chat. The app has no login, gambling, betting, real-money wagering, financial
+and a Kariakoo social hub with fixed emotes and preset phrases; there is no open
+text or voice chat. The hub uses fake coins for local properties and simulated
+NPC rent. The app has no login, gambling, betting, real-money wagering, financial
 services, health features or government services.
 ```
 
@@ -226,8 +229,9 @@ online competition, or turning on Gameplay Insights.
 
 2. **Device or other IDs**
    - Data: a random app-installation identifier and protected sync credential.
-   - Purpose: App functionality for cloud backup, restore, online competition,
-     and deletion; Analytics only when Gameplay Insights is separately enabled.
+   - Purpose: App functionality for ballot voting, cloud backup, restore,
+     online competition, and deletion; Analytics only when Gameplay Insights
+     is separately enabled.
    - Collected: Yes, optional.
    - Shared: No for the service installation ID/sync credential; AdMob
      identifiers are covered by the separate SDK disclosure above.
@@ -267,6 +271,15 @@ Hub Presence consent; disabling presence or leaving removes the row, and
 inactive rows are deleted within the 45-second expiry plus cleanup interval.
 Do not declare this as GPS, precise location, or a way to locate a person.
 
+The fictional Dala Dala World election is another optional App Activity / Other
+action. Setting up a ballot creates a random installation identifier without
+joining public rankings or enabling Cloud Backup. A deliberate vote is stored with that identifier
+to enforce one vote per season. The selected candidate is not shown to other
+players or linked to the public leaderboard name; only aggregate counts are
+returned. No reward is granted. Votes are deleted one year after the season
+closes, or when the player uses Delete Online Data in Settings. This is a game-only
+fictional election, not political content.
+
 Before saving, compare the exact choices to Google Play's current Data Safety
 guidance and any embedded SDK disclosures. The developer remains responsible
 for complete and accurate answers:
@@ -299,10 +312,10 @@ Yes
 Reason:
 
 ```text
-The game has no email/password account. Players can delete the anonymous cloud
-record, backup, online scores, friend links, referral records, and transfer
-codes with Settings > Delete Cloud Data; leaving online competition separately
-removes the public leaderboard profile. Local phone progress remains local and
+The game has no email/password account. Players can delete the anonymous online
+identity, election vote, backup, online scores, friend links, referral records,
+and transfer codes with Settings > Delete Online Data; leaving online
+competition separately removes the public leaderboard profile. Local phone progress remains local and
 can be removed by clearing app storage or uninstalling the app.
 ```
 

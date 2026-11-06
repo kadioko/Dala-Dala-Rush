@@ -17,11 +17,27 @@ var recovery_read_only: bool = false
 const MAX_SAVE_BYTES := 1048576
 
 const DEFAULTS := {
-	"schema_version": 19,
+	"schema_version": 23,
 	"hub_owned_decor": [],
+	"hub_intro_complete": false,
 	"hub_daily_completed_date": "",
 	"hub_daily_started_date": "",
 	"hub_daily_progress": [],
+	"hub_properties": {},
+	"hub_active_job_id": "",
+	"hub_active_job_step": 0,
+	"hub_jobs_claimed_date": "",
+	"hub_jobs_claimed_count": 0,
+	"hub_route_activity": {},
+	"hub_avatar_item": "",
+	"hub_display_vehicle": "",
+	"hub_passport_visited": [],
+	"hub_passport_jobs": [],
+	"hub_passport_claimed": [],
+	"hub_album_found": [],
+	"hub_npc_bonds": {},
+	"hub_decor_placements": {},
+	"hub_rent_claimed_date": "",
 	"hub_presence_opt_in": false,
 	"online_pending_transfer": {},
 	"active_run_id": "",
@@ -308,9 +324,27 @@ func _normalize_core_data() -> void:
 	)
 	var decor: Array[String] = _normalized_string_array(data.get("hub_owned_decor", []))
 	decor = decor.filter(func(item: String) -> bool:
-		return item in ["kanga_flag", "soko_lanterns", "kituo_bench"]
+		return item in ["kanga_flag", "soko_lanterns", "kituo_bench", "market_awning",
+			"mtaa_mural", "bus_bay_bollards", "roof_ornament", "seat_covers", "side_mirrors",
+			"mwenge_reflectors", "mbezi_roof_rack", "posta_placard", "kigamboni_lamp", "ubungo_flag",
+			"konda_cap", "boda_helmet", "road_shades", "conductor_sash", "coastal_kanga", "dispatcher_badge",
+			"posta_relay_stand", "mtaa_phone", "juma_scarf", "musa_spanner_pin", "rehema_postbag"]
 	)
 	data["hub_owned_decor"] = decor
+	var avatar_item := String(data.get("hub_avatar_item", ""))
+	data["hub_avatar_item"] = avatar_item if avatar_item in ["konda_cap", "boda_helmet", "road_shades", "conductor_sash", "coastal_kanga", "dispatcher_badge", "juma_scarf", "musa_spanner_pin", "rehema_postbag"] and avatar_item in decor else ""
+	var display_vehicle := String(data.get("hub_display_vehicle", ""))
+	data["hub_display_vehicle"] = display_vehicle if display_vehicle in data["unlocked_vehicles"] else ""
+	var route_activity: Variant = data.get("hub_route_activity", {})
+	if route_activity is Dictionary:
+		var activity_route := String(route_activity.get("route", ""))
+		var activity_area := String(route_activity.get("district", ""))
+		var activity_status := String(route_activity.get("status", ""))
+		data["hub_route_activity"] = route_activity.duplicate(true) if activity_route in ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"] and activity_area == activity_route and activity_status in ["active", "success_pending"] else {}
+	else:
+		data["hub_route_activity"] = {}
+	var intro_value: Variant = data.get("hub_intro_complete", false)
+	data["hub_intro_complete"] = intro_value if intro_value is bool else false
 	var hub_date := String(data.get("hub_daily_completed_date", ""))
 	data["hub_daily_completed_date"] = hub_date if hub_date.length() == 10 \
 		and hub_date[4] == "-" and hub_date[7] == "-" else ""
@@ -320,6 +354,61 @@ func _normalize_core_data() -> void:
 	var hub_progress: Array[String] = _normalized_string_array(data.get("hub_daily_progress", []))
 	hub_progress = hub_progress.filter(func(stop: String) -> bool: return stop in ["market", "garage", "plaza"])
 	data["hub_daily_progress"] = hub_progress
+	var hub_properties: Dictionary = {}
+	var raw_properties: Variant = data.get("hub_properties", {})
+	if raw_properties is Dictionary:
+		var property_levels := {"kiosk": 2, "home": 3, "workshop": 2, "guest_house": 3,
+			"mwenge_home": 3, "mbezi_yard": 2, "posta_flat": 3, "kigamboni_cottage": 3, "ubungo_rooms": 3}
+		for property_id in property_levels:
+			var level := int(raw_properties.get(property_id, 0))
+			if level > 0:
+				hub_properties[property_id] = clampi(level, 1, int(property_levels[property_id]))
+	data["hub_properties"] = hub_properties
+	var decor_placements: Dictionary = {}
+	var raw_placements: Variant = data.get("hub_decor_placements", {})
+	var placeable_items := ["kanga_flag", "soko_lanterns", "kituo_bench", "market_awning", "mtaa_mural",
+		"bus_bay_bollards", "roof_ornament", "seat_covers", "side_mirrors", "mwenge_reflectors",
+		"mbezi_roof_rack", "posta_placard", "kigamboni_lamp", "ubungo_flag", "posta_relay_stand"]
+	if raw_placements is Dictionary:
+		var placed_items: Array[String] = []
+		for property_id in raw_placements:
+			if not hub_properties.has(String(property_id)) or not (raw_placements[property_id] is Array):
+				continue
+			var raw_slots: Array = raw_placements[property_id]
+			var slots: Array[String] = ["", "", ""]
+			for slot in range(mini(3, raw_slots.size())):
+				var item_id := String(raw_slots[slot])
+				if item_id in decor and item_id in placeable_items and item_id not in placed_items:
+					slots[slot] = item_id
+					placed_items.append(item_id)
+			decor_placements[String(property_id)] = slots
+	data["hub_decor_placements"] = decor_placements
+	var hub_districts := ["kariakoo", "mwenge", "mbezi", "posta", "kigamboni", "ubungo"]
+	for key in ["hub_passport_visited", "hub_passport_jobs", "hub_album_found"]:
+		var saved_ids: Array[String] = _normalized_string_array(data.get(key, []))
+		saved_ids = saved_ids.filter(func(area: String) -> bool: return area in hub_districts)
+		data[key] = saved_ids
+	var claimed_stamps: Array[String] = _normalized_string_array(data.get("hub_passport_claimed", []))
+	claimed_stamps = claimed_stamps.filter(func(stamp: String) -> bool: return stamp in ["2", "4", "6"])
+	data["hub_passport_claimed"] = claimed_stamps
+	var npc_bonds: Dictionary = {}
+	var raw_bonds: Variant = data.get("hub_npc_bonds", {})
+	if raw_bonds is Dictionary:
+		for npc_id in ["juma", "musa", "rehema"]:
+			var bond_level := int(raw_bonds.get(npc_id, 0))
+			if bond_level > 0:
+				npc_bonds[npc_id] = clampi(bond_level, 1, 3)
+	data["hub_npc_bonds"] = npc_bonds
+	var active_job := String(data.get("hub_active_job_id", ""))
+	data["hub_active_job_id"] = active_job if active_job in ["market_delivery", "passenger_escort", "parts_run", "kiosk_stock", "mwenge_boda_delivery", "mbezi_fuel_run", "posta_courier", "kigamboni_parcel", "ubungo_manifest"] else ""
+	data["hub_active_job_step"] = clampi(int(data.get("hub_active_job_step", 0)), 0, 1)
+	var hub_jobs_date := String(data.get("hub_jobs_claimed_date", ""))
+	data["hub_jobs_claimed_date"] = hub_jobs_date if hub_jobs_date.length() == 10 \
+		and hub_jobs_date[4] == "-" and hub_jobs_date[7] == "-" else ""
+	data["hub_jobs_claimed_count"] = clampi(int(data.get("hub_jobs_claimed_count", 0)), 0, 2)
+	var rent_date := String(data.get("hub_rent_claimed_date", ""))
+	data["hub_rent_claimed_date"] = rent_date if rent_date.length() == 10 \
+		and rent_date[4] == "-" and rent_date[7] == "-" else ""
 	data["achievements"] = _normalized_string_array(data.get("achievements", []))
 	data["referral_claimed_invitees"] = _normalized_string_array(
 		data.get("referral_claimed_invitees", [])

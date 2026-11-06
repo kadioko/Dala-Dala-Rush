@@ -77,6 +77,11 @@ func _try_load_file(key: String) -> AudioStream:
 func play_sfx(key: String) -> void:
 	_play_sfx(key, 1.0)
 
+func play_hub_bark(key: String) -> void:
+	if key not in VOICE_KEYS:
+		return
+	_play_sfx(key, 1.0, -13.0)
+
 ## Gives each route's horn a subtle personality without new audio files.
 ## Recorded/licensed route sounds can later replace this through the same key.
 func play_route_horn(route_id: String) -> void:
@@ -91,7 +96,7 @@ func play_route_horn(route_id: String) -> void:
 		"arusha": pitch = 0.96
 	_play_sfx("horn", pitch)
 
-func _play_sfx(key: String, pitch: float) -> void:
+func _play_sfx(key: String, pitch: float, volume_override_db: float = -100.0) -> void:
 	if not sfx_on or game_paused:
 		return
 	var stream: Variant = _sfx_streams.get(key)
@@ -101,7 +106,7 @@ func _play_sfx(key: String, pitch: float) -> void:
 	_next_voice = (_next_voice + 1) % VOICE_POOL
 	p.stream = stream as AudioStream
 	# Keep the horn present over music without making pickups feel equally loud.
-	p.volume_db = -1.0 if key == "horn" else (-2.0 if key == "crash" else -4.0)
+	p.volume_db = volume_override_db if volume_override_db > -100.0 else (-1.0 if key == "horn" else (-2.0 if key == "crash" else -4.0))
 	p.pitch_scale = pitch
 	p.play()
 

@@ -26,7 +26,7 @@ test("real PostgreSQL migrations, recovery, moderation, and ingestion", {
 	try {
 		await t.test("migration ledger serializes first setup and repeated deploys", async () => {
 			await Promise.all([migrate(pool), migrate(pool)]);
-			assert.equal(Number((await pool.query("SELECT COUNT(*) FROM schema_migrations")).rows[0].count), 13);
+			assert.equal(Number((await pool.query("SELECT COUNT(*) FROM schema_migrations")).rows[0].count), 15);
 		});
 		server = createApp(pool).listen(0, "127.0.0.1");
 		await once(server, "listening");
@@ -45,7 +45,48 @@ test("real PostgreSQL migrations, recovery, moderation, and ingestion", {
 		};
 		const player = await register();
 		const reporter = await register();
+		assert.equal((await request("/v1/leaderboard-profile", "PUT", { displayName: "Lounge Player" }, player.headers)).status, 200);
+		assert.equal((await request("/v1/leaderboard-profile", "PUT", { displayName: "Lounge Visitor" }, reporter.headers)).status, 200);
 		const adminHeaders = { "X-Admin-Token": adminToken };
+		await t.test("lounge messages persist only the fixed phrase allowlist", async () => {
+			await pool.query(`INSERT INTO hub_presence
+				(installation_id, district_id, player_x, player_y, vehicle_id, last_emote, emote_at)
+				VALUES ($1, 'kariakoo', 500, 500, 'classic_blue', 'chat_hello', NOW())`, [player.id]);
+			await assert.rejects(pool.query("UPDATE hub_presence SET last_emote = 'free_text' WHERE installation_id = $1", [player.id]), /violates check constraint/);
+			await pool.query("UPDATE hub_presence SET emote_at = NOW() - INTERVAL '16 seconds' WHERE installation_id = $1", [player.id]);
+			const crowd = await request("/v1/hub/crowd/kariakoo", "GET", undefined, reporter.headers);
+			assert.equal(crowd.status, 200);
+			assert.equal(crowd.body.players.find((entry) => entry.playerId === player.id)?.emote, "",
+				"expired phrases must not be returned to other players");
+			await pool.query("DELETE FROM hub_presence WHERE installation_id = $1", [player.id]);
+		});
+		await t.test("fictional election accepts one vote per installation and exposes totals only", async () => {
+			const current = await request('/v1/hub/election', 'GET', undefined, player.headers);
+			assert.equal(current.status, 200);
+			assert.equal(current.body.hasVoted, false);
+			assert.equal(current.body.candidates.length, 3);
+			const choice = current.body.candidates[0].id;
+			const vote = await request('/v1/hub/election/vote', 'POST', {
+				electionId: current.body.electionId, candidateId: choice,
+			}, player.headers);
+			assert.equal(vote.status, 201);
+			assert.equal(vote.body.hasVoted, true);
+			assert.equal(vote.body.results.find(row => row.candidateId === choice).votes, 1);
+			assert.equal(JSON.stringify(vote.body).includes(player.id), false);
+			assert.equal((await request('/v1/hub/election/vote', 'POST', {
+				electionId: current.body.electionId, candidateId: current.body.candidates[1].id,
+			}, player.headers)).status, 409);
+			assert.equal((await pool.query('SELECT COUNT(*) FROM hub_election_votes WHERE installation_id = $1', [player.id])).rows[0].count, '1');
+			await pool.query(`UPDATE hub_elections SET opens_at = NOW() - INTERVAL '2 seconds',
+				closes_at = NOW() - INTERVAL '1 second' WHERE election_id = $1`, [current.body.electionId]);
+			const final = await request('/v1/hub/election', 'GET', undefined, player.headers);
+			assert.equal(final.status, 200);
+			assert.equal(final.body.isOpen, false);
+			assert.equal(final.body.results.find(row => row.candidateId === choice).votes, 1);
+			assert.equal((await request('/v1/hub/election/vote', 'POST', {
+				electionId: current.body.electionId, candidateId: current.body.candidates[1].id,
+			}, player.headers)).status, 409);
+		});
 		await t.test("acknowledged transfer survives both lost responses and revokes other codes", async () => {
 			const source = await register();
 			const code = await request("/v1/account/transfer-code", "POST", {}, source.headers);
@@ -172,6 +213,7 @@ test("real PostgreSQL migrations, recovery, moderation, and ingestion", {
 			assert.equal((await request("/v1/account", "DELETE", undefined, player.headers)).status, 200);
 			assert.equal((await pool.query("SELECT id FROM installations WHERE id = $1", [player.id])).rowCount, 0);
 			assert.equal((await pool.query("SELECT revision FROM cloud_saves WHERE installation_id = $1", [player.id])).rowCount, 0);
+			assert.equal((await pool.query("SELECT election_id FROM hub_election_votes WHERE installation_id = $1", [player.id])).rowCount, 0);
 		});
 		await t.test("failed migrations roll back and checksum drift stops deployment", async () => {
 			const folder = await mkdtemp(path.join(tmpdir(), "ddrtz-migrate-"));
