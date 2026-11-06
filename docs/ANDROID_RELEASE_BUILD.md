@@ -2,10 +2,11 @@
 
 Last updated: November 6, 2026.
 
-The 1.0.20 / code 21 candidate adds the latest Mtaa Wetu improvements. Export
-and verify the bundle after deployment. Physical-device consent, ads, transfer,
-hub/social and performance acceptance remains outstanding. Do not interpret a
-valid export as a phone-tested or Play-approved release.
+The signed 1.0.20 / code 21 candidate adds the latest Mtaa Wetu improvements.
+Its package, signature, pinned upload certificate and manifest are verified.
+Physical-device consent, ads, transfer, hub/social and performance acceptance
+remains outstanding. Do not interpret a valid export as a phone-tested or
+Play-approved release.
 The native consent bridge source is in `native/consent/`; run
 `tools/build_consent_bridge.ps1` after changing it, keep its local AAR with the
 export plugin, and confirm both AdMob and DalaConsent editor plugins are enabled.
@@ -46,14 +47,14 @@ https://support.google.com/googleplay/android-developer/answer/11926878
 
 Complete these before rolling the verified bundle out to testers:
 
-- [ ] Run `tools/verify_project.ps1` and `tools/test_postgres.ps1` (Docker), or
+- [x] Run `tools/verify_project.ps1` and `tools/test_postgres.ps1` (Docker), or
   use an isolated `TEST_DATABASE_URL` ending in `_test`; database tests must not
   be skipped for release acceptance.
 - [ ] Review both rendered UI suites and complete the two-phone worksheet.
-- [ ] Deploy backend migrations 014-015 and matching code; publish privacy changes.
+- [x] Deploy backend migrations 014-015 and matching code; publish privacy changes.
 - [ ] Update/verify Play Console Data Safety and content-rating answers for the
   hub before uploading the code-21 AAB.
-- [ ] Verify code 21 against package, pinned upload certificate, version, API 36
+- [x] Verify code 21 against package, pinned upload certificate, version, API 36
   manifest and bundletool validation.
 
 The following historical gates also remain applicable:
@@ -338,8 +339,9 @@ physical-device, consent, or Play pre-launch checks below.
 - Includes the expanded six-district hub, local activities, passport/album,
   property decoration and portfolio, phone shortcuts, preset lounge and
   fictional election.
-- Not uploaded or phone-tested. Confirm Railway migrations 014-015, published
-  privacy policy, Play Data Safety declarations and two-phone QA before rollout.
+- Not uploaded or phone-tested. Railway migrations 014-015 and the updated
+  privacy policy are live. Play Data Safety declarations and two-phone QA
+  remain before rollout.
 
 ## 6. Install Through Play Testing
 
